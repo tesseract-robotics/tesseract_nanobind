@@ -13,117 +13,140 @@ moves = [instruction.asMoveInstruction() for instruction in _program]
 n_joints = len(joint_names)
 -->
 
-The low-level SQP API builds a trajectory optimization problem term by term (variables,
-constraints, costs) and solves it with a trust-region SQP solver, one step at a time if you
-want. Use it when you replan repeatedly from the previous solution, such as around a moving
-obstacle, or when a constraint has to be written in Python. It sits below the task composer: no
-profiles, no pipeline, every term explicit. The modules are `trajopt_ifopt` (variables and
-terms) and `trajopt_sqp` (problem and solver).
-
-## When to reach for this
+Use the low-level SQP API when you replan from the previous solution every tick, around a
+moving obstacle, or when a constraint has to be written in Python; for a one-shot plan, use a
+[pipeline](task-composer.md). Here you build the trajectory optimization problem term by term
+(variables, constraints, costs) and solve it with a trust-region SQP solver over OSQP, a whole
+solve or one step at a time. Nothing is implicit: no profiles, no pipeline, no contact check or
+time parameterization afterwards. The modules are `trajopt_ifopt` (variables and terms) and
+`trajopt_sqp` (problem and solver).
 
 | Situation | Use |
 |---|---|
-| Offline, one-shot plan | `plan_freespace` / `plan_cartesian` |
-| Multi-stage pipeline (sampling → optimize → time-param) | `TaskComposer` |
-| **Online replanning with a moving obstacle** | **Low-level SQP (this page)** |
+| Offline, one-shot plan | `plan_freespace` / `plan_ompl` / `plan_cartesian` |
+| Your own sequence of planners and checks | a [custom pipeline](task-composer.md#custom-pipelines) |
+| Replanning every tick from the last solution; a Python constraint | this page |
 
-The reference 8-DOF gantry problem prints its replan timing at runtime; run
-[`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) to see numbers on your machine. The SQP loop has no latency bound: a step's time depends on the problem and the collision mode, so measure before relying on a control rate.
+The SQP loop has no latency bound: a step's time depends on the problem and the collision
+mode. [`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py)
+(an 8-DOF gantry) prints its replan timing; measure on your problem before you rely on a
+control rate.
 
-## Modules
+## Variables
 
-| Module | Purpose |
+| Type | Holds |
 |---|---|
-| `tesseract_robotics.trajopt_ifopt` | Variables (`Var`, `Node`, `NodesVariables`), constraints (joint, Cartesian, collision), factory helpers |
-| `tesseract_robotics.trajopt_sqp` | `TrajOptQPProblem` (the QP problem), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
+| `Var` | one block of variables, such as the joint values at one waypoint |
+| `Node` | the `Var`s of one waypoint |
+| `NodesVariables` | every `Node`; the problem is built over it |
 
-The standalone `tesseract_robotics.ifopt` module was **removed in 0.34**.
-All types merged into `tesseract_robotics.trajopt_ifopt`. See the
-[0.33 → 0.34 migration guide](../changes.md) for details.
-
-## Variable hierarchy (0.34+)
-
-The `JointPosition` class is gone. Variables now use a three-level hierarchy:
-
-- **`Var`** — a single variable (e.g., joint values at one waypoint)
-- **`Node`** — groups multiple `Var`s (e.g., joints + velocities at one waypoint)
-- **`NodesVariables`** — container of `Node`s passed to the problem constructor
-
-Build the full hierarchy with `createNodesVariables`:
+`createNodesVariables` builds all three from a seed trajectory, one row of joint values (rad,
+or m for a prismatic joint) per waypoint, and one `Bounds` per joint:
 
 ```python
 from tesseract_robotics.trajopt_ifopt import Bounds, createNodesVariables
 
-bounds = [Bounds(-3.14, 3.14)] * len(joint_names)  # one Bounds per joint
+bounds = [Bounds(-3.14, 3.14)] * len(joint_names)  # rad
 nodes_variables = createNodesVariables(
     "trajectory", joint_names, initial_states, bounds,
 )
-```
-
-Get `Var` references for passing to constraints:
-
-```python
 vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
 ```
 
-## Problem setup
+The terms take these `Var`s. `toBounds(manip.getLimits().joint_limits)` gives the bounds from
+the URDF limits.
+
+## Build and solve a problem
+
+The example builds the problem upstream's `online_planning_example.cpp` builds: a
+`TrajOptQPProblem` over the `NodesVariables`, the start and target poses and one collision
+constraint per step as constraint sets, the joint velocity as a squared cost, then
+`problem.setup()`. Call `setup()` after the last set is added.
 
 ```python
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:setup"
 ```
 
-## Constraints and costs
-
-The `build_optimization_problem` function builds the problem tesseract_planning's
-`online_planning_example.cpp` builds: a `TrajOptQPProblem` over the `NodesVariables`, the
-start and target poses and one collision constraint per step as constraint sets, the joint
-velocity as a squared cost, then `problem.setup()`:
-
 ```python
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:problem"
 ```
 
-Available constraint types in `tesseract_robotics.trajopt_ifopt`. Each goes in as a constraint
-or as a cost with a penalty type its row bounds allow; the
-[`trajopt_ifopt` reference](../api/trajopt_ifopt.md#constraints) lists the bounds and penalty types
-per class:
+The solver does one global `solve`, then per tick `init` on the new problem and a few
+`stepSQPSolver` calls. `setBoxSize` resets the trust region after each step, because the
+trust-region loop can shrink it to zero:
 
-| Constraint | Purpose |
+```python
+--8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:sqp_loop"
+```
+
+`solver.getStatus()` returns an `SQPStatus`; `CONVERGED` is the only success, and the others
+name why the solve stopped (see [What goes wrong](#what-goes-wrong)). A solve can stop with
+constraints still violated, so check `problem.getExactConstraintViolations()` before using the
+result.
+
+### Solver settings
+
+`solver.params` is an `SQPParameters`; set fields before `solve`. The defaults, read from
+`SQPParameters()`:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `max_iter` | 50 | SQP iterations per solve |
+| `max_time` | no limit (`float` max) | wall-clock budget of a solve, s |
+| `initial_trust_box_size` | 0.1 | half-width of the trust region, in variable units (rad) |
+| `min_trust_box_size` | 1e-4 | the trust-region loop ends when the box shrinks below this |
+| `trust_shrink_ratio` / `trust_expand_ratio` | 0.1 / 1.5 | factors applied to the box after a rejected / accepted step |
+| `improve_ratio_threshold` | 0.25 | the actual-over-predicted improvement a step needs to be accepted |
+| `cnt_tolerance` | 1e-4 | the violation below which a constraint counts as satisfied |
+| `initial_merit_error_coeff` | 10 | penalty weight of constraint violation in the merit function |
+| `merit_coeff_increase_ratio` | 10 | factor on that weight when constraints stay violated |
+| `max_merit_coeff_increases` | 5 | penalty increases before `PENALTY_ITERATION_LIMIT` |
+
+```python
+solver.params.max_iter = 100
+solver.params.max_time = 0.05  # s
+```
+
+## Terms
+
+Every term is a constraint set: added with `addConstraintSet` it is a constraint; added with
+`addCostSet(term, penalty)`, `penalty` a `CostPenaltyType` (`SQUARED`, `ABSOLUTE`, `HINGE`), it is
+a cost. The
+[`trajopt_ifopt` reference](../api/trajopt_ifopt.md#constraints) lists each class's row bounds
+and the penalty types they allow.
+
+| Term | Value |
 |---|---|
-| `JointPosConstraint` | Joint values, or per-joint bounds, at a waypoint |
-| `JointVelConstraint` | Joint velocity toward a target (zero for smoothing) |
-| `JointAccelConstraint` | Joint acceleration toward a target |
-| `JointJerkConstraint` | Joint jerk (3rd derivative) toward a target — smoother motion |
-| `CartPosConstraint` | TCP pose at a waypoint |
-| `CartLineConstraint` | TCP on a line segment |
-| `DiscreteCollisionConstraint` | Collision at single timesteps |
-| `DiscreteCollisionNumericalConstraint` | Alt. collision jacobian |
-| `ContinuousCollisionConstraint` | Collision across segments (LVS) |
-| `InverseKinematicsConstraint` | IK-based optimization |
+| `JointPosConstraint` | joint values, or per-joint bounds, at a waypoint |
+| `JointVelConstraint` | joint velocity toward a target (zero for smoothing) |
+| `JointAccelConstraint` | joint acceleration toward a target |
+| `JointJerkConstraint` | joint jerk toward a target |
+| `CartPosConstraint` | TCP pose error at a waypoint |
+| `CartLineConstraint` | TCP distance from a line segment |
+| `DiscreteCollisionConstraint` | collision at one waypoint |
+| `DiscreteCollisionNumericalConstraint` | the same, with a numerical Jacobian |
+| `ContinuousCollisionConstraint` | collision along the segment between two waypoints |
+| `InverseKinematicsConstraint` | joint distance to an IK solution |
 
-Available collision evaluators. Each needs its own collision check type in the config, and its
-constructor raises otherwise:
+A collision term takes an evaluator, and each evaluator needs its check type in the config's
+`collision_check_config.type`; its constructor raises otherwise. The collision margin is in
+`TrajOptCollisionConfig(margin_m, coeff)`; see
+[Collision configuration](planning.md#collision-configuration).
 
 | Evaluator | Pairs with | Check type |
 |---|---|---|
 | `SingleTimestepCollisionEvaluator` | `DiscreteCollisionConstraint` | `DISCRETE` (the default) |
-| `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS discrete) | `LVS_DISCRETE` |
-| `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS continuous) | `LVS_CONTINUOUS` or `CONTINUOUS` |
-
+| `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` | `LVS_DISCRETE` |
+| `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` | `LVS_CONTINUOUS` or `CONTINUOUS` |
 
 ### Per-axis Cartesian constraints
 
-`CartPosConstraint` has two constructors. The short one is an **equality on all six
-axes at unit weight** — the TCP is pinned to the target pose. That form cannot express
-a process constraint, which usually needs one or both of:
-
-* a **free axis** — a rotation the task is indifferent to (about an axis-symmetric
-  tool, say), which must not be pulled back to the target;
-* an **asymmetric bound** — a standoff that may open but never close.
-
-The second constructor takes `coeffs` (per-axis weights) and `bounds`, both length 6
-in `[x, y, z, rx, ry, rz]` order, ahead of `manip`. Build the band with `toBounds`:
+`CartPosConstraint` has two constructors. The short one is an equality on all six axes at unit
+weight: the TCP is pinned to the target. A process constraint usually needs a **free axis** (a
+rotation the task does not care about, such as about an axis-symmetric tool) or an
+**asymmetric band** (a standoff that may open but not close). The long constructor takes
+per-axis `coeffs` and `bounds`, both in `[x, y, z, rx, ry, rz]` order (m, rad), ahead of
+`manip`; `toBounds` builds the band:
 
 ```python
 import numpy as np
@@ -147,39 +170,26 @@ constraint = trajopt_ifopt.CartPosConstraint(
 )
 ```
 
-Two semantics are worth knowing before you rely on the row count:
-
 | Behaviour | Effect |
 |---|---|
-| **Zero coefficient** | Drops that axis' row entirely — six rows become five. This is how an axis is *freed*, not merely de-weighted. |
-| `RangeBoundHandling.KEEP_AS_IS` | Each range stays one row with `[lower, upper]` — the form that preserves an asymmetric band as written. `TrajOptQPProblem` takes no range row: `addConstraintSet` and `addCostSet` raise `rows must have equality or one-sided bounds!`. |
-| `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` (default) | Each *range* row becomes two one-sided rows, `g(x) >= lower` and `g(x) <= upper`, so five constrained axes report ten rows. Equality and already one-sided bounds are unaffected. |
+| Zero coefficient | drops that axis' row: six rows become five. The axis is freed, not de-weighted. |
+| `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` (default) | each range row becomes two one-sided rows, so five banded axes give ten rows; equality and one-sided rows are unchanged |
+| `RangeBoundHandling.KEEP_AS_IS` | each range stays one row; `TrajOptQPProblem` refuses it (see below) |
 
-Both are prerequisites for adding the term as a **cost** rather than a hard constraint:
-as an equality it only ever pulls straight back to the target pose, so a soft Cartesian
-preference is unexpressible and the free axis has to be given up entirely.
-`TrajOptQPProblem.addCostSet` and `addConstraintSet` check every row's bounds, whatever the
-penalty type:
+`addConstraintSet` and `addCostSet` check every row's bounds, whatever the penalty type: an
+equality row and a one-sided row go in, a range row raises. A split band therefore goes in as a
+constraint or as a cost of any penalty type, and one term may mix equality and band axes. An
+`ABSOLUTE` or `HINGE` cost is modelled on its linearized rows (see
+[the QP problem](../api/trajopt_sqp.md#the-qp-problem)).
 
-| Term | As a constraint, or a `SQUARED`, `ABSOLUTE` or `HINGE` cost |
-|---|---|
-| Equality on every constrained axis | accepted |
-| Band, split (default): one-sided rows | accepted |
-| Band, `KEEP_AS_IS`: range rows | raises |
-| Equality and band axes mixed, split | accepted |
-
-A band goes in as a cost with any penalty type on its split rows, and one term may mix equality
-and band axes. An `ABSOLUTE` or `HINGE` cost is modelled on its linearized rows, as it is charged
-(see [the QP problem](../api/trajopt_sqp.md#the-qp-problem)).
-
-!!! note "Eigen arguments are required"
-    `coeffs`, `source_frame_offset`, and `target_frame_offset` have no Python-side
-    defaults. Eigen default arguments raise `std::bad_cast` in this module, so pass
-    them explicitly — `Isometry3d.Identity()` where you want no offset.
+`coeffs`, `source_frame_offset` and `target_frame_offset` have no Python defaults: pass them,
+with `Isometry3d.Identity()` for no offset.
 
 ### Per-joint bounds
 
-`JointPosConstraint` has two constructors. The target one pins every joint of a waypoint to a value. The bounds one takes one `Bounds` per joint, ahead of the variable: an equality, a one-sided limit, or a range.
+`JointPosConstraint` has two constructors: the target one pins every joint of a waypoint; the
+bounds one takes one `Bounds` per joint, ahead of the variable, each an equality, a one-sided
+limit or a range (rad):
 
 ```python
 import numpy as np
@@ -194,23 +204,11 @@ bounds = [
 constraint = trajopt_ifopt.JointPosConstraint(bounds, var, np.array([5.0]), "band")
 ```
 
-By default a range becomes two one-sided rows (`RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES`), because the QP problems accept only equality and one-sided rows; pass `KEEP_AS_IS` to keep it as one. A length-1 `coeffs` weights every row.
+Ranges split into two one-sided rows by default, as above. A length-1 `coeffs` weights every row.
 
+## Warm-starting
 
-## SQP solver loop
-
-The solver loop: initial global `solve`, then per-tick `setVariables` + `stepSQPSolver`
-for warm-started incremental optimization. `setBoxSize` resets the trust region each
-tick (trust-region shrinking can drive the box to zero):
-
-```python
---8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:sqp_loop"
-```
-
-## Warm-Starting
-
-Between solver steps, set the previous solution through the problem. `problem.setVariables`
-writes the variables, then updates every component and recounts the dynamic rows;
+`problem.setVariables(x)` writes the variables, updates every term and recounts the dynamic rows;
 `NodesVariables.setVariables` only writes them. A wrong length raises `VariablesSizeError`:
 
 ```python
@@ -219,27 +217,23 @@ solver.init(problem)
 solver.stepSQPSolver()
 ```
 
-A built problem does not see the environment change. Each collision evaluator keeps
-its own contact manager, and the pose of every link outside the manipulator is fixed in it
-when the evaluator is built: `env.setState(...)` afterwards moves the obstacle in the
-environment, not in the problem. Measured on the example's scene with the obstacle moved
-onto the planned path (summed constraint violation, discrete and LVS continuous alike):
+A built problem does not see the environment change. Each collision evaluator keeps its own
+contact manager, and fixes the pose of every link outside the manipulator when it is built:
+`env.setState(...)` afterwards moves the obstacle in the environment, not in the problem.
+Measured on the example's scene with the obstacle moved onto the planned path (summed constraint
+violation, discrete and LVS continuous alike):
 
 | Problem | Before the move | After the move |
 |---|---|---|
 | Held from before the move | 0.0 | 0.0 |
 | Rebuilt after the move | — | 1.92 |
 
-Perturbing the variables after the move leaves the held problem at 0.002, which is the
-start-position constraint alone, so this is not the evaluator's cache.
+Perturbing the variables after the move leaves the held problem at 0.002, the start-position
+constraint alone, so this is not the evaluator's cache. The example therefore rebuilds the
+problem every tick, as upstream's `online_planning_example.cpp` (0.35.0, lines 351–357) does.
+Hold one problem only when nothing outside the manipulator moves.
 
-That is why the example rebuilds the problem every tick, as upstream's
-`online_planning_example.cpp` (0.35.0, lines 351–357) does. Only when nothing outside the
-manipulator moves can you hold one problem and call `setVariables` + `stepSQPSolver`.
-
-## Starting values and failure
-
-The example uses upstream's values. They are a starting point for this scene, not tuned
+The example's coefficients are upstream's, a starting point for that scene rather than tuned
 guidance:
 
 | Term | Kind | Value |
@@ -247,12 +241,22 @@ guidance:
 | `JointPosConstraint` on the first node | constraint | coefficient 5 per joint |
 | `CartPosConstraint` on the last node | constraint | default coefficients |
 | `JointVelConstraint`, zero target | `SQUARED` cost | coefficient 1 |
-| Collision (`TrajOptCollisionConfig(0.1, 10)`) | constraint | 0.1 m margin, coefficient 10, `collision_margin_buffer` 0.10 m |
+| Collision, `TrajOptCollisionConfig(0.1, 10)` | constraint | 0.1 m margin, coefficient 10, `collision_margin_buffer` 0.10 m |
 
-After `solve`, `solver.getStatus()` returns an `SQPStatus`: `CONVERGED` is the only
-success. `ITERATION_LIMIT`, `PENALTY_ITERATION_LIMIT`, `TIME_LIMIT`, `QP_SOLVE_FAILED`
-and `STOPPED_BY_CALLBACK` each name why it stopped. A run can stop with constraints still
-violated, so check `problem.getExactConstraintViolations()` before using the result.
+## What goes wrong
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `SQPStatus.ITERATION_LIMIT` | `params.max_iter` reached | more iterations, or a better seed |
+| `SQPStatus.PENALTY_ITERATION_LIMIT` | constraints still violated after `max_merit_coeff_increases` penalty increases: the constraints conflict, or the seed is far from feasible | check `problem.getExactConstraintViolations()` for the term; loosen it or make it a cost |
+| `SQPStatus.TIME_LIMIT` | `params.max_time` reached | a larger budget, or fewer steps per tick |
+| `SQPStatus.QP_SOLVE_FAILED` | OSQP failed `max_qp_solver_failures` times (default 3) | `solver.verbose = True` logs the iterations |
+| `SQPStatus.STOPPED_BY_CALLBACK` | a callback returned `False` | intended |
+| `rows must have equality or one-sided bounds!` | a `KEEP_AS_IS` range row went to `addConstraintSet` / `addCostSet` | use the default split |
+| `VariablesSizeError` | `setVariables` got the wrong length | one value per joint per waypoint |
+| a collision evaluator's constructor raises | the config's check type does not match the evaluator | see the evaluator table |
+| the plan ignores a moved obstacle | the problem was built before the move | rebuild it ([Warm-starting](#warm-starting)) |
+| `ModuleNotFoundError: scipy` in a sparse Jacobian | `scipy` is missing; nanobind converts Eigen sparse matrices through `scipy.sparse` | install the package's dependencies |
 
 ## What the TrajOpt-Ifopt planner builds
 
@@ -266,7 +270,7 @@ running a plan:
 | `TrajOptIfoptCompositeProfile.create(composite_manip_info, env, nodes, fixed_indices)` | `TrajOptIfoptTermInfos` over every waypoint: collision, velocity, acceleration, jerk |
 | `TrajOptIfoptSolverProfile.create(verbose=False)` | the `TrustRegionSQPSolver`, with `opt_params` and `callbacks` applied |
 
-`TrajOptIfoptTermInfos` holds four lists of constraint sets. The planner adds `constraints` with
+`TrajOptIfoptTermInfos` holds four lists of terms. The planner adds `constraints` with
 `addConstraintSet` and the others with `addCostSet` and the matching penalty type (`SQUARED`,
 `ABSOLUTE`, `HINGE`).
 
@@ -285,20 +289,20 @@ terms = TrajOptIfoptDefaultCompositeProfile().create(manip_info, env, nodes, fix
 len(terms.constraints), len(terms.squared_costs), len(terms.hinge_costs)
 ```
 
-`TrajOptIfoptWaypointInfo` owns its `Node`, so `info.node` is read-only and keeps `info`
-alive. A constraint set from `term_infos` is shared and outlives the info. The planner moves
-every node into one `NodesVariables`; Python cannot, so the nodes a hook returns are for
-inspection, and a problem you solve yourself is built over `createNodesVariables(...)`.
+`TrajOptIfoptWaypointInfo` owns its `Node`, so `info.node` is read-only and keeps `info` alive.
+A term from `term_infos` is shared and outlives the info. The planner moves every node into one
+`NodesVariables`; Python cannot, so the nodes a hook returns are for inspection, and a problem
+you solve yourself is built over `createNodesVariables(...)`.
 
 ### The planner's term factories
 
 The planner builds its terms with five factories, bound under their C++ names. A hand-built
-problem that uses them gets the planner's coefficients and sparsity choices:
+problem that uses them gets the planner's coefficients and sparsity:
 
 | Factory | Builds |
 |---|---|
 | `createJointPositionConstraint(joint_waypoint, var, coeffs)` | `JointPosConstraint`: the waypoint's position, or its tolerance band |
-| `createCollisionConstraints(vars, env, manip_info, config, fixed_indices, fixed_sparsity)` | One collision set per unfixed step (`DISCRETE`) or per segment (`LVS_DISCRETE`, `LVS_CONTINUOUS`, `CONTINUOUS`); none for `NONE` |
+| `createCollisionConstraints(vars, env, manip_info, config, fixed_indices, fixed_sparsity)` | one collision term per unfixed step (`DISCRETE`) or per segment (`LVS_DISCRETE`, `LVS_CONTINUOUS`, `CONTINUOUS`); none for `NONE` |
 | `createJointVelocityConstraint(target, vars, coeffs)` | `JointVelConstraint` |
 | `createJointAccelerationConstraint(target, vars, coeffs)` | `JointAccelConstraint` |
 | `createJointJerkConstraint(target, vars, coeffs)` | `JointJerkConstraint` |
@@ -327,8 +331,10 @@ An empty `vars` raises `ValueError`, a `None` in it `TypeError`.
 
 ### Progress callbacks through the planner
 
-A Python `SQPCallback` set in `TrajOptIfoptSolverProfile.callbacks` is registered on the solver
-the planner builds. `execute` runs once per SQP iteration, with the GIL taken for the call:
+A Python `SQPCallback` in `TrajOptIfoptSolverProfile.callbacks` is registered on the solver the
+planner builds. `execute` runs once per SQP iteration, with the GIL taken for the call;
+returning `False` ends the solve with `SQPStatus.STOPPED_BY_CALLBACK`, and the planner's response
+is unsuccessful, its message ending in `SQP_STOPPED_BY_CALLBACK`.
 
 ```python
 from tesseract_robotics.trajopt_sqp import SQPCallback
@@ -348,23 +354,13 @@ solver_profile.callbacks = [Progress()]  # assign the whole list; it is copied
 
 !!! warning "`problem` is valid only during the call"
     The planner owns the problem it passes to `execute` and destroys it when the solve ends.
-    Read what you need from `problem` inside the callback; do not store it, or anything
-    taken from it, for use after `execute` returns.
+    Read what you need from `problem` inside the callback; do not keep it, or anything taken
+    from it, after `execute` returns.
 
-!!! note "Returning `False` stops the solve"
-    The solver ends the solve after that call with `SQPStatus.STOPPED_BY_CALLBACK`. Through
-    `TrajOptIfoptMotionPlanner` the response is unsuccessful, its message ending in
-    `SQP_STOPPED_BY_CALLBACK`. The 0.35.0.x wheels up to 0.35.0.8 bundle trajopt 0.35.0, whose
-    solver dropped the `False` and kept stepping: there, bound a solve with
-    `opt_params.max_iterations` or `opt_params.max_time`.
+## Constraints in Python
 
-## Python subclassing
-
-You can subclass `ConstraintSet` from Python to define custom constraints — the
-trampoline landed in 0.34.1.1 (see the
-[CHANGELOG](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/CHANGELOG.md)).
-`scipy` is required at runtime because nanobind's sparse-matrix conversion
-goes through `scipy.sparse`.
+`ConstraintSet` can be subclassed in Python. `scipy` is a runtime requirement: nanobind converts
+the sparse Jacobian through `scipy.sparse`.
 
 ### `PyConstraint`: a rule from `f(q)`
 
@@ -395,9 +391,9 @@ for var in vars_list:
 
 | What | How |
 |---|---|
-| **Jacobian** | By default a forward difference over that waypoint's joints (`calcForwardNumJac`, `n_dof + 1` calls to `f`), placed in the waypoint's columns. Override `jacobian(q)` where an analytic one is cheap. |
-| **Range rows** | A row with `lower < upper`, both finite, is split into two one-sided rows, as `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` does, because `TrajOptQPProblem` takes no range row. |
-| **Weight** | `coeff` is the merit coefficient, one value or one per row. |
+| Jacobian | by default a forward difference over that waypoint's joints (`calcForwardNumJac`, `n_dof + 1` calls to `f`), placed in the waypoint's columns. Override `jacobian(q)` where an analytic one is cheap. |
+| Range rows | a row with `lower < upper`, both finite, is split into two one-sided rows, as `SPLIT_TO_TWO_INEQUALITIES` does, because `TrajOptQPProblem` takes no range row. |
+| Weight | `coeff` is the merit coefficient, one value or one per row. |
 
 The module ships rules built on it, from what Tesseract already computes:
 
@@ -412,31 +408,15 @@ The module ships rules built on it, from what Tesseract already computes:
 | `WorldHold` | tool position in the world, given the base's pose | forward kinematics, analytic Jacobian |
 
 `PointsDown` and `HoldAxis` have C++ counterparts, `CartAxisConeConstraint` and
-`CartAxisAlignConstraint`: use those in production, and read the Python ones as worked
-examples of an analytic Jacobian. `scripts/bench_python_constraints.py` measures what a
-Python rule costs in the online SQP loop against the C++ constraint.
-
-The [Python constraints example](../examples/python-constraints.md) runs all seven in one
-live loop, one solve per frame, with a gauge per rule.
-
-## Migrating from 0.33
-
-If you have 0.33 SQP code, see the [full migration guide](../changes.md) —
-critical items:
-
-- `from tesseract_robotics import ifopt` → `from tesseract_robotics import trajopt_ifopt`
-- `JointPosition(...)` → `createNodesVariables(...)` + `Var` refs
-- `IfoptQPProblem()` → `TrajOptQPProblem(nodes_variables)`, with every constraint and cost
-  set added to it; 0.34's `IfoptQPProblem(IfoptProblem(nodes_variables))` is no longer bound
-  (see [Breaking API changes](../breaking-changes.md#ifoptqpproblem-and-ifoptproblem-removed))
-- `CartPosInfo` struct removed — `CartPosConstraint` takes args directly
-- `CollisionCache` removed — caching is internal
-- `getTotalExactCost()` / `getExactCosts()` take no arguments
-- `getStaticKey()` → `getKey()` (instance method on profiles)
-- Call `problem.setup()` after adding all constraint/cost sets
+`CartAxisAlignConstraint`: use those in production, and read the Python ones as worked examples
+of an analytic Jacobian. `scripts/bench_python_constraints.py` measures what a Python rule costs
+in the online SQP loop against the C++ constraint. The
+[Python constraints example](../examples/python-constraints.md) runs all seven in one live loop,
+one solve per frame, with a gauge per rule.
 
 ## See also
 
-- [`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) — full working example
-- [Online Planning examples](../examples/online-planning.md)
-- [0.33 → 0.34 Migration Guide](../changes.md)
+- [Online planning examples](../examples/online-planning.md)
+- [`trajopt_sqp`](../api/trajopt_sqp.md) and [`trajopt_ifopt`](../api/trajopt_ifopt.md) reference
+- [Migration from 0.33](../changes.md): `ifopt` merged into `trajopt_ifopt`, `JointPosition`
+  replaced by `createNodesVariables`, `IfoptQPProblem` by `TrajOptQPProblem`

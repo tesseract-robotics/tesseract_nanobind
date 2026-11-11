@@ -34,6 +34,8 @@ from tesseract_robotics.trajopt_ifopt import python_constraints as pc
 
 ex = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
 
+# One warm-started SQP step per tick, the unit timed here (the example takes up to 10).
+ONE_SQP_STEP = 1
 TCP = "tool0"
 TOOL_AXIS = np.array([0.0, 0.0, 1.0])  # the tool's z axis, in tool coordinates
 TARGET = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # the example's target
@@ -127,7 +129,12 @@ def configs(max_dev, w_min, coeff):
 def run_once(extra, replans, continuous):
     _PY_SECONDS[0] = 0.0
     with contextlib.redirect_stdout(io.StringIO()):
-        r = ex.run(use_continuous_collision=continuous, extra_constraints=extra, num_replan=replans)
+        r = ex.run(
+            use_continuous_collision=continuous,
+            extra_constraints=extra,
+            num_replan=replans,
+            sqp_steps_per_tick=ONE_SQP_STEP,
+        )
     manip = r["robot"].env.getKinematicGroup("manipulator")
     n, steps = len(r["joint_names"]), r["steps"]
     traj = r["trajectories"][-1][: steps * n].reshape(steps, n)

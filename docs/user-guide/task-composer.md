@@ -25,31 +25,18 @@ task_data.setData("environment", AnyPoly_wrap_EnvironmentConst(env))
 task_data.setData("profiles", AnyPoly_wrap_ProfileDictionary(ProfileDictionary()))
 -->
 
-The task composer runs **pipelines**: graphs of tasks (planners, collision checks, fix-ups,
-time parameterization) defined in YAML and loaded as plugins. The `plan_*` calls of the
-[planning guide](planning.md) each run one; use the task composer directly to pick another
-pipeline, keep the plugins loaded across plans, pass your own profiles, inspect what each task
-did, or define a pipeline of your own. The wrapper is `tesseract_robotics.planning.TaskComposer`;
-the bound C++ types are in `tesseract_robotics.task_composer`.
+Hold one `TaskComposer` per process and plan every program through it: building one loads the
+task plugins, and only the composer that loaded them plans fast. The task composer runs
+[pipelines](../concepts/glossary.md#planning): graphs of tasks (a planner, a contact check, a
+time parameterization) that a YAML config declares and plugins implement. Each `plan_*` call of
+the [planning guide](planning.md) runs one. Use `TaskComposer` directly to run another
+pipeline, pass your own [profiles](#profiles), see which task failed, or run a pipeline of your
+own. The wrapper is `tesseract_robotics.planning.TaskComposer`; the bound C++ types are in
+`tesseract_robotics.task_composer`.
 
-## Overview
+## Run a pipeline
 
-```mermaid
-graph TD
-    A[Input Program] --> B[MinLengthTask]
-    B --> C{Freespace?}
-    C -->|Yes| D[OMPLTask]
-    C -->|No| E[DescartesTask]
-    D --> F[TrajOptTask]
-    E --> F
-    F --> G[TimeParameterizationTask]
-    G --> H[ContactCheckTask]
-    H --> I[Output Trajectory]
-```
-
-## Basic usage
-
-=== "High-Level API"
+=== "TaskComposer"
 
     ```python
     import numpy as np
@@ -63,21 +50,17 @@ graph TD
     program = (
         MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(JointTarget(np.zeros(6)))
-        .move_to(CartesianTarget(Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0, 0, 0)))
+        # m in base_link, tool pointing down: [qx, qy, qz, qw] = [0, 1, 0, 0]
+        .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0)))
     )
 
     composer = TaskComposer.from_config()
     result = composer.plan(robot, program, pipeline="TrajOptPipeline")
-
-    if result.successful:
-        print(f"Planned {len(result.trajectory)} waypoints")
-        for state in result.trajectory:
-            print(state.positions)
-    else:
-        print(f"Planning failed: {result.message}")
+    assert result.successful, result.message
+    print(f"Planned {len(result.trajectory)} waypoints")
     ```
 
-=== "Low-Level API"
+=== "Plugin factory"
 
     ```python
     from pathlib import Path
@@ -95,17 +78,15 @@ graph TD
     # a pathlib.Path is a config file; a str is YAML text
     factory = TaskComposerPluginFactory(Path(config_path), locator)
 
-    # Executor + pipeline node
     executor = factory.createTaskComposerExecutor("TaskflowExecutor")
     pipeline = factory.createTaskComposerNode("TrajOptPipeline")
 
-    # AnyPoly-wrap the inputs the pipeline expects
+    # The inputs the pipeline's ports name, each wrapped in an AnyPoly
     storage = TaskComposerDataStorage()
     storage.setData("planning_input", AnyPoly_wrap_CompositeInstruction(composite))
     storage.setData("environment",    AnyPoly_wrap_EnvironmentConst(env))
     storage.setData("profiles",       AnyPoly_wrap_ProfileDictionary(profiles))
 
-    # Execute
     future = executor.run(pipeline, storage)
     future.wait()
 
@@ -113,10 +94,19 @@ graph TD
     output = future.context.data_storage.getData(output_key)
     ```
 
-!!! tip "Prefer the wrapper"
-    `TaskComposer` hides all the AnyPoly wrapping, input/output key discovery,
-    profile selection and trajectory extraction. Drop to the low-level API
-    only when you need to assemble a custom task graph at runtime.
+`TaskComposer.plan` does what the second tab spells out: it converts a `MotionProgram`, seeds
+Cartesian waypoints with the current state (on a copy; `auto_seed=False` turns it off), picks the
+pipeline's default profiles, wraps the inputs, runs, and unpacks the trajectory into a
+`PlanningResult`. Drop to the factory to run a node `plan` cannot bind (one without a `program`
+output) or to read intermediate data. `PlanningResult` is described under
+[Trajectory output](planning.md#trajectory-output).
+
+| `TaskComposer.from_config` argument | Default | Effect |
+|---|---|---|
+| `config_path` | `get_task_composer_config_path()`: `TESSERACT_TASK_COMPOSER_CONFIG_FILE` if set, else the bundled config | the YAML that declares the pipelines and the executor |
+| `num_threads` | the config's executor (`threads: 5` in the bundled config) | threads of a new `TaskflowExecutor`; at least 1 |
+| `executor` | none | a pre-built executor; excludes `num_threads` |
+| `warmup` | `False` | `True` builds the [common pipelines](#plugin-warmup) now; a list builds those |
 
 ## Plugin warmup
 
@@ -124,71 +114,80 @@ The task composer loads its tasks as plugins (`boost_plugin_loader`, `dlopen`). 
 `TaskComposer` loads the factory, and the first plan through a pipeline creates its nodes; later
 plans through the same composer reuse them. Measured on an Apple M1 Max (10 cores):
 `TaskComposer.from_config()` takes 0.3 to 1.0 s, and the first `basic_cartesian_example` plan
-1.9 s against 1.5 s for the next ones. The C++ task composer behaves the same way.
+1.9 s against 1.5 s for the next ones.
 
-`TaskComposer.warmup(...)` amortizes that cost up front. See
-`planning/composer.py` for the full docstring.
+`warmup` moves the node creation to startup, where it does not land on the first plan:
 
 ```python
 from tesseract_robotics.planning import TaskComposer
 
-# Option 1: explicit warmup — clearest timing profile
 composer = TaskComposer.from_config()
-composer.warmup(["FreespacePipeline"])          # create the pipeline's nodes now
-result = composer.plan(robot, program, pipeline="FreespacePipeline")  # fast
+composer.warmup(["FreespacePipeline"])  # create this pipeline's nodes now
+result = composer.plan(robot, program, pipeline="FreespacePipeline")
+assert result.successful, result.message
 
-# Option 2: warmup=True — loads a curated set of common pipelines
-composer = TaskComposer.from_config(warmup=True)
-
-# Option 3: warmup=[...] — specific pipelines only
-composer = TaskComposer.from_config(
-    warmup=["TrajOptPipeline", "OMPLPipeline"],
-)
+composer = TaskComposer.from_config(warmup=True)  # the common pipelines, listed below
+composer = TaskComposer.from_config(warmup=["TrajOptPipeline", "OMPLPipeline"])
 ```
 
-**When warmup helps:**
+`warmup=True` builds `TrajOptPipeline`, `TrajOptIfoptPipeline`, `FreespacePipeline`,
+`FreespaceIfoptPipeline`, `CartesianPipeline` and `OMPLPipeline`. A name that does not load
+raises `PipelineWarmupError`. Warming up pays off in a REPL, a service and a benchmark; a script
+that plans once spends the same time either way.
 
-- Interactive use (REPL, Jupyter) — pay once, plan many times.
-- GUI / service applications — initialize at startup, fast responses after.
-- Benchmarking — separate plugin-load time from algorithm time.
+The module-level `plan_*` functions build a new composer on every call unless you pass
+`composer=`, and pay the load again each time:
 
-**When warmup doesn't help:**
+```python
+from tesseract_robotics.planning import TaskComposer, plan_cartesian
 
-- Single-run scripts — total wall-clock time is roughly the same either way.
+composer = TaskComposer.from_config(warmup=["DescartesDPipeline"])
+for program in programs:
+    result = plan_cartesian(robot, program, composer=composer)
+```
 
 ## Available pipelines
 
-`TaskComposer.get_available_pipelines()` takes the configured node names from the factory (`TaskComposerPluginFactory.getTaskComposerNodePlugins()`), builds each one once, and returns those that built. The config is read as the C++ factory loaded it, so `!include` works, and a `TaskComposer` built from a factory without `config_path` lists its pipelines too. As of the current `task_composer_plugins.yaml` this is **36 pipelines**:
+`TaskComposer.get_available_pipelines()` lists the node names the config declares that build;
+the bundled config has 36. Each shipped `<Name>Pipeline` wraps a `<Name>Task` behind two input
+formatting tasks, and every `<Name>Task` but the raster ones has the same shape:
 
-```python
-composer = TaskComposer.from_config()
-pipelines = composer.get_available_pipelines()
-print(pipelines)
+```mermaid
+flowchart LR
+    P[ProcessInputTask] --> F[FormatInputTask] --> M[MinLengthTask]
+    M --> PL["planner task(s)"] --> C[DiscreteContactCheckTask] --> T[IterativeSplineParameterizationTask] --> D[DoneTask]
+    M -. fails .-> E[ErrorTask]
+    PL -. fails .-> E
+    C -. fails .-> E
+    T -. fails .-> E
 ```
 
-A representative sample:
+The pipelines differ in the planner tasks between `MinLengthTask` and the contact check:
 
-| Pipeline | What it runs |
-|----------|--------------|
-| `FreespacePipeline` | OMPL → TrajOpt → time parameterization |
-| `CartesianPipeline` | Cartesian path with TrajOpt |
-| `TrajOptPipeline` | TrajOpt optimization only |
-| `OMPLPipeline` | OMPL sampling only |
-| `RasterFtPipeline` | Industrial raster with freespace transitions |
-| `DescartesFPipeline` | Descartes forward graph search |
+| Pipeline | Planner tasks | `plan_*` that runs it |
+|---|---|---|
+| `TrajOptPipeline` | TrajOpt | `plan_freespace` |
+| `FreespacePipeline` | OMPL, then TrajOpt | `plan_ompl` |
+| `OMPLPipeline` | OMPL | |
+| `TrajOptIfoptPipeline` | TrajOpt-Ifopt | |
+| `FreespaceIfoptPipeline` | OMPL, then TrajOpt-Ifopt | |
+| `CartesianPipeline` | Descartes (`float`), then TrajOpt | |
+| `DescartesDPipeline` / `DescartesFPipeline` | Descartes on `double` / `float` states | `plan_cartesian` (`D`) |
+| `DescartesDNPCPipeline` / `DescartesFNPCPipeline` | as above, without the contact check | |
+| `Raster{Ft,Ct}{,Only}{,Global}Pipeline` | a raster program: simple planner seed, then a planning task per raster and transition | |
 
-See `TaskComposer.get_available_pipelines()` at runtime for the full 36.
+Each `Pipeline` has a `Task` twin (`TrajOptTask`, …) without the two formatting tasks, which a
+custom graph can embed. [The DOT graphs](#visualizing-pipelines) show every node.
 
-!!! info "Pipeline count is not a contract"
-    The exact number is driven by `task_composer_plugins.yaml` in the
-    packaged `task_composer` data. It may grow or shrink in
-    future versions. Treat `get_available_pipelines()` as the source of
-    truth, not the literal "36".
+```python
+pipelines = composer.get_available_pipelines()
+assert "FreespacePipeline" in pipelines
+```
 
 ### Splitting a config with `!include`
 
-The factory expands `!include` when it loads a config from a path. A relative
-path resolves against the including file's directory:
+The factory expands `!include` when it loads a config from a path. A relative path resolves
+against the including file's directory:
 
 ```yaml
 # main.yaml
@@ -199,8 +198,8 @@ task_composer_plugins:
   tasks: !include tasks.yaml
 ```
 
-`TaskComposer.from_config("main.yaml")` and `get_available_pipelines()` see the
-included tasks. To inspect the config the factory loaded:
+`TaskComposer.from_config("main.yaml")` and `get_available_pipelines()` see the included tasks.
+To inspect the config the factory loaded:
 
 ```python
 factory = composer.factory
@@ -208,67 +207,137 @@ factory.getTaskComposerNodePlugins()           # {node name: PluginInfo}
 factory.getAvailableTaskComposerNodePlugins()  # node factory class names
 ```
 
-The two differ: `getTaskComposerNodePlugins()` is keyed by the names you pass
-to `plan(pipeline=...)` (`TrajOptPipeline`), while
-`getAvailableTaskComposerNodePlugins()` lists the factory classes the plugin
-libraries export (`PipelineTaskFactory`), the values a `PluginInfo.class_name`
-may take. The second call loads the plugin libraries.
+`getTaskComposerNodePlugins()` is keyed by the names `plan(pipeline=...)` takes
+(`TrajOptPipeline`); `getAvailableTaskComposerNodePlugins()` lists the factory classes the plugin
+libraries export (`PipelineTaskFactory`), the values `PluginInfo.class_name` may take. The second
+call loads the plugin libraries.
 
-### Convenience methods
+## Profiles
 
-`TaskComposer` also exposes per-backend shortcuts:
+A task reads its settings from the `ProfileDictionary` under its own name (the namespace) and the
+profile name each instruction carries (`DEFAULT` unless the program or target names another);
+[Profiles](../concepts/index.md#profiles) explains the lookup. `plan` with `profiles=None` takes
+the pipeline's default set from `default_profiles_for(pipeline)`:
+
+| Pipelines | Default set |
+|---|---|
+| `TrajOpt*` | `create_trajopt_default_profiles()` |
+| `TrajOptIfopt*` | `create_trajopt_ifopt_default_profiles()` |
+| `OMPL*` | `create_ompl_default_profiles()` |
+| `Freespace*` | `create_freespace_pipeline_profiles()` |
+| `FreespaceIfopt*` | `create_freespace_ifopt_pipeline_profiles()` |
+| `Cartesian*` | `create_cartesian_pipeline_profiles()` |
+| `Descartes*` | `create_descartes_default_profiles()` |
+| `Raster*` | `create_raster_pipeline_profiles()` |
+
+Any other node raises `NoDefaultProfilesError`; pass `profiles=`. The planner settings these
+helpers expose are on the [planning guide](planning.md). The other tasks (`MinLengthTask`, the
+contact check, the time parameterization) use their library defaults unless you add a profile
+under their name.
 
 ```python
-composer.plan_freespace(robot, program)   # TrajOptPipeline
-composer.plan_ompl(robot, program)        # FreespacePipeline (pipeline="OMPLPipeline" for raw OMPL)
-composer.plan_cartesian(robot, program)   # DescartesDPipeline
+from tesseract_robotics.planning import create_trajopt_default_profiles
+
+profiles = create_trajopt_default_profiles()
+result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
 ```
 
-Or use the module-level functions from `tesseract_robotics.planning`:
+A hand-built dictionary takes one `addProfile(namespace, profile name, profile)` per entry:
 
 ```python
-from tesseract_robotics.planning import plan_freespace, plan_ompl, plan_cartesian
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
+from tesseract_robotics.motion_planners_trajopt import TrajOptDefaultMoveProfile
 
-result = plan_freespace(robot, program)
+profiles = ProfileDictionary()
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", OMPLRealVectorMoveProfile())
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", TrajOptDefaultMoveProfile())
 ```
 
-Without a `composer`, each module-level call builds a new composer and loads the task composer
-plugins again, so timing a solve through it measures the load.
-Build one composer and pass it to every call; you own its lifetime (#137):
+### Profiles from YAML
 
-```python
-from tesseract_robotics.planning import TaskComposer, plan_cartesian
+Every planner profile with a C++ YAML constructor has a static `from_yaml(text)`. It parses the
+text with the profile's own C++ reader, so the keys are the C++ field names; keys left out keep
+the profile's defaults. Malformed YAML raises `ValueError`; a value of the wrong type raises the
+C++ reader's error.
 
-composer = TaskComposer.from_config(warmup=["DescartesDPipeline"])
-for program in programs:
-    result = plan_cartesian(robot, program, composer=composer)
-```
+=== "Simple"
+
+    ```python
+    from tesseract_robotics.motion_planners_simple import SimplePlannerLVSMoveProfile
+
+    profile = SimplePlannerLVSMoveProfile.from_yaml("min_steps: 4\n")
+    assert profile == SimplePlannerLVSMoveProfile(min_steps=4)
+    ```
+
+=== "OMPL"
+
+    ```python
+    from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
+
+    profile = OMPLRealVectorMoveProfile.from_yaml("solver_config:\n  planning_time: 3.5\n")
+    assert profile.solver_config.planning_time == 3.5
+    ```
+
+    A nested key replaces that sub-config, built from its own defaults: `solver_config:` starts
+    with no planners, so add them with `profile.solver_config.addPlanner(...)`.
+
+=== "TrajOpt"
+
+    ```python
+    from tesseract_robotics.motion_planners_trajopt import (
+        TrajOptDefaultCompositeProfile,
+        TrajOptDefaultMoveProfile,
+        TrajOptOSQPSolverProfile,
+    )
+
+    move = TrajOptDefaultMoveProfile.from_yaml("joint_cost_config:\n  enabled: true\n")
+    composite = TrajOptDefaultCompositeProfile.from_yaml("avoid_singularity_coeff: 7.5\n")
+    solver = TrajOptOSQPSolverProfile.from_yaml("settings:\n  max_iter: 321\n")
+    assert move.joint_cost_config.enabled
+    assert composite.avoid_singularity_coeff == 7.5
+    assert solver.settings.max_iter == 321
+    ```
+
+    `settings:` and `opt_params:` merge into the solver profile's values: keys left out keep them.
+
+=== "TrajOpt-Ifopt"
+
+    ```python
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
+        TrajOptIfoptDefaultCompositeProfile,
+        TrajOptIfoptOSQPSolverProfile,
+    )
+
+    composite = TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: false\n")
+    solver = TrajOptIfoptOSQPSolverProfile.from_yaml("opt_params:\n  max_iter: 7\n")
+    assert not composite.smooth_jerks
+    assert solver.opt_params.max_iter == 7
+    ```
+
+=== "Task composer"
+
+    ```python
+    from tesseract_robotics.task_composer_planning import (
+        MinLengthProfile,
+        UpsampleTrajectoryProfile,
+    )
+
+    assert MinLengthProfile.from_yaml("min_length: 99\n").min_length == 99
+    upsample = UpsampleTrajectoryProfile.from_yaml("longest_valid_segment_length: 0.7\n")
+    assert upsample.longest_valid_segment_length == 0.7
+    ```
+
+The Descartes profiles have no YAML constructor upstream, so they have no `from_yaml`.
 
 ## Visualizing pipelines
 
-Every `TaskComposerNode` exports its task graph as [Graphviz DOT](https://graphviz.org/) — the same `dump()` mechanism the C++ task composer uses:
-
-```python
-from pathlib import Path
-
-from tesseract_robotics.common import GeneralResourceLocator
-from tesseract_robotics.task_composer import TaskComposerPluginFactory
-
-locator = GeneralResourceLocator()
-factory = TaskComposerPluginFactory(Path(config_path), locator)
-pipeline = factory.createTaskComposerNode("FreespacePipeline")
-
-dot = pipeline.getDotgraph()             # DOT source as a string
-pipeline.saveDotgraph("pipeline.dot")    # or write it straight to disk
-```
-
-Render to an image with graphviz:
-
-```bash
-dot -Tsvg pipeline.dot -o pipeline.svg
-```
-
-The graphs below are generated by `scripts/generate_pipeline_dotgraphs.py` (`pixi run docs-dotgraphs`), which trims `dump()`'s debug fields (UUIDs, C++ type names, I/O key maps) from the labels. Diamonds are conditional tasks; edge labels are the branch taken by their return value — `[1]` continues the pipeline, `[0]` jumps to `ErrorTask`. Subgraph nodes expand into their own clusters. Click any graph to zoom.
+Every `TaskComposerNode` exports its graph as [Graphviz DOT](https://graphviz.org/), the `dump()`
+output of the C++ task composer: `getDotgraph()` returns the DOT source, `saveDotgraph(path)`
+writes it, and `dot -Tsvg pipeline.dot -o pipeline.svg` renders it. The graphs below come from
+`pixi run docs-dotgraphs` (`scripts/generate_pipeline_dotgraphs.py`), which trims the debug fields (UUIDs, C++ type names,
+port maps) from the labels. Diamonds are conditional tasks; an edge label is the return value
+that takes it, `[1]` onward and `[0]` to `ErrorTask`. Click a graph to zoom.
 
 === "Freespace"
 
@@ -294,47 +363,104 @@ The graphs below are generated by `scripts/generate_pipeline_dotgraphs.py` (`pix
 
     [![RasterFtPipeline DOT graph](../assets/dotgraphs/RasterFtPipeline.svg)](../assets/dotgraphs/RasterFtPipeline.svg)
 
-### Debugging failed plans
+### Debugging a failed plan
 
-Both methods take an optional results map, uuid → `TaskComposerNodeInfo` — pass the run's `task_infos.getInfoMap()` to overlay execution results on the graph: successful nodes render green with their execution time, failed and aborted nodes render red.
+`result.message` names the task that failed and why, `"<task>: <message>"`; the
+[planning guide](planning.md#when-a-plan-fails) lists the common ones. `result.task_infos` holds
+every node that ran (`name`, `status_code`, `status_message`, `elapsed_time`). To see where in
+the graph a run stopped, pass the run's info map to `saveDotgraph` (or `getDotgraph`) to colour
+the graph with it.
 
 ```python
 future = composer.executor.run(task, task_data)
 future.wait()
 
 if not future.context.isSuccessful():
-    # Annotated graph: green = succeeded (+ timing), red = failed/aborted
+    # green: succeeded, with its time; red: failed or aborted
     task.saveDotgraph("debug.dot", future.context.task_infos.getInfoMap())
 ```
 
-This run was aborted by `DiscreteContactCheckTask` — the planners upstream succeeded (green, with solve times), the contact check failed (red, its status message naming the offending link pair), and the enclosing subgraph reports the abort:
+Here `DiscreteContactCheckTask` aborted the run: the planners succeeded (green, with their solve
+times), the contact check failed (red, its message naming the link pair) and the enclosing graph
+reports the abort.
 
 [![Annotated FreespacePipeline DOT graph](../assets/dotgraphs/FreespacePipeline_annotated.svg)](../assets/dotgraphs/FreespacePipeline_annotated.svg)
 
-!!! tip "First stop for a failed plan"
-    `result.message` tells you *that* a plan failed; the annotated DOT graph
-    shows you *where* — including nodes that never ran because an earlier
-    stage aborted the pipeline.
+## Custom pipelines
 
-## Task types
+A pipeline of your own is a `PipelineTaskFactory` entry under `tasks: plugins:` in the config:
+`nodes` by name, each a task factory `class` with its `config`, or an existing node by `task`;
+`edges` from each node to its destinations, the first on failure (`[0]`) and the second on
+success (`[1]`); and `terminals`. This one is `TrajOptTask` without its contact check, behind
+the `TrajOptPipeline` front end:
 
-| Task | Purpose |
-|------|---------|
-| `MinLengthTask` | Ensure a minimum number of waypoints |
-| `OMPLMotionPlannerTask` | Sampling-based planning |
-| `TrajOptMotionPlannerTask` | Trajectory optimization |
-| `DescartesMotionPlannerTask` | Cartesian graph search |
-| `SimpleMotionPlannerTask` | Joint interpolation |
-| `TimeOptimalParameterizationTask` | Add time parametrization (TOTG) |
-| `IterativeSplineParameterizationTask` | Smooth timing |
-| `ContactCheckTask` | Collision validation |
-| `FixStateBoundsTask` | Clamp to joint limits |
-| `FixStateCollisionTask` | Push out of collision |
+```python
+import copy
+from pathlib import Path
 
-## Config schemas
+import yaml
 
-Each node and executor type describes the YAML config it accepts as a schema, a
-`common.PropertyTree`. Its YAML crosses as text:
+from tesseract_robotics.planning import TaskComposer, create_trajopt_default_profiles
+from tesseract_robotics.task_composer import TaskComposerPluginFactory
+
+custom = yaml.safe_load("""
+TrajOptNoCheckTask:
+  class: PipelineTaskFactory
+  config:
+    conditional: true
+    inputs: {program: input_data, environment: environment, profiles: profiles}
+    outputs: {program: output_data}
+    nodes:
+      DoneTask: {class: DoneTaskFactory, config: {conditional: false}}
+      ErrorTask: {class: ErrorTaskFactory, config: {conditional: false}}
+      MinLengthTask:
+        class: MinLengthTaskFactory
+        config:
+          conditional: true
+          inputs: {program: input_data, environment: environment, profiles: profiles}
+          outputs: {program: output_data}
+      TrajOptMotionPlannerTask:
+        class: TrajOptMotionPlannerTaskFactory
+        config:
+          conditional: true
+          inputs: {program: output_data, environment: environment, profiles: profiles}
+          outputs: {program: output_data}
+          format_result_as_input: false
+      IterativeSplineParameterizationTask:
+        class: IterativeSplineParameterizationTaskFactory
+        config:
+          conditional: true
+          inputs: {program: output_data, environment: environment, profiles: profiles}
+          outputs: {program: output_data}
+    edges:
+      - {source: MinLengthTask, destinations: [ErrorTask, TrajOptMotionPlannerTask]}
+      - {source: TrajOptMotionPlannerTask, destinations: [ErrorTask, IterativeSplineParameterizationTask]}
+      - {source: IterativeSplineParameterizationTask, destinations: [ErrorTask, DoneTask]}
+    terminals: [ErrorTask, DoneTask]
+""")
+
+config = yaml.safe_load(Path(config_path).read_text())
+tasks = config["task_composer_plugins"]["tasks"]["plugins"]
+tasks.update(custom)
+# Reuse the shipped pipeline's front end, pointed at the new task
+tasks["TrajOptNoCheckPipeline"] = copy.deepcopy(tasks["TrajOptPipeline"])
+tasks["TrajOptNoCheckPipeline"]["config"]["nodes"]["MotionPlanningTask"]["task"] = "TrajOptNoCheckTask"
+
+factory = TaskComposerPluginFactory(yaml.safe_dump(config), locator)  # a str is YAML text
+custom_composer = TaskComposer(factory, locator)
+result = custom_composer.plan(
+    robot, program, pipeline="TrajOptNoCheckPipeline", profiles=create_trajopt_default_profiles()
+)
+assert result.successful, result.message
+```
+
+A custom node has no default profiles, so `plan` needs `profiles=`. In a file, the same entries
+go under `tasks: plugins:` of your config, or into a file it pulls in with `!include`.
+
+### Config schemas
+
+Each node and executor type describes the config it accepts as a schema, a
+`common.PropertyTree`; YAML crosses as text. `applyConfig` checks a config against it:
 
 ```python
 from tesseract_robotics.task_composer import (
@@ -354,7 +480,7 @@ schema.applyConfig("inputs: {program: in}\noutputs: {program: out}\nbogus_key: 1
 
 `applyConfig` merges the config into the schema and returns every error (empty when valid);
 `allow_extra_properties=True` accepts undeclared keys. A port mapping that breaks the contract
-gives a `ValidationError` instead, whose `toString()` (also `str()`) is `inputs.<port>: <message>`:
+gives a `ValidationError`, whose `toString()` (also `str()`) is `inputs.<port>: <message>`:
 
 ```python
 from tesseract_robotics.task_composer import TaskComposerPortMap
@@ -367,122 +493,23 @@ outputs.set("program", "out")
 error.toString()                            # 'inputs.bogus_port: undeclared port'
 ```
 
-## Profiles
+## What goes wrong
 
-Profiles configure each task's behaviour. `TaskComposer.plan(...)` auto-selects a pipeline-appropriate default set from `planning/profiles.py`. You can also build profiles yourself and pass them via the `profiles` keyword:
+`plan` raises on a configuration or programming error and returns `successful=False` when a
+planner ran and found no solution.
 
-```python
-from tesseract_robotics.planning import create_trajopt_default_profiles
-
-profiles = create_trajopt_default_profiles()
-result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
-```
-
-For a manual `ProfileDictionary`:
-
-```python
-from tesseract_robotics.command_language import ProfileDictionary
-from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
-from tesseract_robotics.motion_planners_trajopt import TrajOptDefaultMoveProfile
-
-# addProfile(namespace, profile name, profile): the namespace is the planner task's name
-profiles = ProfileDictionary()
-profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", OMPLRealVectorMoveProfile())
-profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", TrajOptDefaultMoveProfile())
-```
-
-## Error handling
-
-`TaskComposer.plan(...)` always returns a `PlanningResult`. On failure the result is populated from the task composer's aborting node info:
-
-```python
-result = composer.plan(robot, program)
-if not result.successful:
-    print(f"Planning failed: {result.message}")
-```
-
-### Common failures
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `OMPL failed to find solution` | Start/goal in collision or unreachable | Check collisions, increase time |
-| `TrajOpt failed to converge` | Bad initial trajectory | Feed it an OMPL seed first |
-| `Contact check failed` | Trajectory has collisions | Increase collision margin |
-| `IK failed` | Cartesian target unreachable | Verify workspace + TCP offset |
-| `createTaskComposerNode: 'X' not found among the configured plugins: […]` | `pipeline=` names no configured node | Pick a name from the list in the message |
-
-On the raw factory, `createTaskComposerNode` and `createTaskComposerExecutor` raise
-`TaskComposerPluginError` (a `RuntimeError`) instead of returning `None`; `plan` turns it into
-a failed `PlanningResult`.
-
-## Parallel execution
-
-The Task Composer uses Taskflow for parallel execution. Override the thread count via `TaskComposer.from_config(num_threads=...)` or pass a pre-built executor:
-
-```python
-from tesseract_robotics.task_composer import TaskflowTaskComposerExecutor
-
-# Override YAML-configured thread count
-composer = TaskComposer.from_config(num_threads=8)
-
-# Or provide a custom executor
-executor = TaskflowTaskComposerExecutor("MyExecutor", 8)
-composer = TaskComposer.from_config(executor=executor)
-```
-
-!!! info "Automatic Parallelization"
-    Independent tasks (such as IK for different waypoints) run in parallel
-    automatically. The task graph determines dependencies.
-
-## Custom pipelines
-
-Define custom task graphs in YAML and point `TaskComposer.from_config(path)` at them:
-
-```yaml
-# custom_pipeline.yaml
-task_composer_plugins:
-  tasks:
-    MyCustomPipeline:
-      type: graph
-      nodes:
-        - name: plan_ompl
-          type: OMPLMotionPlannerTask
-          input: planning_input
-          output: ompl_output
-
-        - name: smooth_trajopt
-          type: TrajOptMotionPlannerTask
-          input: ompl_output
-          output: trajopt_output
-          depends: [plan_ompl]
-
-        - name: time_param
-          type: TimeOptimalParameterizationTask
-          input: trajopt_output
-          output: output_program
-          depends: [smooth_trajopt]
-```
-
-## Integration example
-
-Use a warmed-up composer behind a small service class:
-
-```python
-from tesseract_robotics.planning import Robot, TaskComposer
-
-class PlanningServer:
-    def __init__(self, robot: Robot):
-        self.robot = robot
-        self.composer = TaskComposer.from_config()
-        self.composer.warmup(["FreespacePipeline"])    # one-time cost
-
-    def plan_motion(self, program):
-        return self.composer.plan(
-            self.robot, program, pipeline="FreespacePipeline"
-        )
-```
+| Symptom | Cause | Fix |
+|---|---|---|
+| `UnknownPipelineError` | `pipeline=` names no configured node; the message lists them | pick a listed name |
+| `NoDefaultProfilesError` | a custom node and `profiles=None` | pass `profiles=` |
+| `PipelineLayoutError` | the node has no `program` output or no `planning_input` / `program` input | run it through the plugin factory |
+| `ProfileTypeMismatchError` | a Descartes node reads `D` profiles and the dictionary holds only `F` ones, or the reverse | see [two scalar types](planning.md#descartes) |
+| `PipelineWarmupError` | a name passed to `warmup` does not load | check the name and the plugin search paths |
+| `TaskComposerPluginError` (a `RuntimeError`) from the factory | `createTaskComposerNode` / `createTaskComposerExecutor` found no such plugin | as above; the factory never returns `None` |
+| `ConflictingExecutorError`, `InvalidThreadCountError` | both `num_threads` and `executor`, or `num_threads < 1` | pass one, at least 1 |
+| `successful=False`, `"<task>: <message>"` | the named task failed | [When a plan fails](planning.md#when-a-plan-fails); render the [annotated graph](#debugging-a-failed-plan) |
 
 ## Next steps
 
-- [Low-Level SQP](low-level-sqp.md) — Trajectory optimization
-- [Online Planning Example](../examples/online-planning.md) — Dynamic replanning
+- [Low-level SQP](low-level-sqp.md): build and step an optimization problem yourself.
+- [Online planning example](../examples/online-planning.md): replanning around a moving obstacle.
