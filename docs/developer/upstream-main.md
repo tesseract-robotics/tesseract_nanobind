@@ -4,13 +4,10 @@ The `upstream-main` branch tracks the `master` branches of tesseract, trajopt an
 tesseract_planning ahead of the next release (0.36), so the bindings catch up
 while upstream moves rather than after it tags. See issue #141.
 
-!!! note "The outer loop is gone"
-    The feedstock builds (`build-feedstock`, the `packaged` env, the `packaging/*-feedstock`
-    submodules) were replaced by one native build shared with CI, see
-    [The native stack build](native-stack.md). Sections below that describe them are history.
-
-The inner loop, `pixi run -e upstream build-upstream`, compiles the upstream C++ from git
-checkouts incrementally, then the bindings, for day-to-day binding work.
+!!! note "History"
+    This page records the 0.36 catch-up. The feedstock builds, the `packaged` and `upstream` pixi
+    envs and `scripts/build_upstream.sh` were replaced by one native build shared with CI, see
+    [The native stack build](native-stack.md); commands below that name them no longer exist.
 
 ## Status
 
@@ -45,96 +42,6 @@ CI. The user-facing changes are in
   conda-forge's `piqp`: its win-64 build ships a `.lib` and no DLL, and its builds pin a
   Python version, which the stack packages must not. So `piqp` is a pixi dependency only
   in the `upstream` env, which compiles trajopt itself.
-
-### Merging `pixi.lock` on a rebase
-
-`pixi.lock` conflicts on every rebase onto main: main re-locks its own envs, and this
-branch adds envs main does not have (`upstream`, `packaged`) or re-locks one both
-have (`default` and the `py3xx` envs, once they moved to the dev label). Text merges
-of the lock are never right; merge it per environment.
-
-1. **Start from main's lock.** Take the rebase target's side (stage 2,
-   `git show :2:pixi.lock`) as the base and add every environment that exists only in
-   the replayed commit (stage 3), with its platforms and the package records it
-   references (a small YAML script; `merge_pixi_lock.py` in the catch-up did this).
-   Main's envs keep main's solve.
-2. **Replace re-locked envs.** For an env both sides have but the branch re-locked,
-   replace main's entry with the branch's (stage 3) and add the package records it
-   needs. Main's solve of that env is the wrong one: it pins the 0.35 packages.
-3. **Canonicalise.** Run `pixi lock`. It rewrites the file in its own order, prunes
-   records nothing references and re-solves only what the manifest no longer
-   satisfies.
-4. **Check per env.** Compare each environment against main's lock (a script that
-   loads both files and prints `same` / `DIFF` / `only-new` / `only-ref` per env;
-   `check_lock_envs.py` in the catch-up). Every env the branch did not change must be
-   `same`; every `DIFF` must be one the branch meant to re-lock.
-
-Then `git add pixi.lock` and continue the rebase. Never resolve the lock with
-`git checkout --ours` / `--theirs`: either side alone drops the other's envs.
-
-## Layout
-
-```text
-upstream/                         # upstream sources (submodules, pinned SHAs)
-├── boost_plugin_loader           # 0.4.5 — tesseract main needs it, the channel has 0.4.3
-├── tesseract
-├── trajopt
-├── tesseract_planning
-└── build/                        # persistent ninja build dirs (gitignored)
-```
-
-descartes_light and opw_kinematics come from the `tesseract-robotics` channel
-in the inner loop: neither has build-relevant changes past the packaged versions
-(descartes_light 0.4.10, opw_kinematics 0.5.3).
-
-## Inner loop
-
-```bash
-git submodule update --init upstream
-pixi run -e upstream build-upstream-cpp   # C++ only
-pixi run -e upstream build-upstream       # C++, then the bindings
-```
-
-`scripts/build_upstream.sh` builds boost_plugin_loader → tesseract → trajopt
-(`trajopt_common`, `trajopt_sco`, `trajopt_ifopt`, `trajopt`, `trajopt_sqp`) →
-tesseract_planning and installs each into the `upstream` env's prefix, where the
-bindings find them exactly as they find the conda packages on `main`. It mirrors
-the feedstocks' `recipe/build.sh`:
-
-- same compilers: `clang_osx-arm64` / `clangxx_osx-arm64` 19 on macOS,
-  `gcc_linux-64` / `gxx_linux-64` 14 on Linux, as pinned in the feedstocks'
-  `.ci_support`. These activation packages export `CXX`, `CXXFLAGS` and
-  `CMAKE_ARGS`; the `c-compiler` 2.x metapackage installs bare clang without
-  them.
-- same `${CMAKE_ARGS}` and `-D` flags. Outside conda-build `CMAKE_ARGS` carries
-  no install prefix, so the script adds `CMAKE_INSTALL_PREFIX=$CONDA_PREFIX`.
-- third-party deps: the `upstream` pixi feature lists the union of the
-  feedstock recipes' `host` sections, and no tesseract packages.
-- on macOS, `CXXFLAGS` minus `-fvisibility-inlines-hidden`, as upstream's own
-  conda recipe (see [Gotchas found](#gotchas-found)).
-
-Each package keeps a ninja build dir under `upstream/build/<name>` and compiles
-through ccache; ninja uses every core. Measured on an M1 Max (10 cores):
-
-| Build | Time |
-|---|---|
-| no-op | 1–2 s |
-| one tesseract `.cpp` touched | 2 s (1 translation unit + relink) |
-
-To reconfigure a package (new CMake options, or after a big SHA jump), remove
-its build dir: `upstream/build/<name>`. To change one cache option in place, pass
-the source dir explicitly — `cmake -B` alone takes the cwd as the source and
-refuses:
-
-```bash
-pixi run -e upstream cmake -DOPTION=VALUE -S upstream/tesseract -B upstream/build/tesseract
-```
-
-The script configures with `CMAKE_BUILD_WITH_INSTALL_RPATH=ON`. Without it, every
-repeat install prints `install_name_tool: no LC_RPATH load command` errors on
-macOS: CMake's install script re-runs `-delete_rpath <build tree>` on files it
-reports up to date, and the first install already removed that rpath. Nothing
-runs from the build tree (tests are off), so the build-tree rpath has no use.
 
 ## Binding status
 
@@ -246,11 +153,3 @@ runs after ours, then called by a C++ worker during finalization.
   hashes differ.
 - `planning` and `viewer` convert ids with `.name()` where they leave tesseract
   (signatures, glTF/JSON payloads).
-
-## Default environment
-
-The `default` env builds the stack with `pixi run native-build` and the bindings against it with
-`pixi run build` (see [The native stack build](native-stack.md)). The bindings do not build
-against the 0.35.0 packages, by design: they need the id API (`tesseract::common::LinkId`,
-`JointId`, `getJointIds`, …), `tesseract/common/logging.h` and
-`tesseract/geometry/impl/signed_distance_field.h`, which 0.35 lacks.

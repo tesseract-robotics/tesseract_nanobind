@@ -88,8 +88,8 @@ If you modify a C++ binding file (`src/bindings/<module>.cpp`):
 pixi run install
 ```
 
-To work against unreleased upstream C++, use the `upstream` environment: see
-[Building against upstream main](upstream-main.md).
+To work against another upstream C++ commit, change `dependencies.rosinstall` and run
+`pixi run build` ([The native stack build](native-stack.md)).
 
 ### Task Dependency Chain
 
