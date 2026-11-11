@@ -24,6 +24,7 @@ import time
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.command_language import (
     CompositeInstruction,
     MoveInstruction,
@@ -33,7 +34,7 @@ from tesseract_robotics.command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.common import ManipulatorInfo
+from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.motion_planners import PlannerRequest
 from tesseract_robotics.motion_planners_ompl import (
     Cost,
@@ -101,7 +102,8 @@ class BenchProfile(OMPLRealVectorMoveProfile):
 
 
 def _request(arm: str) -> tuple[PlannerRequest, BenchProfile]:
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820", locator)
     create_obstacle(
         robot, "sphere_attached", sphere(SPHERE_RADIUS_M), Pose.from_xyz(*SPHERE_CENTER_M)
     )
