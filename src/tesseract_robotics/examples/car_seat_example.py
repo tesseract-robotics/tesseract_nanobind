@@ -99,6 +99,7 @@ from tesseract_robotics.scene_graph import (
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 # Predefined joint positions from C++ getPredefinedPosition()
+# (car_seat_example.cpp: Pick1 at 165-174, Place1 at 198-206, Home from 207)
 # All values in radians except carriage_rail (meters)
 # Joint order varies - use dict keys for order-independent access
 POSITIONS = {
@@ -141,6 +142,31 @@ POSITIONS = {
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
+# Collision constraint and cost of the composite profile (car_seat_example.cpp:319-329;
+# the TrajOptIfopt branch repeats them at 287-298). Margins and buffers [m], coefficients [-].
+CONSTRAINT_MARGIN_M = 0.0
+CONSTRAINT_COEFF = 10
+CONSTRAINT_BUFFER_M = 0.005
+COST_MARGIN_M = 0.005
+COST_COEFF = 50
+COST_BUFFER_M = 0.01
+# Longest valid segment of the LVS_CONTINUOUS collision checks [m] (cpp:322, 328).
+LVS_LENGTH_M = 0.1
+# OSQP solver limits (cpp:338-340; the TrajOptIfopt branch at 307-309): iterations [-],
+# minimum approximate improvement and minimum trust-box size [cost units, m].
+SOLVER_MAX_ITER = 200
+SOLVER_MIN_APPROX_IMPROVE = 1e-3
+SOLVER_MIN_TRUST_BOX_SIZE = 1e-3
+# Seats: how many, the first one's position and the pitch along x [m] (cpp:135:
+# `(0.5 + i, 2.15, 0.45)`), and how many convex collision hulls each has.
+SEAT_COUNT = 3
+SEAT_FIRST_XYZ_M = (0.5, 2.15, 0.45)
+SEAT_PITCH_M = 1.0
+SEAT_HULL_COUNT = 10
+# Seat yaw: exactly pi, so the rotation block is diag(-1, -1, 1). The C++ example rotates by
+# the literal 3.14159 (cpp:134), a rounded pi.
+SEAT_YAW_FLIP = -1.0
+
 
 def create_car_seat_profiles():
     """Create TrajOpt profiles for car seat motion planning.
@@ -159,20 +185,26 @@ def create_car_seat_profiles():
     composite = TrajOptDefaultCompositeProfile()
 
     # Collision constraint: margin=0, coeff=10
-    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config = TrajOptCollisionConfig(
+        CONSTRAINT_MARGIN_M, CONSTRAINT_COEFF
+    )
     composite.collision_constraint_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS
     )
-    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.1
-    composite.collision_constraint_config.collision_margin_buffer = 0.005
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_constraint_config.collision_margin_buffer = CONSTRAINT_BUFFER_M
 
     # Collision cost: margin=0.005, coeff=50
-    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config = TrajOptCollisionConfig(COST_MARGIN_M, COST_COEFF)
     composite.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS
     )
-    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
-    composite.collision_cost_config.collision_margin_buffer = 0.01
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_cost_config.collision_margin_buffer = COST_BUFFER_M
 
     # === Plan/Move Profile ===
     plan = TrajOptDefaultMoveProfile()
@@ -183,9 +215,9 @@ def create_car_seat_profiles():
 
     # === Solver Profile (OSQP) ===
     solver = TrajOptOSQPSolverProfile()
-    solver.opt_params.max_iter = 200
-    solver.opt_params.min_approx_improve = 1e-3
-    solver.opt_params.min_trust_box_size = 1e-3
+    solver.opt_params.max_iter = SOLVER_MAX_ITER
+    solver.opt_params.min_approx_improve = SOLVER_MIN_APPROX_IMPROVE
+    solver.opt_params.min_trust_box_size = SOLVER_MIN_TRUST_BOX_SIZE
 
     for name in ["DEFAULT", "FREESPACE"]:
         profiles.addProfile(TRAJOPT_NS, name, composite)
@@ -209,20 +241,26 @@ def create_car_seat_ifopt_profiles():
     composite = TrajOptIfoptDefaultCompositeProfile()
 
     # Collision constraint: margin=0, coeff=10
-    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config = TrajOptCollisionConfig(
+        CONSTRAINT_MARGIN_M, CONSTRAINT_COEFF
+    )
     composite.collision_constraint_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS
     )
-    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.1
-    composite.collision_constraint_config.collision_margin_buffer = 0.005
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_constraint_config.collision_margin_buffer = CONSTRAINT_BUFFER_M
 
     # Collision cost: margin=0.005, coeff=50
-    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config = TrajOptCollisionConfig(COST_MARGIN_M, COST_COEFF)
     composite.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS
     )
-    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
-    composite.collision_cost_config.collision_margin_buffer = 0.01
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_cost_config.collision_margin_buffer = COST_BUFFER_M
 
     move = TrajOptIfoptDefaultMoveProfile()
     move.cartesian_cost_config.enabled = False
@@ -231,9 +269,9 @@ def create_car_seat_ifopt_profiles():
     move.joint_constraint_config.enabled = True
 
     solver = TrajOptIfoptOSQPSolverProfile()
-    solver.opt_params.max_iter = 200
-    solver.opt_params.min_approx_improve = 1e-3
-    solver.opt_params.min_trust_box_size = 1e-3
+    solver.opt_params.max_iter = SOLVER_MAX_ITER
+    solver.opt_params.min_approx_improve = SOLVER_MIN_APPROX_IMPROVE
+    solver.opt_params.min_trust_box_size = SOLVER_MIN_TRUST_BOX_SIZE
 
     # C++ names its composite "FREESPACE"; MotionProgram's composite is "DEFAULT".
     for name in ["DEFAULT", "FREESPACE"]:
@@ -265,7 +303,7 @@ def add_seats(robot):
         "package://tesseract/support/meshes/car_seat/visual/seat.dae"
     )
 
-    for i in range(3):
+    for i in range(SEAT_COUNT):
         seat_name = f"seat_{i + 1}"
         link = Link(seat_name)
 
@@ -278,7 +316,7 @@ def add_seats(robot):
         link.addVisual(visual)
 
         # Collision meshes (10 convex hulls)
-        for m in range(1, 11):
+        for m in range(1, SEAT_HULL_COUNT + 1):
             collision_url = f"package://tesseract/support/meshes/car_seat/collision/seat_{m}.stl"
             collision_resource = locator.locateResource(collision_url)
             for mesh in createMeshFromResource(collision_resource):
@@ -293,8 +331,9 @@ def add_seats(robot):
         joint.child_link_id = seat_name
         joint.type = JointType.FIXED
         transform = np.eye(4)
-        transform[0, 0] = transform[1, 1] = -1.0  # 180deg Z rotation
-        transform[:3, 3] = [0.5 + i, 2.15, 0.45]
+        transform[0, 0] = transform[1, 1] = SEAT_YAW_FLIP  # 180deg Z rotation
+        seat_x, seat_y, seat_z = SEAT_FIRST_XYZ_M
+        transform[:3, 3] = [seat_x + i * SEAT_PITCH_M, seat_y, seat_z]
         joint.parent_to_joint_origin_transform = Isometry3d(transform)
 
         if not robot.env.applyCommand(AddLinkCommand(link, joint)):
@@ -304,7 +343,7 @@ def add_seats(robot):
     # At the pick position, end_effector is very close to the seat
     # Without this, collision checking will reject the goal state
     acm = AllowedCollisionMatrix()
-    for i in range(3):
+    for i in range(SEAT_COUNT):
         seat_name = f"seat_{i + 1}"
         acm.addAllowedCollision(seat_name, "end_effector", "Adjacent")
 

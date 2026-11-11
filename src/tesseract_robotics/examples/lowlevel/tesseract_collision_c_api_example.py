@@ -126,6 +126,17 @@ from tesseract_robotics.state_solver import OFKTStateSolver
 # export TESSERACT_RESOURCE_PATH="$(pwd)/tesseract/"
 
 
+# The IRB 2400's six joints, an obstacle sphere's radius [m] and position on the world [m],
+# the collision margin [m], and the sweep of joint_1: 10 steps of 5 degrees from -25 degrees.
+JOINT_COUNT = 6
+OBSTACLE_RADIUS_M = 0.1
+OBSTACLE_XYZ_M = (0.7, 0.0, 1.5)
+COLLISION_MARGIN_M = 0.1
+SWEEP_FIRST_STEP = -5
+SWEEP_LAST_STEP = 5
+SWEEP_STEP_DEG = 5
+
+
 def main():
     # =========================================================================
     # STEP 1: Environment Initialization
@@ -152,8 +163,8 @@ def main():
         raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     # ABB IRB2400 is a 6-axis industrial robot with joints named joint_1..joint_6
-    robot_joint_names = [f"joint_{i + 1}" for i in range(6)]
-    robot_joint_pos = np.zeros(6)
+    robot_joint_names = [f"joint_{i + 1}" for i in range(JOINT_COUNT)]
+    robot_joint_pos = np.zeros(JOINT_COUNT)
 
     # =========================================================================
     # STEP 2: Add Obstacle Geometry via Environment Commands
@@ -164,13 +175,13 @@ def main():
 
     # Visual component: for rendering/visualization (optional for collision)
     sphere_link_visual = Visual()
-    sphere_link_visual.geometry = Sphere(0.1)  # 10cm radius
+    sphere_link_visual.geometry = Sphere(OBSTACLE_RADIUS_M)
     sphere_link.addVisual(sphere_link_visual)
 
     # Collision component: this is what the contact manager actually checks
     # A link without collision geometry is invisible to the collision checker
     sphere_link_collision = Collision()
-    sphere_link_collision.geometry = Sphere(0.1)
+    sphere_link_collision.geometry = Sphere(OBSTACLE_RADIUS_M)
     sphere_link.addCollision(sphere_link_collision)
 
     # Joint connects child link to parent link with a transform
@@ -182,7 +193,7 @@ def main():
 
     # Position sphere at (0.7, 0, 1.5)m relative to base_link
     # This is within the robot's workspace to trigger collision during sweep
-    sphere_link_joint_transform = Isometry3d.Identity() * Translation3d(0.7, 0, 1.5)
+    sphere_link_joint_transform = Isometry3d.Identity() * Translation3d(*OBSTACLE_XYZ_M)
     sphere_joint.parent_to_joint_origin_transform = sphere_link_joint_transform
 
     # Apply command to modify environment - this updates the scene graph
@@ -210,15 +221,15 @@ def main():
 
     # Collision margin: report contacts when objects are within this distance
     # margin=0.1 means contacts reported when separation < 10cm
-    margin_data = CollisionMarginData(0.1)
+    margin_data = CollisionMarginData(COLLISION_MARGIN_M)
     manager.setCollisionMarginData(margin_data)
 
     # =========================================================================
     # STEP 5: Collision Query Loop
     # =========================================================================
     # Sweep joint_1 (base rotation) to move robot toward/away from obstacle
-    for i in range(-5, 5):
-        robot_joint_pos[0] = i * np.deg2rad(5)  # -25 to +20 degrees
+    for i in range(SWEEP_FIRST_STEP, SWEEP_LAST_STEP):
+        robot_joint_pos[0] = i * np.deg2rad(SWEEP_STEP_DEG)  # -25 to +20 degrees
         print(f"Contact check at robot position: {robot_joint_pos}")
 
         # Update state solver with new joint positions

@@ -67,6 +67,31 @@ TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 # OSQP's own time-based adaptation cadence.
 OSQP_ADAPTIVE_RHO_INTERVAL = 25
 
+# The ABB IRB 2400's six joints, and the pose the environment starts in [rad].
+JOINT_COUNT = 6
+START_JOINT_RAD = 0.1
+# The two Cartesian waypoints on base_link [m]: shared x and z, then each one's y.
+WAYPOINT_X_M = 0.8
+WAYPOINT_Z_M = 1.455
+WAYPOINT_1_Y_M = -0.3
+WAYPOINT_2_Y_M = 0.3
+# Tool orientation, scalar-last [qx, qy, qz, qw]: a quarter turn about y (sin and cos of
+# pi/4 to eight digits).
+TOOL_QUAT_XYZW = (0.0, 0.70710678, 0.0, 0.70710678)
+# Interpolation limits for generateInterpolatedProgram: state, translation and rotation
+# longest valid segments [rad, m, rad], and the minimum steps per segment [-].
+INTERP_STATE_LVS = 3.14
+INTERP_TRANSLATION_LVS_M = 1.0
+INTERP_ROTATION_LVS_RAD = 3.14
+INTERP_MIN_STEPS = 10
+# Velocity and acceleration scaling of the time parameterisation [-].
+SCALING_FACTOR = 1.0
+# Axes drawn on each plotted waypoint [m].
+AXES_LENGTH_M = 0.05
+# Waypoints printed at the start and at the end of the trajectory [-].
+PRINT_HEAD = 3
+PRINT_TAIL = 2
+
 
 def run():
     # Initialize the resource locator and environment
@@ -87,19 +112,19 @@ def run():
     manip_info.working_frame = "base_link"
 
     # Set initial state
-    joint_names = [f"joint_{i + 1}" for i in range(6)]
-    t_env.setState(joint_names, np.ones(6) * 0.1)
+    joint_names = [f"joint_{i + 1}" for i in range(JOINT_COUNT)]
+    t_env.setState(joint_names, np.ones(JOINT_COUNT) * START_JOINT_RAD)
 
     # Create Cartesian waypoints
     wp1 = CartesianWaypoint(
         Isometry3d.Identity()
-        * Translation3d(0.8, -0.3, 1.455)
-        * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
+        * Translation3d(WAYPOINT_X_M, WAYPOINT_1_Y_M, WAYPOINT_Z_M)
+        * Quaterniond.from_xyzw(*TOOL_QUAT_XYZW)
     )
     wp2 = CartesianWaypoint(
         Isometry3d.Identity()
-        * Translation3d(0.8, 0.3, 1.455)
-        * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
+        * Translation3d(WAYPOINT_X_M, WAYPOINT_2_Y_M, WAYPOINT_Z_M)
+        * Quaterniond.from_xyzw(*TOOL_QUAT_XYZW)
     )
 
     # Create move instructions
@@ -150,7 +175,14 @@ def run():
     print(f"OMPL found path with {ompl_response.results.size()} instructions")
 
     # Interpolate OMPL results
-    interpolated = generateInterpolatedProgram(ompl_response.results, t_env, 3.14, 1.0, 3.14, 10)
+    interpolated = generateInterpolatedProgram(
+        ompl_response.results,
+        t_env,
+        INTERP_STATE_LVS,
+        INTERP_TRANSLATION_LVS_M,
+        INTERP_ROTATION_LVS_RAD,
+        INTERP_MIN_STEPS,
+    )
 
     # === TrajOptIfopt Optimization ===
     print("Running TrajOptIfopt optimizer...")
@@ -158,9 +190,9 @@ def run():
     # Create profiles with velocity/accel coefficients sized for 6-DOF robot
     plan_profile = TrajOptIfoptDefaultMoveProfile()
     composite_profile = TrajOptIfoptDefaultCompositeProfile()
-    composite_profile.velocity_coeff = np.ones(6)
-    composite_profile.acceleration_coeff = np.ones(6)
-    composite_profile.jerk_coeff = np.ones(6)
+    composite_profile.velocity_coeff = np.ones(JOINT_COUNT)
+    composite_profile.acceleration_coeff = np.ones(JOINT_COUNT)
+    composite_profile.jerk_coeff = np.ones(JOINT_COUNT)
     solver_profile = TrajOptIfoptOSQPSolverProfile()
     solver_profile.setAdaptiveRhoInterval(OSQP_ADAPTIVE_RHO_INTERVAL)
 
@@ -194,8 +226,8 @@ def run():
 
     # Create profile with velocity/acceleration scaling
     isp_profile = IterativeSplineParameterizationCompositeProfile()
-    isp_profile.max_velocity_scaling_factor = 1.0
-    isp_profile.max_acceleration_scaling_factor = 1.0
+    isp_profile.max_velocity_scaling_factor = SCALING_FACTOR
+    isp_profile.max_acceleration_scaling_factor = SCALING_FACTOR
 
     # The profile namespace must be the algorithm's name ("ISP"): a profile registered
     # under any other namespace is not found, and compute() silently uses defaults.
@@ -215,9 +247,9 @@ def run():
         wp = wp_poly.asStateWaypoint()
         pos = wp.getPosition().flatten()
         time = wp.getTime()
-        if i < 3 or i >= len(trajopt_results) - 2:
+        if i < PRINT_HEAD or i >= len(trajopt_results) - PRINT_TAIL:
             print(f"  [{i:2d}] t={time:.3f}s  joints={np.array2string(pos, precision=3)}")
-        elif i == 3:
+        elif i == PRINT_HEAD:
             print("  ...")
 
     return {
@@ -236,7 +268,9 @@ def main() -> int:
     with TesseractViewer() as viewer:
         viewer.update_environment(results["env"])
         viewer.update_trajectory(results["trajectory"])
-        viewer.plot_trajectory(results["trajectory"], results["manip_info"], axes_length=0.05)
+        viewer.plot_trajectory(
+            results["trajectory"], results["manip_info"], axes_length=AXES_LENGTH_M
+        )
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
     return 0 if results["success"] else 1

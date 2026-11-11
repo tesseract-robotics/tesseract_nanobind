@@ -83,6 +83,12 @@ from tesseract_robotics.environment import (
 from tesseract_robotics.geometry import Sphere
 from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link, Visual
 
+# Margin of the boxbot checks [m] (tesseract_environment_utils.cpp), and the joint values of
+# the trajectory's replacement midpoint [rad].
+ZERO_MARGIN_M = 0.0
+MIDPOINT_RAD = 0.5
+
+
 BOXBOT_URDF_URL = "package://tesseract/support/urdf/boxbot.urdf"
 BOXBOT_SRDF_URL = "package://tesseract/support/urdf/boxbot.srdf"
 IIWA_URDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
@@ -145,8 +151,8 @@ def boxbot_checks(locator: GeneralResourceLocator) -> dict[str, Any]:
     """tesseract_environment_utils.cpp: boxbot state and segment checks at margin 0."""
     env = load(locator, BOXBOT_URDF_URL, BOXBOT_SRDF_URL)
     request = ContactRequest(ContactTestType.FIRST)
-    config = ContactManagerConfig(0.0)
-    disabled = ContactManagerConfig(0.0)
+    config = ContactManagerConfig(ZERO_MARGIN_M)
+    disabled = ContactManagerConfig(ZERO_MARGIN_M)
     disabled.modify_object_enabled = {"boxbot_link": False}
 
     # --8<-- [start:state]
@@ -291,7 +297,7 @@ def joint_trajectory() -> tuple[JointTrajectory, dict[str, Any]]:
 
     positions = [state.position.tolist() for state in trajectory]
     midpoint = trajectory[1]
-    midpoint.position = np.full(2, 0.5)
+    midpoint.position = np.full(2, MIDPOINT_RAD)
     getitem_is_copy = trajectory[1].position.tolist() == [1.0, 1.0]
     pushed[1] = midpoint
     after_setitem = pushed[1].position.tolist()

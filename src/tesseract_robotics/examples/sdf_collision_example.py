@@ -93,6 +93,21 @@ MARGIN = 0.1
 # Grid resolution. Voxel size is (domain_max - domain_min) / (dimensions - 1), so 65 samples
 # across 0.7 m is ~11 mm - about 15 samples across the bore, enough to resolve it.
 DOMAIN_HALF_EXTENT = 0.35
+# Level-set octree voxel edge [m]; metres to millimetres for the voxel readout [mm/m].
+OCTREE_RESOLUTION_M = 0.025
+MM_PER_M = 1000
+# Spot-check probes on the x axis [m]: inside the shell, and outside the ball.
+SHELL_PROBE_X_M = 0.20
+OUTSIDE_PROBE_X_M = 0.30
+# Display-only companion's colour [r, g, b, a].
+PROXY_RGBA = (0.85, 0.35, 0.15, 1.0)
+# Probe x positions of the margin sweep [m]; the viewer trajectory's duration [s] and waypoints.
+SWEEP_PROBE_X_M = (0.45, 0.39, 0.35, 0.32, 0.30, 0.25)
+SWEEP_PERIOD_S = 4.0
+SWEEP_STEPS = 60
+# Console banner width [characters]; spatial dimensions of a field [-].
+BANNER_WIDTH = 68
+AXES = 3
 SAMPLES_PER_AXIS = 65
 
 # Probe travel for the animated sweep: clear of the margin band at one end, penetrating at
@@ -229,7 +244,7 @@ def build_robot(directory: Path, contact_manager_plugins: str) -> Robot:
     )
 
 
-def level_set_octree(field, resolution: float = 0.025) -> Octree:
+def level_set_octree(field, resolution: float = OCTREE_RESOLUTION_M) -> Octree:
     """
     Voxelize the field's zero level set into an `Octree`, for display only.
 
@@ -361,9 +376,9 @@ def run(**kwargs):
     Returns:
         dict with the field and the discrete-only robot
     """
-    print("=" * 68)
+    print("=" * BANNER_WIDTH)
     print("Signed Distance Field Collision")
-    print("=" * 68)
+    print("=" * BANNER_WIDTH)
 
     # =====================================================================
     # 1. Build the field from a concave distance function
@@ -373,7 +388,7 @@ def run(**kwargs):
     dims = field.getDimensions()
     voxel = 2 * DOMAIN_HALF_EXTENT / (SAMPLES_PER_AXIS - 1)
     print(
-        f"SignedDistanceField: {dims[0]}x{dims[1]}x{dims[2]} samples, voxel {voxel * 1000:.1f} mm"
+        f"SignedDistanceField: {dims[0]}x{dims[1]}x{dims[2]} samples, voxel {voxel * MM_PER_M:.1f} mm"
     )
     assert field.getType() == GeometryType.SIGNED_DISTANCE_FIELD
     assert field.isDiscretized()
@@ -381,8 +396,8 @@ def run(**kwargs):
     # Spot-check the concavity: the bore is a hole, so its axis is *outside* the solid.
     for label, point in (
         ("bore axis (in the hole)", np.zeros(3)),
-        ("inside the shell", np.array([0.20, 0.0, 0.0])),
-        ("outside the ball", np.array([0.30, 0.0, 0.0])),
+        ("inside the shell", np.array([SHELL_PROBE_X_M, 0.0, 0.0])),
+        ("outside the ball", np.array([OUTSIDE_PROBE_X_M, 0.0, 0.0])),
     ):
         print(f"  {label:24}  d = {field.getDistance(point):+.4f} m")
 
@@ -421,7 +436,7 @@ def run(**kwargs):
 
         # Display-only companion so the viewer has something to draw where the field is.
         proxy = level_set_octree(field)
-        attach_link(robot, "bored_ball_surface", proxy, visual_color=(0.85, 0.35, 0.15, 1.0))
+        attach_link(robot, "bored_ball_surface", proxy, visual_color=PROXY_RGBA)
         print(f"  level-set proxy: {proxy.calcNumSubShapes()} cubes (visual only)")
         print(f"  links: {robot.get_link_names()}")
 
@@ -433,7 +448,7 @@ def run(**kwargs):
         # apart *before* they touch.
         print(f"\n--- 4. Sweep the probe (margin {MARGIN} m) ---")
         print(f"  {'probe_x':>8}  {'reported':>12}  {'analytic':>10}")
-        rows = sweep(robot, (0.45, 0.39, 0.35, 0.32, 0.30, 0.25))
+        rows = sweep(robot, SWEEP_PROBE_X_M)
         for x, reported, analytic in rows:
             shown = f"{reported:+.4f}" if reported is not None else "no contact"
             print(f"  {x:8.2f}  {shown:>12}  {analytic:+10.4f}")
@@ -472,7 +487,7 @@ def run(**kwargs):
     return {"field": field, "robot": robot, "proxy": proxy}
 
 
-def sweep_trajectory(period: float = 4.0, steps: int = 60):
+def sweep_trajectory(period: float = SWEEP_PERIOD_S, steps: int = SWEEP_STEPS):
     """
     A probe_x trajectory that dives into the obstacle and backs out again, for the viewer.
 

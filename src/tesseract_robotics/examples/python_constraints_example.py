@@ -44,6 +44,7 @@ import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 import numpy as np
 import trimesh
@@ -82,8 +83,10 @@ from tesseract_robotics.trajopt_ifopt.python_constraints import (
 
 # One solve per frame of the viewer's 30 Hz playback [Hz].
 FRAME_HZ = 30.0
+# Milliseconds in a second [ms/s].
+MS_PER_S = 1e3
 # What a solve may take for the loop to keep that rate [ms].
-FRAME_MS = 1e3 / FRAME_HZ
+FRAME_MS = MS_PER_S / FRAME_HZ
 # The arm's joints at the start [rad]: the tool points straight down, in front of the robot.
 START = np.array([0.0, 0.30, 0.10, 0.0, 1.17, 0.0])
 # How far the rail swings while it is driven [m].
@@ -161,6 +164,107 @@ VIEW_LOOK_AT_M = np.array([-0.6, -0.3, 1.25])
 VIEW_FOV_RAD = 0.7
 RULER_M = 1.6
 ROW_PITCH_M = 0.18
+
+
+# The cell's solids. Boxes are (x, y, z) edges [m], cylinders and balls a radius [m] and, for
+# cylinders, a height [m]; every offset is in the frame of the link the solid sits on.
+class Cylinder(NamedTuple):
+    radius_m: float
+    height_m: float
+
+
+ADAPTER = Cylinder(0.07, ADAPTER_M)
+# The rail: two beams either side of the carriage, each its own box.
+RAIL_BEAM_M = (0.08, 3.4, 0.06)
+RAIL_BEAM_X_M = 0.33
+CARRIAGE_M = (0.86, 0.7, 0.04)
+# The workpiece: a square pedestal under a round plate, whose top is the tip's height.
+PEDESTAL_SIDE_M = 0.36
+PLATE = Cylinder(0.26, 0.03)
+# The camera: a mast with its head clearance, a pan housing, the body and its lens.
+MAST_RADIUS_M = 0.025
+MAST_HEAD_CLEARANCE_M = 0.06
+PAN_HOUSING = Cylinder(0.045, 0.06)
+CAMERA_BODY_M = (0.1, 0.1, 0.16)
+LENS = Cylinder(0.035, 0.05)
+LENS_Z_M = 0.105
+# The panel's markers: a ball for the live value, a bar for the bound, a ball for the mark.
+GAUGE_BALL_RADIUS_M = 0.024
+GAUGE_BAR_M = (0.014, 0.014, 0.085)
+MARK_RADIUS_M = 0.016
+# Tessellation of the round solids: cylinder sections [-] and icosphere subdivisions [-].
+CYLINDER_SECTIONS = 72
+ICOSPHERE_SUBDIVISIONS = 4
+# Limits of the instrument and camera joints: travel of a slide [m], and the velocity,
+# acceleration and effort every joint is given [m/s, m/s^2, N] (nothing here is torque-limited).
+SLIDE_TRAVEL_M = 2000.0
+JOINT_RATE_LIMIT = 10.0
+# The faces of a triangle in a trimesh index array carry their vertex count first [-].
+TRIANGLE_VERTICES = 3
+# Optical frame from the tilt frame: z forward, x right, y down.
+OPTICAL_FROM_TILT = ((0.0, 0.0, 1.0), (-1.0, 0.0, 0.0), (0.0, -1.0, 0.0))
+# Millimetres in a metre [mm/m].
+MM_PER_M = 1e3
+# Cone glyphs: segments around the rim [-]; the PointsDown cone's length and the HoldAxis line's
+# [m]; how far the view cone reaches past the mark [m].
+CONE_SEGMENTS = 48
+POINTS_DOWN_LENGTH_M = 0.55
+AXIS_LINE_M = 0.7
+VIEW_OVERSHOOT_M = 0.25
+# The trace circle: segments [-] and how far it floats above the workpiece [m].
+CIRCLE_SEGMENTS = 72
+CIRCLE_LIFT_M = 0.002
+# The ElbowUp plane glyph: half extents along x and y, and its x offset [m].
+PLANE_HALF_XY_M = (0.45, 1.7)
+PLANE_X_M = 0.35
+# The ball's slide line is drawn from this far behind its parked position to this y [m].
+SLIDE_OVERRUN_M = 0.3
+SLIDE_END_Y_M = 1.2
+# The keep-out shell glyph's colour [RGB].
+SHELL_RGB = (255, 90, 60)
+# Line thicknesses of the glyphs [scene units].
+RULER_THICKNESS = 0.006
+AXIS_THICKNESS = 0.008
+VIEW_AXIS_THICKNESS = 0.004
+CIRCLE_THICKNESS = 0.006
+SLIDE_THICKNESS = 0.006
+# Panel text: line heights of the captions, the legend, the gauge labels and the end numbers
+# [m]; the glyph box takes this fraction of a line [-]; the ruler's tick half length [m] and
+# label lift [m]; how far the end numbers stand off the ruler [m].
+CAPTION_LINE_M = 0.15
+LEGEND_LINE_M = 0.062
+LABEL_LINE_M = 0.085
+TEXT_EM_FRACTION = 0.78
+TICK_HALF_M = 0.025
+LABEL_LIFT_M = 0.03
+END_NUMBER_OFFSET_M = 0.04
+# Image-based lighting strength of the viewer's environment map [-].
+ENVIRONMENT_INTENSITY = 0.35
+# Text alignment: the fraction of the text box its anchor sits from its centre [-].
+ALIGN_ACROSS = {"left": 0.5, "center": 0.0, "right": -0.5}
+ALIGN_ALONG = {"bottom": 0.5, "center": 0.0, "top": -0.5}
+
+
+class SliderRange(NamedTuple):
+    """A viewer slider: its range, step and starting value, in the quantity's unit."""
+
+    lo: float
+    hi: float
+    step: float
+    initial: float
+
+
+# Under `--sliders`. The rail's position, the carriage's follow band, the ball's slide, and
+# each rule's bound.
+SLIDER_RAIL = SliderRange(-RAIL_SWING_M, RAIL_SWING_M, 0.01, 0.0)
+SLIDER_FOLLOW = SliderRange(0.02, 1.0, 0.01, FOLLOW_BAND_M)
+SLIDER_BALL = SliderRange(BALL_PARKED_M, 0.3, 0.01, BALL_PARKED_M)
+SLIDER_OPACITY = SliderRange(0.0, 1.0, 0.01, GLYPH_OPACITY)
+SLIDER_AXIS_DEG = SliderRange(0.5, 20.0, 0.5, 0.5)
+SLIDER_CONE_DEG = SliderRange(5.0, 40.0, 1.0, 20.0)
+SLIDER_ELBOW_M = SliderRange(1.10, 1.35, 0.005, 1.2)
+SLIDER_VIEW_DEG = SliderRange(1.0, 25.0, 0.5, VIEW_DEG)
+SLIDER_DEXTERITY = SliderRange(0.7, 1.5, 0.01, 0.8)
 
 
 @dataclass(frozen=True)
@@ -338,7 +442,11 @@ def _isometry(xyz=(0.0, 0.0, 0.0), rotation: np.ndarray | None = None) -> Isomet
 
 def _finished(vertices: np.ndarray, triangles: np.ndarray, finish: Finish) -> Mesh:
     """A tesseract mesh that carries its own PBR material, which the viewer shades with."""
-    faces = np.column_stack([np.full(len(triangles), 3), triangles]).astype(np.int32).ravel()
+    faces = (
+        np.column_stack([np.full(len(triangles), TRIANGLE_VERTICES), triangles])
+        .astype(np.int32)
+        .ravel()
+    )
     material = MeshMaterial(np.array(finish.rgba), finish.metallic, finish.roughness, np.zeros(4))
     return Mesh(np.asarray(vertices, dtype=np.float64), faces, mesh_material=material)
 
@@ -349,12 +457,12 @@ def _box(x: float, y: float, z: float, finish: Finish) -> Mesh:
 
 
 def _cylinder(radius: float, height: float, finish: Finish) -> Mesh:
-    shape = trimesh.creation.cylinder(radius, height, sections=72)
+    shape = trimesh.creation.cylinder(radius, height, sections=CYLINDER_SECTIONS)
     return _finished(shape.vertices, shape.faces, finish)
 
 
 def _ball(radius: float, finish: Finish) -> Mesh:
-    shape = trimesh.creation.icosphere(subdivisions=4, radius=radius)
+    shape = trimesh.creation.icosphere(subdivisions=ICOSPHERE_SUBDIVISIONS, radius=radius)
     return _finished(shape.vertices, shape.faces, finish)
 
 
@@ -394,11 +502,20 @@ def _add_link(
     elif revolute:
         joint.type = JointType.REVOLUTE
         joint.axis = np.asarray(axis, dtype=np.float64)
-        joint.limits = JointLimits(-np.pi, np.pi, 0.0, 10.0, 10.0, 10.0)
+        joint.limits = JointLimits(
+            -np.pi, np.pi, 0.0, JOINT_RATE_LIMIT, JOINT_RATE_LIMIT, JOINT_RATE_LIMIT
+        )
     else:
         joint.type = JointType.PRISMATIC
         joint.axis = np.asarray(axis, dtype=np.float64)
-        joint.limits = JointLimits(-2000.0, 2000.0, 0.0, 10.0, 10.0, 10.0)
+        joint.limits = JointLimits(
+            -SLIDE_TRAVEL_M,
+            SLIDE_TRAVEL_M,
+            0.0,
+            JOINT_RATE_LIMIT,
+            JOINT_RATE_LIMIT,
+            JOINT_RATE_LIMIT,
+        )
     robot.add_link(link, joint)
 
 
@@ -430,7 +547,7 @@ def build_cell() -> Robot:
         "adapter",
         "tool0",
         _isometry((0, 0, ADAPTER_M / 2)),
-        (_visual(_cylinder(0.07, ADAPTER_M, ANODISED)),),
+        (_visual(_cylinder(ADAPTER.radius_m, ADAPTER.height_m, ANODISED)),),
     )
     _add_link(
         robot,
@@ -458,8 +575,12 @@ def build_cell() -> Robot:
         WORLD,
         _isometry(),
         (
-            _visual(_box(0.08, 3.4, 0.06, RAIL_STEEL), _isometry((0.33, 0, 0.03))),
-            _visual(_box(0.08, 3.4, 0.06, RAIL_STEEL), _isometry((-0.33, 0, 0.03))),
+            _visual(
+                _box(*RAIL_BEAM_M, RAIL_STEEL), _isometry((RAIL_BEAM_X_M, 0, RAIL_BEAM_M[2] / 2))
+            ),
+            _visual(
+                _box(*RAIL_BEAM_M, RAIL_STEEL), _isometry((-RAIL_BEAM_X_M, 0, RAIL_BEAM_M[2] / 2))
+            ),
         ),
     )
     _add_link(
@@ -467,7 +588,7 @@ def build_cell() -> Robot:
         "carriage",
         "positioner_tool0",
         _isometry(),
-        (_visual(_box(0.86, 0.7, 0.04, ALUMINIUM), _isometry((0, 0, 0.02))),),
+        (_visual(_box(*CARRIAGE_M, ALUMINIUM), _isometry((0, 0, CARRIAGE_M[2] / 2))),),
     )
 
     # The workpiece: a plate on a pedestal, its top where the tool tip is at the start.
@@ -479,8 +600,14 @@ def build_cell() -> Robot:
         WORLD,
         _isometry((tip[0], tip[1], 0)),
         (
-            _visual(_box(0.36, 0.36, top - 0.03, CAST_IRON), _isometry((0, 0, (top - 0.03) / 2))),
-            _visual(_cylinder(0.26, 0.03, POLISHED), _isometry((0, 0, top - 0.015))),
+            _visual(
+                _box(PEDESTAL_SIDE_M, PEDESTAL_SIDE_M, top - PLATE.height_m, CAST_IRON),
+                _isometry((0, 0, (top - PLATE.height_m) / 2)),
+            ),
+            _visual(
+                _cylinder(PLATE.radius_m, PLATE.height_m, POLISHED),
+                _isometry((0, 0, top - PLATE.height_m / 2)),
+            ),
         ),
     )
 
@@ -498,7 +625,7 @@ def build_cell() -> Robot:
     nod = np.array(
         [[np.cos(pitch), 0, np.sin(pitch)], [0, 1, 0], [-np.sin(pitch), 0, np.cos(pitch)]]
     )
-    optical = np.array([[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]])
+    optical = np.array(OPTICAL_FROM_TILT)
     _add_link(
         robot,
         "camera_mast",
@@ -506,8 +633,8 @@ def build_cell() -> Robot:
         _isometry((mast_x, mast_y, 0)),
         (
             _visual(
-                _cylinder(0.025, CAMERA_HEIGHT_M - 0.06, RAIL_STEEL),
-                _isometry((0, 0, (CAMERA_HEIGHT_M - 0.06) / 2)),
+                _cylinder(MAST_RADIUS_M, CAMERA_HEIGHT_M - MAST_HEAD_CLEARANCE_M, RAIL_STEEL),
+                _isometry((0, 0, (CAMERA_HEIGHT_M - MAST_HEAD_CLEARANCE_M) / 2)),
             ),
         ),
     )
@@ -516,7 +643,12 @@ def build_cell() -> Robot:
         "camera_pan",
         "camera_mast",
         _isometry((0, 0, CAMERA_HEIGHT_M), yaw),
-        (_visual(_cylinder(0.045, 0.06, ANODISED), _isometry((0, 0, -0.03))),),
+        (
+            _visual(
+                _cylinder(PAN_HOUSING.radius_m, PAN_HOUSING.height_m, ANODISED),
+                _isometry((0, 0, -PAN_HOUSING.height_m / 2)),
+            ),
+        ),
         axis=(0, 0, 1),
         revolute=True,
     )
@@ -526,8 +658,10 @@ def build_cell() -> Robot:
         "camera_pan",
         _isometry(rotation=nod @ optical),
         (
-            _visual(_box(0.1, 0.1, 0.16, ANODISED)),
-            _visual(_cylinder(0.035, 0.05, TOOL_STEEL), _isometry((0, 0, 0.105))),
+            _visual(_box(*CAMERA_BODY_M, ANODISED)),
+            _visual(
+                _cylinder(LENS.radius_m, LENS.height_m, TOOL_STEEL), _isometry((0, 0, LENS_Z_M))
+            ),
         ),
         # The tilt axis, the pan frame's y, in the optical frame: its -x.
         axis=(-1, 0, 0),
@@ -566,7 +700,7 @@ def _add_instruments(robot: Robot) -> None:
             f"{gauge.key}_value",
             WORLD,
             _isometry(start),
-            (_visual(_ball(0.024, WHITE_ENAMEL)),),
+            (_visual(_ball(GAUGE_BALL_RADIUS_M, WHITE_ENAMEL)),),
             axis=right,
         )
         _add_link(
@@ -574,7 +708,7 @@ def _add_instruments(robot: Robot) -> None:
             f"{gauge.key}_bound",
             WORLD,
             _isometry(start),
-            (_visual(_box(0.014, 0.014, 0.085, ORANGE_ENAMEL)),),
+            (_visual(_box(*GAUGE_BAR_M, ORANGE_ENAMEL)),),
             axis=right,
         )
     for index in range(len(ACTS)):
@@ -588,7 +722,7 @@ def _add_instruments(robot: Robot) -> None:
         "mark",
         "mark_y",
         _isometry(),
-        (_visual(_ball(0.016, ORANGE_ENAMEL)),),
+        (_visual(_ball(MARK_RADIUS_M, ORANGE_ENAMEL)),),
         axis=(0, 0, 1),
     )
     # Shown at the mark, and moving with it: the PointsDown cone and the HoldAxis line.
@@ -627,7 +761,7 @@ def measure(cell: JointGroup, q: np.ndarray, target: np.ndarray, clearance_m: fl
     tcp, camera = poses[TCP], poses[CAMERA]
     to_tip = tcp.translation - camera.translation
     return {
-        "hold_mm": float(np.linalg.norm(tcp.translation - target) * 1e3),
+        "hold_mm": float(np.linalg.norm(tcp.translation - target) * MM_PER_M),
         "tilt_deg": _angle_deg(tcp.rotation[:, 2] @ DOWN),
         "elbow_m": float(poses[ELBOW].translation[2]),
         "view_deg": _angle_deg(camera.rotation[:, 2] @ to_tip / np.linalg.norm(to_tip)),
@@ -831,7 +965,7 @@ class LiveLoop:
         started = time.perf_counter()
         if sets:
             tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver()).solve(problem)
-        solve_ms = (time.perf_counter() - started) * 1e3
+        solve_ms = (time.perf_counter() - started) * MS_PER_S
 
         solved = np.asarray(var.value())
         self.q = solved.copy() if inputs.rail_m is None else np.array([inputs.rail_m, *solved])
@@ -957,7 +1091,7 @@ def trajectory_rows(results: dict) -> list[list[float]]:
     return rows
 
 
-def _cone_mesh(half_angle: float, length: float, segments: int = 48):
+def _cone_mesh(half_angle: float, length: float, segments: int = CONE_SEGMENTS):
     """A cone with its apex at the origin, opening along +z: vertices and faces."""
     angles = np.linspace(0.0, 2.0 * np.pi, segments, endpoint=False)
     radius = length * np.tan(half_angle)
@@ -973,7 +1107,7 @@ def _text_image(text: str) -> np.ndarray:
     """`text` as white glyphs on a transparent RGBA image, TEXT_LINE_PX high per line."""
     from PIL import Image, ImageDraw, ImageFont
 
-    font = ImageFont.load_default(size=round(0.78 * TEXT_LINE_PX))
+    font = ImageFont.load_default(size=round(TEXT_EM_FRACTION * TEXT_LINE_PX))
     lines = text.split("\n")
     pad = TEXT_LINE_PX // 8
     width = max(round(font.getlength(line)) for line in lines) + 2 * pad
@@ -1004,8 +1138,8 @@ def _add_text(
     height = line_height_m * image.shape[0] / TEXT_LINE_PX
     width = height * image.shape[1] / image.shape[0]
     up = np.array([0.0, 0.0, 1.0])
-    across = {"left": 0.5, "center": 0.0, "right": -0.5}[align] * width
-    along = {"bottom": 0.5, "center": 0.0, "top": -0.5}[valign] * height
+    across = ALIGN_ACROSS[align] * width
+    along = ALIGN_ALONG[valign] * height
     # The image's x runs along `right` and its y down, so its face looks back at the view.
     axes = np.column_stack([right, -up, np.cross(right, -up)])
     scene.add_image(
@@ -1034,7 +1168,7 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
     """
     scene = viewer.server.scene
     # Image-based lighting, for the metal of the tool, the rail and the workpiece.
-    scene.configure_environment_map(hdri="warehouse", environment_intensity=0.35)
+    scene.configure_environment_map(hdri="warehouse", environment_intensity=ENVIRONMENT_INTENSITY)
 
     # Captions, one per act, each on its own link.
     corner, right = panel_frame()
@@ -1048,7 +1182,7 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
             caption,
             caption_anchor(),
             right,
-            0.15,
+            CAPTION_LINE_M,
             valign="top",
         )
 
@@ -1059,7 +1193,7 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
         "ball: live value  ·  bar: its bound, while the rule is on",
         corner + [0, 0, ROW_PITCH_M],
         right,
-        0.062,
+        LEGEND_LINE_M,
     )
     rulers, ticks = [], []
     for row, gauge in enumerate(GAUGES):
@@ -1067,17 +1201,22 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
         end = start + RULER_M * right
         rulers.append([start, end])
         for point in (start, end):
-            ticks.append([point - [0, 0, 0.025], point + [0, 0, 0.025]])
+            ticks.append([point - [0, 0, TICK_HALF_M], point + [0, 0, TICK_HALF_M]])
         _add_text(
-            scene, f"/panel/{gauge.key}/label", gauge.label, start + [0, 0, 0.03], right, 0.085
+            scene,
+            f"/panel/{gauge.key}/label",
+            gauge.label,
+            start + [0, 0, LABEL_LIFT_M],
+            right,
+            LABEL_LINE_M,
         )
         _add_text(
             scene,
             f"/panel/{gauge.key}/lo",
             f"{gauge.lo:g}",
-            start - 0.04 * right,
+            start - END_NUMBER_OFFSET_M * right,
             right,
-            0.062,
+            LEGEND_LINE_M,
             align="right",
             valign="center",
         )
@@ -1085,18 +1224,18 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
             scene,
             f"/panel/{gauge.key}/hi",
             f"{gauge.hi:g}",
-            end + 0.04 * right,
+            end + END_NUMBER_OFFSET_M * right,
             right,
-            0.062,
+            LEGEND_LINE_M,
             valign="center",
         )
-    scene.add_line_segments("/panel/rulers", np.array(rulers), GREY_RGB, thickness=0.006)
-    scene.add_line_segments("/panel/ticks", np.array(ticks), GREY_RGB, thickness=0.006)
+    scene.add_line_segments("/panel/rulers", np.array(rulers), GREY_RGB, thickness=RULER_THICKNESS)
+    scene.add_line_segments("/panel/ticks", np.array(ticks), GREY_RGB, thickness=RULER_THICKNESS)
 
     # PointsDown: the cone the tool axis stays in, apex on the mark.
     glyphs = []
     cone_deg = next(act.cone_deg for act in ACTS if act.cone_deg is not None)
-    vertices, faces = _cone_mesh(np.radians(cone_deg), 0.55)
+    vertices, faces = _cone_mesh(np.radians(cone_deg), POINTS_DOWN_LENGTH_M)
     glyphs.append(
         scene.add_mesh_simple(
             "/links/cone_stage/cone",
@@ -1111,25 +1250,27 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
     # HoldAxis: the line the tool axis locks onto.
     scene.add_line_segments(
         "/links/axis_stage/axis",
-        np.array([[[0.0, 0.0, 0.0], [0.0, 0.0, 0.7]]]),
+        np.array([[[0.0, 0.0, 0.0], [0.0, 0.0, AXIS_LINE_M]]]),
         ORANGE_RGB,
-        thickness=0.008,
+        thickness=AXIS_THICKNESS,
     )
     # The circle the mark moves on in the last act, through the mark.
     radius = next(act.trace_m for act in ACTS if act.trace_m is not None)
-    turns = np.linspace(0.0, 2.0 * np.pi, 73)
-    circle = radius * np.column_stack([np.cos(turns) - 1.0, np.sin(turns), np.zeros(73)])
+    turns = np.linspace(0.0, 2.0 * np.pi, CIRCLE_SEGMENTS + 1)
+    circle = radius * np.column_stack(
+        [np.cos(turns) - 1.0, np.sin(turns), np.zeros(CIRCLE_SEGMENTS + 1)]
+    )
     scene.add_line_segments(
         "/links/trace_stage/circle",
-        np.stack([circle[:-1], circle[1:]], axis=1) + [0.0, 0.0, 0.002],
+        np.stack([circle[:-1], circle[1:]], axis=1) + [0.0, 0.0, CIRCLE_LIFT_M],
         ORANGE_RGB,
-        thickness=0.006,
+        thickness=CIRCLE_THICKNESS,
     )
     # ElbowUp: the plane the elbow stays above, along the rail.
-    half_x, half_y = 0.45, 1.7
+    half_x, half_y = PLANE_HALF_XY_M
     plane = np.array(
         [[-half_x, -half_y, 0], [half_x, -half_y, 0], [half_x, half_y, 0], [-half_x, half_y, 0]]
-    ) + [0.35, 0.0, 0.0]
+    ) + [PLANE_X_M, 0.0, 0.0]
     glyphs.append(
         scene.add_mesh_simple(
             "/links/plane_stage/plane",
@@ -1142,7 +1283,7 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
         )
     )
     # WatchTheTool: the cone the tip stays in and the camera's optical axis, out to the mark.
-    reach = float(np.linalg.norm(target - [*CAMERA_MAST_XY_M, CAMERA_HEIGHT_M])) + 0.25
+    reach = float(np.linalg.norm(target - [*CAMERA_MAST_XY_M, CAMERA_HEIGHT_M])) + VIEW_OVERSHOOT_M
     vertices, faces = _cone_mesh(np.radians(VIEW_DEG), reach)
     glyphs.append(
         scene.add_mesh_simple(
@@ -1159,21 +1300,28 @@ def decorate(viewer, target: np.ndarray, solve_ms: Sequence[float] | None = None
         "/links/view_stage/axis",
         np.array([[[0.0, 0.0, 0.0], [0.0, 0.0, reach]]]),
         ORANGE_RGB,
-        thickness=0.004,
+        thickness=VIEW_AXIS_THICKNESS,
     )
     # Clearance: the ball's slide, and the shell the forearm stays out of.
     slide_x, slide_z = BALL_LINE_XZ_M
     scene.add_line_segments(
         "/slide",
-        np.array([[[slide_x, BALL_PARKED_M - 0.3, slide_z], [slide_x, 1.2, slide_z]]]),
+        np.array(
+            [
+                [
+                    [slide_x, BALL_PARKED_M - SLIDE_OVERRUN_M, slide_z],
+                    [slide_x, SLIDE_END_Y_M, slide_z],
+                ]
+            ]
+        ),
         GREY_RGB,
-        thickness=0.006,
+        thickness=SLIDE_THICKNESS,
     )
     glyphs.append(
         scene.add_icosphere(
             "/links/obstacle/shell",
             radius=BALL_RADIUS_M + CLEARANCE_MIN_M,
-            color=(255, 90, 60),
+            color=SHELL_RGB,
             opacity=GLYPH_OPACITY,
             cast_shadow=False,
         )
@@ -1189,11 +1337,14 @@ def face_view(viewer) -> None:
     camera.fov = VIEW_FOV_RAD
 
 
+def _slider(gui, label: str, rng: SliderRange):
+    """A viewer slider over `rng`."""
+    return gui.add_slider(label, min=rng.lo, max=rng.hi, step=rng.step, initial_value=rng.initial)
+
+
 def add_opacity_slider(viewer, glyphs: list):
     """A slider for how solid the rules' translucent glyphs are drawn; returns its handle."""
-    slider = viewer.server.gui.add_slider(
-        "Constraint opacity", min=0.0, max=1.0, step=0.01, initial_value=GLYPH_OPACITY
-    )
+    slider = _slider(viewer.server.gui, "Constraint opacity", SLIDER_OPACITY)
 
     @slider.on_update
     def _(_event) -> None:
@@ -1222,54 +1373,26 @@ def drive_with_sliders(viewer, loop: LiveLoop, stop: threading.Event) -> None:
     )
     with gui.add_folder("Inputs"):
         swings = gui.add_checkbox("Rail swings by itself", True)
-        rail = gui.add_slider(
-            "Rail [m]", min=-RAIL_SWING_M, max=RAIL_SWING_M, step=0.01, initial_value=0.0
-        )
+        rail = _slider(gui, "Rail [m]", SLIDER_RAIL)
         ours = gui.add_checkbox("Rail is the solver's 7th axis", False)
-        follow = gui.add_slider(
-            "Carriage follows the tip within [m]",
-            min=0.02,
-            max=1.0,
-            step=0.01,
-            initial_value=FOLLOW_BAND_M,
-        )
+        follow = _slider(gui, "Carriage follows the tip within [m]", SLIDER_FOLLOW)
         gui.add_markdown(
             "Ticked, the carriage drives to abeam of the tip and stays there: drag the mark by "
             "its handle. Widen the band for the other rules to move the carriage."
         )
-        ball = gui.add_slider(
-            "Ball on its slide [m]",
-            min=BALL_PARKED_M,
-            max=0.3,
-            step=0.01,
-            initial_value=BALL_PARKED_M,
-        )
+        ball = _slider(gui, "Ball on its slide [m]", SLIDER_BALL)
     with gui.add_folder("Rules"):
         hold = gui.add_checkbox("WorldHold", True)
         axis_on = gui.add_checkbox("HoldAxis", False)
-        axis = gui.add_slider(
-            "HoldAxis tolerance [°]", min=0.5, max=20.0, step=0.5, initial_value=0.5
-        )
+        axis = _slider(gui, "HoldAxis tolerance [°]", SLIDER_AXIS_DEG)
         cone_on = gui.add_checkbox("PointsDown", False)
-        cone = gui.add_slider(
-            "PointsDown cone [°]", min=5.0, max=40.0, step=1.0, initial_value=20.0
-        )
+        cone = _slider(gui, "PointsDown cone [°]", SLIDER_CONE_DEG)
         elbow_on = gui.add_checkbox("ElbowUp", False)
-        elbow = gui.add_slider(
-            "Elbow at least [m]", min=1.10, max=1.35, step=0.005, initial_value=1.2
-        )
+        elbow = _slider(gui, "Elbow at least [m]", SLIDER_ELBOW_M)
         view_on = gui.add_checkbox("WatchTheTool", True)
-        view = gui.add_slider(
-            "Tip off the camera axis at most [°]",
-            min=1.0,
-            max=25.0,
-            step=0.5,
-            initial_value=VIEW_DEG,
-        )
+        view = _slider(gui, "Tip off the camera axis at most [°]", SLIDER_VIEW_DEG)
         dexterous_on = gui.add_checkbox("StayDexterous", False)
-        dexterous = gui.add_slider(
-            "Manipulability at least", min=0.7, max=1.5, step=0.01, initial_value=0.8
-        )
+        dexterous = _slider(gui, "Manipulability at least", SLIDER_DEXTERITY)
         clearance = gui.add_checkbox("Clearance", False)
     status = gui.add_text("Solve", initial_value="", disabled=True)
 
@@ -1317,7 +1440,7 @@ def drive_with_sliders(viewer, loop: LiveLoop, stop: threading.Event) -> None:
                 solve_line(on, float(np.median(recent))),
                 caption_anchor(),
                 panel_frame()[1],
-                0.15,
+                CAPTION_LINE_M,
                 valign="top",
             )
             recent.clear()

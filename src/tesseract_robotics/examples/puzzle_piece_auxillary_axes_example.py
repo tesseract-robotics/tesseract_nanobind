@@ -117,6 +117,32 @@ from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
+# The CSV is exported in millimetres; the scene is in metres (puzzle_piece_auxillary_axes_example.cpp:122).
+M_PER_MM = 1e-3
+# CSV header rows to skip (cpp:104-106: `lnum < 3` after `++lnum`).
+CSV_HEADER_ROWS = 2
+# CSV columns: point number, x, y, z, i, j, k (cpp:108-120).
+CSV_MIN_COLUMNS = 7
+# A toolpath point closer to the origin than this has no inward direction [m]. The C++
+# example normalises (-pos) unguarded (cpp:131); this port falls back to +x instead of
+# dividing by zero.
+ORIGIN_NEIGHBOURHOOD_M = 1e-6
+FALLBACK_X_AXIS = (1.0, 0.0, 0.0)
+# Cartesian constraint weights [x, y, z, rx, ry, rz] [-]: position 5, roll and pitch 2, yaw
+# free (cpp:236-240, 262-266).
+CARTESIAN_COEFF = (5.0, 5.0, 5.0, 2.0, 2.0, 0.0)
+# Collision cost of the composite profile: margin [m] and coefficient [-] (cpp:243, 271).
+COST_MARGIN_M = 0.025
+COST_COEFF = 1.0
+# OSQP: iterations [-], minimum approximate improvement and minimum trust-box size
+# (cpp:277-279; TrajOptIfopt branch 249-251). adaptive_rho is 0 (cpp:276).
+SOLVER_MAX_ITER = 200
+SOLVER_MIN_APPROX_IMPROVE = 1e-3
+SOLVER_MIN_TRUST_BOX_SIZE = 1e-3
+OSQP_ADAPTIVE_RHO = 0
+# Initial joints [rad]: arm slightly bent, positioner neutral (cpp:179-188).
+START_JOINTS_RAD = (-0.785398, 0.4, 0.0, -1.9, 0.0, 1.0, 0.0, 0.0, 0.0)
+
 
 def make_puzzle_tool_poses(robot):
     """Load toolpath poses from puzzle_bent.csv.
@@ -143,15 +169,15 @@ def make_puzzle_tool_poses(robot):
     with open(csv_path) as f:
         reader = csv.reader(f)
         for lnum, row in enumerate(reader):
-            if lnum < 2 or len(row) < 7:  # Skip header rows
+            if lnum < CSV_HEADER_ROWS or len(row) < CSV_MIN_COLUMNS:  # Skip header rows
                 continue
 
             try:
                 # Parse x,y,z (mm) and normal i,j,k - convert mm to meters
                 x, y, z = (
-                    float(row[1]) / 1000,
-                    float(row[2]) / 1000,
-                    float(row[3]) / 1000,
+                    float(row[1]) * M_PER_MM,
+                    float(row[2]) * M_PER_MM,
+                    float(row[3]) * M_PER_MM,
                 )
                 i, j, k = float(row[4]), float(row[5]), float(row[6])
             except (ValueError, IndexError):
@@ -164,7 +190,9 @@ def make_puzzle_tool_poses(robot):
             # Build orthogonal frame from surface normal
             # Use negative position as reference to create X-axis pointing inward
             temp_x = (
-                -pos / np.linalg.norm(pos) if np.linalg.norm(pos) > 1e-6 else np.array([1, 0, 0])
+                -pos / np.linalg.norm(pos)
+                if np.linalg.norm(pos) > ORIGIN_NEIGHBOURHOOD_M
+                else np.array(FALLBACK_X_AXIS)
             )
             y_axis = np.cross(norm, temp_x)
             y_axis /= np.linalg.norm(y_axis)
@@ -198,22 +226,22 @@ def create_profiles():
     plan.joint_cost_config.enabled = False
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
-    plan.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 0.0])
+    plan.cartesian_constraint_config.coeff = np.array(CARTESIAN_COEFF)
 
     # Composite profile: soft collision cost (not hard constraint)
     composite = TrajOptDefaultCompositeProfile()
     composite.collision_constraint_config.enabled = False
     composite.collision_cost_config.enabled = True
-    composite.collision_cost_config.contact_manager_config.default_margin = 0.025  # 25mm margin
+    composite.collision_cost_config.contact_manager_config.default_margin = COST_MARGIN_M
     composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
-    composite.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(1.0)
+    composite.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(COST_COEFF)
 
     # Solver profile: OSQP with C++ settings
     solver = TrajOptOSQPSolverProfile()
-    solver.settings.adaptive_rho = 0
-    solver.opt_params.max_iter = 200
-    solver.opt_params.min_approx_improve = 1e-3
-    solver.opt_params.min_trust_box_size = 1e-3
+    solver.settings.adaptive_rho = OSQP_ADAPTIVE_RHO
+    solver.opt_params.max_iter = SOLVER_MAX_ITER
+    solver.opt_params.min_approx_improve = SOLVER_MIN_APPROX_IMPROVE
+    solver.opt_params.min_trust_box_size = SOLVER_MIN_TRUST_BOX_SIZE
 
     profiles.addProfile(TRAJOPT_NS, "CARTESIAN", plan)
     profiles.addProfile(TRAJOPT_NS, "DEFAULT", composite)
@@ -237,17 +265,17 @@ def create_ifopt_profiles():
     move.joint_cost_config.enabled = False
     move.cartesian_cost_config.enabled = False
     move.cartesian_constraint_config.enabled = True
-    move.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 0.0])
+    move.cartesian_constraint_config.coeff = np.array(CARTESIAN_COEFF)
 
     composite = TrajOptIfoptDefaultCompositeProfile()
     composite.collision_constraint_config.enabled = False
-    composite.collision_cost_config = TrajOptCollisionConfig(0.025, 1.0)  # 25mm margin, coeff 1
+    composite.collision_cost_config = TrajOptCollisionConfig(COST_MARGIN_M, COST_COEFF)
     composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
     solver = TrajOptIfoptOSQPSolverProfile()
-    solver.opt_params.max_iter = 200
-    solver.opt_params.min_approx_improve = 1e-3
-    solver.opt_params.min_trust_box_size = 1e-3
+    solver.opt_params.max_iter = SOLVER_MAX_ITER
+    solver.opt_params.min_approx_improve = SOLVER_MIN_APPROX_IMPROVE
+    solver.opt_params.min_trust_box_size = SOLVER_MIN_TRUST_BOX_SIZE
 
     profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "CARTESIAN", move)
     profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "DEFAULT", composite)
@@ -293,7 +321,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
         "joint_aux2",  # Positioner: Z-rotation + tilt
     ]
     # Initial configuration from C++ (arm slightly bent, positioner neutral)
-    joint_pos = np.array([-0.785398, 0.4, 0.0, -1.9, 0.0, 1.0, 0.0, 0.0, 0.0])
+    joint_pos = np.array(START_JOINTS_RAD)
     robot.set_joints(joint_pos, joint_names=joint_names)
 
     # === LOAD TOOLPATH ===

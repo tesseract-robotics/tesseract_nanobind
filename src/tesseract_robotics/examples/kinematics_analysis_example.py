@@ -137,6 +137,36 @@ ERROR_DIFF_BASE_ANGLE = 0.5
 ERROR_DIFF_BIG_STEP = 0.2
 
 UNIT_X = np.array([1.0, 0.0, 0.0])
+# Joint rates for the twist identity [rad/s]: 0.1 .. 0.7, one per joint of the arm.
+JOINT_RATES = np.arange(1.0, 8.0) / 10.0
+# A translation along all three axes, shared by the transform-error and error-diff examples [m].
+TRANSLATION_M = (1.0, 2.0, 3.0)
+# Arm joints the validity check takes: the first six of Q.
+ARM_JOINTS = 6
+# applyTolerances example: values, and the lower and upper bounds each is clamped against.
+TOLERANCE_VALUES = (-2.0, -0.25, 0.25, 2.0)
+TOLERANCE_LOWER = (-1.0, -0.5, -0.5, -1.0)
+TOLERANCE_UPPER = (1.0, 0.5, 0.5, 1.0)
+# Error-diff bands over [x, y, z, rx, ry, rz]: translation rows are wide open, the
+# orientation rows other than x are +-0.5 [m, rad].
+BAND_TRANSLATION = 5.0
+BAND_ORIENTATION = 0.5
+# x-rotation row: the band that holds both errors [rad]; how far below the base angle the
+# "below" band's top sits, and how far its bottom sits under that [rad]; the top edge that
+# falls between the two errors [rad].
+BAND_INSIDE = (0.0, 1.0)
+BAND_BELOW_OFFSET = 0.1
+BAND_BELOW_WIDTH = 0.01
+BAND_EDGE_TOP = 0.55
+# Row of the x rotation in a 6-row error [-].
+X_ROTATION_ROW = 3
+
+
+def _band(x_rotation: float, orientation: float) -> np.ndarray:
+    """A band over [x, y, z, rx, ry, rz]: the x rotation at `x_rotation`, the other orientation
+    rows at `orientation`, and the translation rows `BAND_TRANSLATION` out on the same side."""
+    side = np.sign(orientation)
+    return np.array([side * BAND_TRANSLATION] * 3 + [x_rotation, orientation, orientation])
 
 
 def locate(locator: GeneralResourceLocator, url: str) -> Path:
@@ -284,7 +314,7 @@ def run() -> dict[str, Any]:
 
     # --8<-- [start:twist]
     jacobian = np.asfortranarray(fwd_kin.calcJacobian(Q, TIP_LINK))
-    q_dot = np.arange(1.0, 8.0) / 10.0
+    q_dot = JOINT_RATES
     change_base, ref_point = isometry(RZ90, unit(0)), unit(2)
 
     twist = jacobian @ q_dot
@@ -343,8 +373,8 @@ def run() -> dict[str, Any]:
     }
 
     # --8<-- [start:validity]
-    six = Q[:6].tolist()
-    is_valid = (isValid(six), isValid([*six[:5], float("nan")]))
+    six = Q[:ARM_JOINTS].tolist()
+    is_valid = (isValid(six), isValid([*six[:-1], float("nan")]))
     check_kinematics = checkKinematics(group)
     # --8<-- [end:validity]
 
@@ -380,14 +410,14 @@ def run() -> dict[str, Any]:
     # --8<-- [start:transform_error]
     identity = Isometry3d.Identity()
     rot_x = Isometry3d(AngleAxisd(np.pi / 2, UNIT_X))
-    translated = Isometry3d(Translation3d(1.0, 2.0, 3.0))
+    translated = Isometry3d(Translation3d(*TRANSLATION_M))
     rotation_error = calcTransformError(identity, rot_x)
     translation_error = calcTransformError(identity, translated)
     # --8<-- [end:transform_error]
     transform_error = {
         "rotation_part": is_approx(rotation_error[3:], np.array([np.pi / 2, 0.0, 0.0])),
         "rotation_translation_zero": bool(np.array_equal(rotation_error[:3], np.zeros(3))),
-        "translation_part": is_approx(translation_error[:3], np.array([1.0, 2.0, 3.0])),
+        "translation_part": is_approx(translation_error[:3], np.array(TRANSLATION_M)),
         "translation_rotation_zero": bool(np.array_equal(translation_error[3:], np.zeros(3))),
         "rotational_error": is_approx(
             calcRotationalError(rot_x.rotation), np.array([np.pi / 2, 0.0, 0.0])
@@ -395,24 +425,24 @@ def run() -> dict[str, Any]:
     }
 
     # --8<-- [start:tolerances]
-    v = np.array([-2.0, -0.25, 0.25, 2.0])
-    applyTolerances(v, np.array([-1.0, -0.5, -0.5, -1.0]), np.array([1.0, 0.5, 0.5, 1.0]))
+    v = np.array(TOLERANCE_VALUES)
+    applyTolerances(v, np.array(TOLERANCE_LOWER), np.array(TOLERANCE_UPPER))
 
-    target = Isometry3d(Translation3d(1.0, 2.0, 3.0))
+    target = Isometry3d(Translation3d(*TRANSLATION_M))
     target_perturbed = Isometry3d(AngleAxisd(-ERROR_DIFF_EPS, UNIT_X)) * target
     source = Isometry3d(AngleAxisd(ERROR_DIFF_BASE_ANGLE, UNIT_X))
     source_perturbed = Isometry3d(AngleAxisd(ERROR_DIFF_BASE_ANGLE + ERROR_DIFF_EPS, UNIT_X))
     source_big = Isometry3d(AngleAxisd(ERROR_DIFF_BASE_ANGLE + ERROR_DIFF_BIG_STEP, UNIT_X))
 
     # Band around both errors on the x-rotation row: clamped to zero
-    inside_lower = np.array([-5.0, -5.0, -5.0, 0.0, -0.5, -0.5])
-    inside_upper = np.array([5.0, 5.0, 5.0, 1.0, 0.5, 0.5])
+    inside_lower = _band(BAND_INSIDE[0], -BAND_ORIENTATION)
+    inside_upper = _band(BAND_INSIDE[1], BAND_ORIENTATION)
     # Band below both errors: the same offset on both, the raw difference remains
-    band_top = ERROR_DIFF_BASE_ANGLE - 0.1
-    below_lower = np.array([-5.0, -5.0, -5.0, band_top - 0.01, -0.5, -0.5])
-    below_upper = np.array([5.0, 5.0, 5.0, band_top, 0.5, 0.5])
+    band_top = ERROR_DIFF_BASE_ANGLE - BAND_BELOW_OFFSET
+    below_lower = _band(band_top - BAND_BELOW_WIDTH, -BAND_ORIENTATION)
+    below_upper = _band(band_top, BAND_ORIENTATION)
     # Band edge between the two errors: 0.5 inside [0, 0.55], 0.7 above it -> 0.15
-    edge_upper = np.array([5.0, 5.0, 5.0, 0.55, 0.5, 0.5])
+    edge_upper = _band(BAND_EDGE_TOP, BAND_ORIENTATION)
 
     raw = calcJacobianTransformErrorDiff(target, source, source_perturbed)
     raw_dynamic = calcJacobianTransformErrorDiff(target, target_perturbed, source, source_perturbed)
@@ -431,7 +461,7 @@ def run() -> dict[str, Any]:
         ).max(),
         "band_edge": calcJacobianTransformErrorDiff(
             target, source, source_big, inside_lower, edge_upper
-        )[3],
+        )[X_ROTATION_ROW],
         "dynamic_inside_band": np.abs(
             calcJacobianTransformErrorDiff(
                 target, target_perturbed, source, source_perturbed, inside_lower, inside_upper
@@ -440,12 +470,12 @@ def run() -> dict[str, Any]:
         "dynamic_above_band_vs_raw": abs(
             calcJacobianTransformErrorDiff(
                 target, target_perturbed, source, source_perturbed, below_lower, below_upper
-            )[3]
-            - raw_dynamic[3]
+            )[X_ROTATION_ROW]
+            - raw_dynamic[X_ROTATION_ROW]
         ),
         "dynamic_band_edge": calcJacobianTransformErrorDiff(
             target, target_perturbed, source, source_big, inside_lower, edge_upper
-        )[3],
+        )[X_ROTATION_ROW],
     }
     # --8<-- [end:tolerances]
 
@@ -510,7 +540,7 @@ def main() -> None:
     )
     diff = result["error_diff"]
     print(
-        f"calcJacobianTransformErrorDiff: raw x-rotation row {diff['raw'][3]:.3e}; inside the band "
+        f"calcJacobianTransformErrorDiff: raw x-rotation row {diff['raw'][X_ROTATION_ROW]:.3e}; inside the band "
         f"{diff['inside_band']:.1e}; across the band edge {diff['band_edge']:.6f} (dynamic target "
         f"{diff['dynamic_band_edge']:.6f})"
     )

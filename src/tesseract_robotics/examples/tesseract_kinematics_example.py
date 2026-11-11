@@ -60,6 +60,11 @@ from tesseract_robotics.planning import Robot
 IK_TARGET_OFFSET_RAD = 0.1
 
 
+# Pose for the forward kinematics [rad]: elbow bent -1.57 rad (-90 deg) on joint 4, wrist
+# rotated 1.57 rad (90 deg) on joint 6; 1.57 is a rounded pi/2.
+IK_JOINT_POS_RAD = (0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0)
+
+
 def main():
     # --8<-- [start:fk_ik]
     # =========================================================================
@@ -78,7 +83,7 @@ def main():
     # Joint configuration: 7 joint angles in radians
     # This pose bends the elbow (-1.57 rad = -90 deg on joint 4)
     # and rotates the wrist (1.57 rad = 90 deg on joint 6)
-    joint_pos = np.array([0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0])
+    joint_pos = np.array(IK_JOINT_POS_RAD)
 
     # robot.fk() computes pose of tip_link given joint angles
     # "manipulator" is the kinematic group defined in SRDF

@@ -70,7 +70,17 @@ JOINT_POS = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 # addPointCloud() (example.cpp): points every 0.05 m across a 1 m cube, voxelised at
 # 2 x 0.05 m, the octomap link at (1, 0, 0).
 POINT_PITCH_M = 0.05
+# Side of the point-cloud cube [m] (cpp:94, `1 / delta` points per axis).
+CLOUD_SIDE_M = 1.0
 OCTOMAP_POSITION_M = (1.0, 0.0, 0.0)
+# Collision cost and constraint margins [m] (basic_cartesian_example.cpp:228, 232).
+COST_MARGIN_M = 0.025
+CONSTRAINT_MARGIN_M = 0.0
+# The two Cartesian waypoints [m] (cpp:196-200): shared x and z, then each one's y.
+WAYPOINT_X_M = 0.5
+WAYPOINT_Z_M = 0.62
+WAYPOINT_1_Y_M = -0.2
+WAYPOINT_2_Y_M = 0.3
 
 # The C++ Eigen::Quaterniond(0, 0, 1.0, 0) is scalar-first (w=0, x=0, y=1, z=0): 180 deg
 # about Y, tool down. Scalar-last, as Quaterniond.from_xyzw takes it: (0, 1, 0, 0).
@@ -78,7 +88,7 @@ TOOL_DOWN_XYZW = (0.0, 1.0, 0.0, 0.0)
 
 
 def _add_point_cloud(env) -> None:
-    count = round(1.0 / POINT_PITCH_M)
+    count = round(CLOUD_SIDE_M / POINT_PITCH_M)
     cloud = PointCloud()
     for i in range(count):
         for j in range(count):
@@ -102,7 +112,7 @@ def _cartesian(y: float) -> CartesianWaypointPoly:
     return CartesianWaypointPoly(
         CartesianWaypoint(
             Isometry3d.Identity()
-            * Translation3d(0.5, y, 0.62)
+            * Translation3d(WAYPOINT_X_M, y, WAYPOINT_Z_M)
             * Quaterniond.from_xyzw(*TOOL_DOWN_XYZW)
         )
     )
@@ -126,8 +136,8 @@ def _profiles(ifopt: bool) -> ProfileDictionary:
         composite_profile = TrajOptDefaultCompositeProfile()
         move_profile = TrajOptDefaultMoveProfile()
 
-    composite_profile.collision_cost_config = _collision_config(0.025)
-    composite_profile.collision_constraint_config = _collision_config(0.0)
+    composite_profile.collision_cost_config = _collision_config(COST_MARGIN_M)
+    composite_profile.collision_constraint_config = _collision_config(CONSTRAINT_MARGIN_M)
     composite_profile.smooth_velocities = True
     composite_profile.smooth_accelerations = False
     composite_profile.smooth_jerks = False
@@ -167,10 +177,10 @@ def run(ifopt: bool = False):
     start_instruction = MoveInstruction(wp0, MoveInstructionType.FREESPACE, "freespace_profile")
     start_instruction.setDescription("Start Instruction")
     plan_f0 = MoveInstruction(
-        _cartesian(-0.2), MoveInstructionType.FREESPACE, "RASTER", "freespace_profile"
+        _cartesian(WAYPOINT_1_Y_M), MoveInstructionType.FREESPACE, "RASTER", "freespace_profile"
     )
     plan_f0.setDescription("from_start_plan")
-    plan_c0 = MoveInstruction(_cartesian(0.3), MoveInstructionType.LINEAR, "RASTER")
+    plan_c0 = MoveInstruction(_cartesian(WAYPOINT_2_Y_M), MoveInstructionType.LINEAR, "RASTER")
     plan_f1 = MoveInstruction(wp0, MoveInstructionType.FREESPACE, "freespace_profile")
     plan_f1.setDescription("to_end_plan")
     for instruction in (start_instruction, plan_f0, plan_c0, plan_f1):

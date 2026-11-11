@@ -100,12 +100,34 @@ TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
 # Constants of pick_and_place_example.cpp and the PickAndPlaceExample constructor defaults
 # (pick_and_place_example.h): box edge and position on the table, as the low-level port has them.
-OFFSET = 0.005  # clearance between the box and the table [m]
+OFFSET = 0.005  # clearance between the box and the table [m] (cpp:84)
 BOX_SIZE = 0.2  # box edge [m]
 BOX_XY = (0.15, 0.4)  # box position on the table [m]
-TABLE_HEIGHT_M = 0.772
-APPROACH_HEIGHT_M = 0.15  # pick approach, above the grasp pose [m]
-PLACE_APPROACH_BACKOFF_M = 0.25  # place approach, in -Y from the shelf pose [m]
+TABLE_HEIGHT_M = 0.772  # cpp:201
+APPROACH_HEIGHT_M = 0.15  # pick approach, above the grasp pose [m] (cpp:206)
+PLACE_APPROACH_BACKOFF_M = 0.25  # place approach, in -Y from the shelf pose [m] (cpp:406)
+# Collision constraint and cost of the composite profile (pick_and_place_example.cpp:285-297;
+# TrajOptIfopt branch 243-256). Margins and buffers [m], coefficients [-], longest valid
+# segment [m].
+CONSTRAINT_MARGIN_M = 0.0
+CONSTRAINT_COEFF = 10
+CONSTRAINT_BUFFER_M = 0.005
+COST_MARGIN_M = 0.005
+COST_COEFF = 50
+COST_BUFFER_M = 0.01
+LVS_LENGTH_M = 0.05
+# Default collision margin of the environment [m] (cpp:144).
+DEFAULT_MARGIN_M = 0.005
+# Start joints [rad]: elbow bent down, -1.57 on joint 4 (cpp:165).
+START_JOINTS_RAD = (0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0)
+IIWA_DOF = 7
+# Grasp orientation: Eigen Quaterniond(0, 0, 1, 0) is a half turn about y (cpp:199).
+PICK_ROTATION = ((-1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, -1.0))
+# Shelf orientation: Eigen Quaterniond(0, 0, 0.7071068, 0.7071068) is a half turn about
+# (0, 1, 1)/sqrt(2) (cpp:394); its matrix is 2 n n^T - I.
+SHELF_ROTATION = ((-1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
+# middle_left_shelf position [m] (cpp:395).
+SHELF_POSITION_M = (-0.148856, 0.73085, 1.16)
 LINK_BOX = "box"
 LINK_BASE = "world"
 LINK_TCP = "iiwa_tool0"
@@ -125,20 +147,26 @@ def create_profiles():
     composite = TrajOptDefaultCompositeProfile()
 
     # Collision constraint (hard): margin=0, coeff=10 (matches C++)
-    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config = TrajOptCollisionConfig(
+        CONSTRAINT_MARGIN_M, CONSTRAINT_COEFF
+    )
     composite.collision_constraint_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_DISCRETE
     )
-    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.05
-    composite.collision_constraint_config.collision_margin_buffer = 0.005
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_constraint_config.collision_margin_buffer = CONSTRAINT_BUFFER_M
 
     # Collision cost (soft): margin=0.005, coeff=50 (matches C++)
-    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config = TrajOptCollisionConfig(COST_MARGIN_M, COST_COEFF)
     composite.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_DISCRETE
     )
-    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
-    composite.collision_cost_config.collision_margin_buffer = 0.01
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_cost_config.collision_margin_buffer = COST_BUFFER_M
 
     profiles.addProfile(TRAJOPT_NS, "DEFAULT", composite)
     return profiles
@@ -183,12 +211,12 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
         GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
     )
     # Set default collision margin (distance for contact reporting)
-    robot.set_collision_margin(0.005)  # 5mm
+    robot.set_collision_margin(DEFAULT_MARGIN_M)
 
     # KUKA IIWA joint names (7-DOF)
-    joint_names = [f"iiwa_joint_a{i}" for i in range(1, 8)]
+    joint_names = [f"iiwa_joint_a{i}" for i in range(1, IIWA_DOF + 1)]
     # Initial configuration: elbow bent down (-90 deg on joint 4)
-    start_pos = np.array([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0])
+    start_pos = np.array(START_JOINTS_RAD)
     robot.set_joints(start_pos, joint_names=joint_names)
 
     # Add box to table surface
@@ -222,7 +250,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     # - Rotation: Ry(180) = gripper pointing down
     # - Rotation matrix: [[-1,0,0], [0,1,0], [0,0,-1]]
     pick_z = BOX_SIZE + TABLE_HEIGHT_M + OFFSET
-    pick_rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
+    pick_rotation = np.array(PICK_ROTATION)
     pick_pose = Pose.from_matrix_position(pick_rotation, [box_pos[0], box_pos[1], pick_z])
 
     # Approach pose: APPROACH_HEIGHT_M directly above pick pose (same orientation)
@@ -281,8 +309,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     # C++ Eigen::Quaterniond(0, 0, 0.7071068, 0.7071068) is scalar-first (w=0, x=0, y=0.7071,
     # z=0.7071): with w = 0 it is a 180 deg rotation about the axis (0, 1, 1)/sqrt(2), whose
     # matrix is 2 n n^T - I = [[-1,0,0], [0,0,1], [0,1,0]]
-    place_rotation = np.array([[-1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
-    place_pos = [-0.148856, 0.73085, 1.16]  # middle_left_shelf coordinates
+    place_rotation = np.array(SHELF_ROTATION)
+    place_pos = list(SHELF_POSITION_M)
     place_pose = Pose.from_matrix_position(place_rotation, place_pos)
 
     # Approach: 25cm back from shelf in -Y direction (approach from front)

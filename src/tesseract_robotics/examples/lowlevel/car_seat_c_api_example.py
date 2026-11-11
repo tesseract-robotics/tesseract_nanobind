@@ -79,6 +79,110 @@ from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
+# Collision constraint and cost of the composite profile (car_seat_example.cpp:319-329;
+# TrajOptIfopt branch 287-298). Margins and buffers [m], coefficients [-].
+CONSTRAINT_MARGIN_M = 0.0
+CONSTRAINT_COEFF = 10
+CONSTRAINT_BUFFER_M = 0.005
+COST_MARGIN_M = 0.005
+COST_COEFF = 50
+COST_BUFFER_M = 0.01
+# Longest valid segment of the LVS_CONTINUOUS checks [m] (cpp:322, 328).
+LVS_LENGTH_M = 0.1
+# OSQP limits (cpp:338-340; TrajOptIfopt branch 307-309): iterations [-], minimum approximate
+# improvement and minimum trust-box size.
+SOLVER_MAX_ITER = 200
+SOLVER_MIN_APPROX_IMPROVE = 1e-3
+SOLVER_MIN_TRUST_BOX_SIZE = 1e-3
+# Seats (cpp:134-135): count, first position [m] with pitch along x [m], convex hulls each.
+SEAT_COUNT = 3
+SEAT_FIRST_XYZ_M = (0.5, 2.15, 0.45)
+SEAT_PITCH_M = 1.0
+SEAT_HULL_COUNT = 10
+# Seat yaw: exactly pi, so the rotation block is diag(-1, -1, 1); the C++ example uses the
+# rounded literal 3.14159 (cpp:134).
+SEAT_YAW_FLIP = -1.0
+
+# Predefined joint positions from C++ getPredefinedPosition() [rad; carriage_rail in m]
+# (car_seat_example.cpp: Default 156-163, Pick1 165-174, Pick2/Pick3 176-196, Place1 198-206,
+# Home 207+). The C++ Pick2 and Pick3 set only the carriage and write their other joints
+# into Pick1 by mistake; here they carry Pick1's arm values.
+POSITIONS = {}
+
+# Default: carriage centered, arm in typical working pose
+POSITIONS["Default"] = {
+    "carriage_rail": 1.0,
+    "joint_b": 0.0,
+    "joint_e": 0.0,
+    "joint_l": 0.0,
+    "joint_r": 0.0,
+    "joint_s": -1.5707,  # -pi/2: shoulder rotated
+    "joint_t": 0.0,
+    "joint_u": -1.5707,  # -pi/2: elbow bent
+}
+
+# Pick1: above seat_1 at X=0.5, carriage at 2.22m
+# joint_s=-3.14 (pi rotation), arm reaching down
+POSITIONS["Pick1"] = {
+    "carriage_rail": 2.22,
+    "joint_b": 0.39,
+    "joint_e": 0.0,
+    "joint_l": 0.5,
+    "joint_r": 0.0,
+    "joint_s": -3.14,  # ~-pi: shoulder fully rotated for downward reach
+    "joint_t": -0.29,
+    "joint_u": -1.45,
+}
+
+# Pick2: above seat_2 at X=1.5, carriage shifted 1m left
+POSITIONS["Pick2"] = {
+    "carriage_rail": 1.22,
+    "joint_b": 0.39,
+    "joint_e": 0.0,
+    "joint_l": 0.5,
+    "joint_r": 0.0,
+    "joint_s": -3.14,
+    "joint_t": -0.29,
+    "joint_u": -1.45,
+}
+
+# Pick3: above seat_3 at X=2.5, carriage at 0.22m
+POSITIONS["Pick3"] = {
+    "carriage_rail": 0.22,
+    "joint_b": 0.39,
+    "joint_e": 0.0,
+    "joint_l": 0.5,
+    "joint_r": 0.0,
+    "joint_s": -3.14,
+    "joint_t": -0.29,
+    "joint_u": -1.45,
+}
+
+# Place1: carriage at 4.15m (far end of rail), complex arm config
+# This places the seat at the car body mounting position
+POSITIONS["Place1"] = {
+    "carriage_rail": 4.15466,  # Far end of linear rail
+    "joint_b": 0.537218,
+    "joint_e": 0.0189056,
+    "joint_l": 0.801223,
+    "joint_r": 0.0580309,
+    "joint_s": -0.0481182,  # Near zero: arm pointing forward
+    "joint_t": -0.325783,
+    "joint_u": -1.2813,
+}
+
+# Home: all joints at zero (robot at origin, arm extended)
+POSITIONS["Home"] = {
+    "carriage_rail": 0.0,
+    "joint_b": 0.0,
+    "joint_e": 0.0,
+    "joint_l": 0.0,
+    "joint_r": 0.0,
+    "joint_s": 0.0,
+    "joint_t": 0.0,
+    "joint_u": 0.0,
+}
+
 
 def create_car_seat_profiles():
     """Create TrajOpt profiles for car seat motion planning.
@@ -97,20 +201,26 @@ def create_car_seat_profiles():
     composite = TrajOptDefaultCompositeProfile()
 
     # Collision constraint: margin=0, coeff=10
-    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config = TrajOptCollisionConfig(
+        CONSTRAINT_MARGIN_M, CONSTRAINT_COEFF
+    )
     composite.collision_constraint_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS
     )
-    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.1
-    composite.collision_constraint_config.collision_margin_buffer = 0.005
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_constraint_config.collision_margin_buffer = CONSTRAINT_BUFFER_M
 
     # Collision cost: margin=0.005, coeff=50
-    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config = TrajOptCollisionConfig(COST_MARGIN_M, COST_COEFF)
     composite.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS
     )
-    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
-    composite.collision_cost_config.collision_margin_buffer = 0.01
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = (
+        LVS_LENGTH_M
+    )
+    composite.collision_cost_config.collision_margin_buffer = COST_BUFFER_M
 
     # === Plan/Move Profile ===
     plan = TrajOptDefaultMoveProfile()
@@ -121,9 +231,9 @@ def create_car_seat_profiles():
 
     # === Solver Profile (OSQP) ===
     solver = TrajOptOSQPSolverProfile()
-    solver.opt_params.max_iter = 200
-    solver.opt_params.min_approx_improve = 1e-3
-    solver.opt_params.min_trust_box_size = 1e-3
+    solver.opt_params.max_iter = SOLVER_MAX_ITER
+    solver.opt_params.min_approx_improve = SOLVER_MIN_APPROX_IMPROVE
+    solver.opt_params.min_trust_box_size = SOLVER_MIN_TRUST_BOX_SIZE
 
     for name in ["DEFAULT", "FREESPACE"]:
         profiles.addProfile(TRAJOPT_NS, name, composite)
@@ -142,83 +252,7 @@ def get_predefined_positions():
     Returns:
         dict: Named configurations mapping joint names to values
     """
-    positions = {}
-
-    # Default: carriage centered, arm in typical working pose
-    positions["Default"] = {
-        "carriage_rail": 1.0,
-        "joint_b": 0.0,
-        "joint_e": 0.0,
-        "joint_l": 0.0,
-        "joint_r": 0.0,
-        "joint_s": -1.5707,  # -pi/2: shoulder rotated
-        "joint_t": 0.0,
-        "joint_u": -1.5707,  # -pi/2: elbow bent
-    }
-
-    # Pick1: above seat_1 at X=0.5, carriage at 2.22m
-    # joint_s=-3.14 (pi rotation), arm reaching down
-    positions["Pick1"] = {
-        "carriage_rail": 2.22,
-        "joint_b": 0.39,
-        "joint_e": 0.0,
-        "joint_l": 0.5,
-        "joint_r": 0.0,
-        "joint_s": -3.14,  # ~-pi: shoulder fully rotated for downward reach
-        "joint_t": -0.29,
-        "joint_u": -1.45,
-    }
-
-    # Pick2: above seat_2 at X=1.5, carriage shifted 1m left
-    positions["Pick2"] = {
-        "carriage_rail": 1.22,
-        "joint_b": 0.39,
-        "joint_e": 0.0,
-        "joint_l": 0.5,
-        "joint_r": 0.0,
-        "joint_s": -3.14,
-        "joint_t": -0.29,
-        "joint_u": -1.45,
-    }
-
-    # Pick3: above seat_3 at X=2.5, carriage at 0.22m
-    positions["Pick3"] = {
-        "carriage_rail": 0.22,
-        "joint_b": 0.39,
-        "joint_e": 0.0,
-        "joint_l": 0.5,
-        "joint_r": 0.0,
-        "joint_s": -3.14,
-        "joint_t": -0.29,
-        "joint_u": -1.45,
-    }
-
-    # Place1: carriage at 4.15m (far end of rail), complex arm config
-    # This places the seat at the car body mounting position
-    positions["Place1"] = {
-        "carriage_rail": 4.15466,  # Far end of linear rail
-        "joint_b": 0.537218,
-        "joint_e": 0.0189056,
-        "joint_l": 0.801223,
-        "joint_r": 0.0580309,
-        "joint_s": -0.0481182,  # Near zero: arm pointing forward
-        "joint_t": -0.325783,
-        "joint_u": -1.2813,
-    }
-
-    # Home: all joints at zero (robot at origin, arm extended)
-    positions["Home"] = {
-        "carriage_rail": 0.0,
-        "joint_b": 0.0,
-        "joint_e": 0.0,
-        "joint_l": 0.0,
-        "joint_r": 0.0,
-        "joint_s": 0.0,
-        "joint_t": 0.0,
-        "joint_u": 0.0,
-    }
-
-    return positions
+    return {name: dict(joints) for name, joints in POSITIONS.items()}
 
 
 def get_position_vector(joint_names, pos_dict):
@@ -251,7 +285,7 @@ def add_seats(env, locator):
         "package://tesseract/support/meshes/car_seat/visual/seat.dae"
     ).getFilePath()
 
-    for i in range(3):
+    for i in range(SEAT_COUNT):
         seat_name = f"seat_{i + 1}"
         link_seat = Link(seat_name)
 
@@ -269,7 +303,7 @@ def add_seats(env, locator):
         # === COLLISION GEOMETRY ===
         # 10 pre-decomposed convex hulls for efficient collision checking
         # Each STL is a convex piece of the original seat geometry
-        for m in range(1, 11):  # seat_1.stl through seat_10.stl
+        for m in range(1, SEAT_HULL_COUNT + 1):  # seat_1.stl through seat_10.stl
             collision_mesh_url = (
                 f"package://tesseract/support/meshes/car_seat/collision/seat_{m}.stl"
             )
@@ -293,9 +327,10 @@ def add_seats(env, locator):
         # Transform: position (0.5+i, 2.15, 0.45) with 180deg Z rotation
         # Seats are spaced 1m apart along X axis, Y=2.15 (pick station)
         transform_mat = np.eye(4)
-        transform_mat[0, 0] = -1.0  # cos(pi) = -1: 180deg rotation
-        transform_mat[1, 1] = -1.0  # rotation affects X and Y axes
-        transform_mat[:3, 3] = [0.5 + i, 2.15, 0.45]  # Position: X varies, Y/Z fixed
+        transform_mat[0, 0] = SEAT_YAW_FLIP  # cos(pi) = -1: 180deg rotation
+        transform_mat[1, 1] = SEAT_YAW_FLIP  # rotation affects X and Y axes
+        seat_x, seat_y, seat_z = SEAT_FIRST_XYZ_M
+        transform_mat[:3, 3] = [seat_x + i * SEAT_PITCH_M, seat_y, seat_z]  # X varies, Y/Z fixed
         joint_seat.parent_to_joint_origin_transform = Isometry3d(transform_mat)
 
         # AddLinkCommand: adds link+joint to scene graph at runtime

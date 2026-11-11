@@ -89,8 +89,29 @@ from tesseract_robotics.planning.profiles import (
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 # C++ addPointCloud(): points every 0.05 m across a 1 m cube, voxelised at twice that pitch.
+# basic_cartesian_example.cpp:93 (`delta`).
 POINT_PITCH_M = 0.05
+# Side of the point-cloud cube [m]: `length = 1 / delta` points per axis (cpp:94).
+CLOUD_SIDE_M = 1.0
+# The cube's low corner on each axis in the octree frame [m] (cpp:101-103).
+CLOUD_CORNER_M = -0.5
+# Octree pose on base_link [m] (cpp:116).
 OCTREE_ORIGIN = (1.0, 0.0, 0.0)
+# Collision cost and constraint margins [m] and coefficients [-] of the "cartesian_program"
+# composite profile (cpp:228-232, 256-260).
+COST_MARGIN_M = 0.025
+COST_COEFF = 1.0
+CONSTRAINT_MARGIN_M = 0.0
+CONSTRAINT_COEFF = 1.0
+# Cartesian waypoint coefficient count: x, y, z, rx, ry, rz (cpp:242).
+CARTESIAN_DOF = 6
+# Start joints [rad] (cpp:164-170).
+START_JOINTS_RAD = (-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0)
+# Tool-down waypoints [m] (cpp:196-200). Quaternion scalar-last: the C++ Eigen::Quaterniond
+# (w=0, x=0, y=1, z=0) reordered.
+WAYPOINT_1_M = (0.5, -0.2, 0.62)
+WAYPOINT_2_M = (0.5, 0.3, 0.62)
+TOOL_DOWN_QUAT_XYZW = (0.0, 1.0, 0.0, 0.0)
 
 
 def add_point_cloud_octree(robot):
@@ -102,13 +123,15 @@ def add_point_cloud_octree(robot):
     so the octree is a solid 1 m cube of 1000 boxes — the collision load of a scanned part, with no
     gaps to route through. Swap the grid for a scanner's points and the rest is unchanged.
     """
-    count = round(1.0 / POINT_PITCH_M)
+    count = round(CLOUD_SIDE_M / POINT_PITCH_M)
     cloud = PointCloud()
     for i in range(count):
         for j in range(count):
             for k in range(count):
                 cloud.addPoint(
-                    -0.5 + i * POINT_PITCH_M, -0.5 + j * POINT_PITCH_M, -0.5 + k * POINT_PITCH_M
+                    CLOUD_CORNER_M + i * POINT_PITCH_M,
+                    CLOUD_CORNER_M + j * POINT_PITCH_M,
+                    CLOUD_CORNER_M + k * POINT_PITCH_M,
                 )
     tree = createOctree(cloud, 2 * POINT_PITCH_M, prune=False, binary=True)
     octree = Octree(tree, OctreeSubType.BOX, pruned=False, binary_octree=True)
@@ -133,8 +156,10 @@ def _discrete_collision_config(margin, coeff):
 def basic_cartesian_trajopt_profiles(joint_count):
     """The C++ example's TrajOpt profiles, value for value, under the names its program uses."""
     composite = TrajOptDefaultCompositeProfile()
-    composite.collision_cost_config = _discrete_collision_config(0.025, 1.0)
-    composite.collision_constraint_config = _discrete_collision_config(0.0, 1.0)
+    composite.collision_cost_config = _discrete_collision_config(COST_MARGIN_M, COST_COEFF)
+    composite.collision_constraint_config = _discrete_collision_config(
+        CONSTRAINT_MARGIN_M, CONSTRAINT_COEFF
+    )
     composite.smooth_velocities = True
     composite.smooth_accelerations = False
     composite.smooth_jerks = False
@@ -146,7 +171,7 @@ def basic_cartesian_trajopt_profiles(joint_count):
     move.cartesian_cost_config = cartesian_cost
     cartesian = move.cartesian_constraint_config
     cartesian.enabled = True
-    cartesian.coeff = np.ones(6)
+    cartesian.coeff = np.ones(CARTESIAN_DOF)
     move.cartesian_constraint_config = cartesian
     joint_cost = move.joint_cost_config
     joint_cost.enabled = False
@@ -197,14 +222,14 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
 
     # Get joint names and set initial configuration
     joint_names = robot.get_joint_names("manipulator")
-    joint_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+    joint_pos = np.array(START_JOINTS_RAD)
     robot.set_joints(joint_pos, joint_names=joint_names)
 
     # Create Cartesian waypoints (6D poses), tool pointing down. The C++
     # Eigen::Quaterniond(0, 0, 1.0, 0) is scalar-first (w=0, x=0, y=1, z=0):
     # 180° about Y. In the project's scalar-last order that is [0, 1.0, 0, 0].
-    wp1 = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 1.0, 0, 0])
-    wp2 = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 1.0, 0, 0])
+    wp1 = Pose.from_xyz_quat(WAYPOINT_1_M, TOOL_DOWN_QUAT_XYZW)
+    wp2 = Pose.from_xyz_quat(WAYPOINT_2_M, TOOL_DOWN_QUAT_XYZW)
 
     # Build 4-phase motion program:
     # 1. StateTarget: Start from known joint configuration

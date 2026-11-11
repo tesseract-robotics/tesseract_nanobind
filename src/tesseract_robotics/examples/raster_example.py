@@ -87,6 +87,17 @@ from tesseract_robotics.planning import (
 )
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 
+# Raster path on base_link [m] (tesseract_planning/motion_planners/examples/raster_example.cpp:
+# 102-115): constant x and z, seven y values at 0.1 m pitch.
+RASTER_X_M = 0.8
+RASTER_Z_M = 0.8
+RASTER_Y_M = (-0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3)
+# Tool pointing down, scalar-last [qx, qy, qz, qw]: the C++ Eigen::Quaterniond(0, 0, -1, 0)
+# (w, x, y, z), a half turn about y (cpp:103).
+TOOL_DOWN_QUAT_XYZW = (0.0, -1.0, 0.0, 0.0)
+# Raster segments, each followed by a freespace transition to the next.
+SEGMENT_COUNT = 3
+
 
 def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):
     """Execute industrial raster pattern planning.
@@ -120,22 +131,22 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     joint_names = robot.get_joint_names("manipulator")
 
     # Home position: all joints at zero (from C++ example)
-    home_pos = np.zeros(6)
+    home_pos = np.zeros(len(joint_names))
     robot.set_joints(home_pos, joint_names=joint_names)
 
     # === DEFINE RASTER GEOMETRY ===
     # Tool orientation from C++: Quaterniond(w=0, x=0, y=-1.0, z=0)
     # This is 180deg rotation around Y-axis (tool pointing down)
     # Python format: (qx, qy, qz, qw)
-    tool_quat = [0.0, -1.0, 0.0, 0.0]
+    tool_quat = list(TOOL_DOWN_QUAT_XYZW)
 
     # Raster path geometry (from C++ example):
     # - X = 0.8m constant (distance from robot base)
     # - Z = 0.8m constant (height above floor)
     # - Y varies from -0.3m to +0.3m (7 waypoints, 0.1m spacing)
-    x_const = 0.8
-    z_const = 0.8
-    y_values = [-0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3]
+    x_const = RASTER_X_M
+    z_const = RASTER_Z_M
+    y_values = RASTER_Y_M
 
     # Create Cartesian waypoints with constant orientation
     waypoints = [Pose.from_xyz_quat([x_const, y, z_const], tool_quat) for y in y_values]
@@ -148,7 +159,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     # - raster_segment: linear moves through waypoints (3 times)
     # - transitions: freespace moves between segments
     # - to_end: final waypoint -> home (freespace)
-    num_segments = 3
+    num_segments = SEGMENT_COUNT
 
     program = MotionProgram(
         "manipulator", tcp_frame="tool0", working_frame="base_link", profile="RASTER"

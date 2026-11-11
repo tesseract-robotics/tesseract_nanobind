@@ -46,6 +46,15 @@ from tesseract_robotics.planning.profiles import (
     create_cartesian_pipeline_profiles,
 )
 
+# Raster on base_link [m] (tesseract_planning/motion_planners/examples/chain_example.cpp:99-114):
+# three passes at these x positions, each sweeping y at constant height.
+PASS_X_M = (0.8, 0.9, 1.0)
+PASS_Y_START_M = -0.2
+PASS_Y_END_M = 0.2
+PASS_Z_M = 0.8
+# Tool pointing down, scalar-last [qx, qy, qz, qw]: a half turn about y.
+TOOL_DOWN_QUAT_XYZW = (0.0, -1.0, 0.0, 0.0)
+
 
 def run(pipeline="CartesianPipeline", num_planners=None, *, composer: TaskComposer | None = None):
     """Run chain planning example.
@@ -72,27 +81,27 @@ def run(pipeline="CartesianPipeline", num_planners=None, *, composer: TaskCompos
     print(f"Manipulator joints ({len(joint_names)}): {joint_names}")
 
     # Home position: all joints at 0 (typical industrial robot config)
-    joint_start = np.zeros(6)
+    joint_start = np.zeros(len(joint_names))
     robot.set_joints(joint_start, joint_names=joint_names)
 
     # Define raster waypoints (from C++ example). Project canonical
     # quaternion is scalar-last [qx, qy, qz, qw]. (0, -1, 0, 0) is a 180°
     # rotation about Y — tool pointing straight down (Z-axis inverted).
-    quat_down = (0.0, -1.0, 0.0, 0.0)
+    quat_down = TOOL_DOWN_QUAT_XYZW
 
     # Raster pattern: 3 parallel passes at different X positions
     # Each pass sweeps Y from -0.2m to +0.2m at constant Z=0.8m
     # Raster 1: x=0.8m
-    wp1 = Pose.from_xyz_quat([0.8, -0.2, 0.8], quat_down)  # Start of pass 1
-    wp2 = Pose.from_xyz_quat([0.8, 0.2, 0.8], quat_down)  # End of pass 1
+    wp1 = Pose.from_xyz_quat([PASS_X_M[0], PASS_Y_START_M, PASS_Z_M], quat_down)  # Start of pass 1
+    wp2 = Pose.from_xyz_quat([PASS_X_M[0], PASS_Y_END_M, PASS_Z_M], quat_down)  # End of pass 1
 
     # Raster 2: x=0.9m (10cm step in X)
-    wp3 = Pose.from_xyz_quat([0.9, -0.2, 0.8], quat_down)
-    wp4 = Pose.from_xyz_quat([0.9, 0.2, 0.8], quat_down)
+    wp3 = Pose.from_xyz_quat([PASS_X_M[1], PASS_Y_START_M, PASS_Z_M], quat_down)
+    wp4 = Pose.from_xyz_quat([PASS_X_M[1], PASS_Y_END_M, PASS_Z_M], quat_down)
 
     # Raster 3: x=1.0m
-    wp5 = Pose.from_xyz_quat([1.0, -0.2, 0.8], quat_down)
-    wp6 = Pose.from_xyz_quat([1.0, 0.2, 0.8], quat_down)
+    wp5 = Pose.from_xyz_quat([PASS_X_M[2], PASS_Y_START_M, PASS_Z_M], quat_down)
+    wp6 = Pose.from_xyz_quat([PASS_X_M[2], PASS_Y_END_M, PASS_Z_M], quat_down)
 
     # --8<-- [start:descartes_then_trajopt]
     # Build motion program with FREESPACE and CARTESIAN segments

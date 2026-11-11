@@ -101,6 +101,8 @@ IIWA_SRDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
 BOX_PAIR = ("box_link", "second_box_link")
 # box_box_example.cpp: margins (m) and box_link poses
 MARGIN = 0.1
+# The thin box's edges [m].
+THIN_BOX_M = (0.1, 1.0, 1.0)
 LARGER_MARGIN = 0.25
 PENETRATING_XY = (0.2, 0.1)
 GAP_X = 1.6
@@ -166,7 +168,7 @@ def contact_test(manager, test_type: ContactTestType = ContactTestType.CLOSEST, 
 def add_box_box_objects(manager, hull) -> None:
     """box_box_example.cpp: the unit box, the disabled thin box and the 2 m hull."""
     manager.addCollisionObject("box_link", 0, [Box(1, 1, 1)], [translation(0)])
-    manager.addCollisionObject("thin_box_link", 0, [Box(0.1, 1, 1)], [translation(0)], False)
+    manager.addCollisionObject("thin_box_link", 0, [Box(*THIN_BOX_M)], [translation(0)], False)
     manager.addCollisionObject("second_box_link", 0, [hull], [translation(0)])
     manager.setActiveCollisionObjects(list(BOX_PAIR))
 
@@ -431,7 +433,7 @@ def validator_and_result_map(manager, hull) -> dict[str, Any]:
 def add_cast_objects(manager) -> None:
     """collision_box_box_cast_unit.hpp: static unit box, disabled thin box, moving box."""
     manager.addCollisionObject("static_box_link", 0, [Box(1, 1, 1)], [translation(0)])
-    manager.addCollisionObject("thin_box_link", 0, [Box(0.1, 1, 1)], [translation(0)], False)
+    manager.addCollisionObject("thin_box_link", 0, [Box(*THIN_BOX_M)], [translation(0)], False)
     moving = Box(CAST_MOVING_SIZE, CAST_MOVING_SIZE, CAST_MOVING_SIZE)
     manager.addCollisionObject("moving_box_link", 0, [moving], [translation(*CAST_MOVING_OFFSET)])
     manager.setActiveCollisionObjects(["moving_box_link"])
