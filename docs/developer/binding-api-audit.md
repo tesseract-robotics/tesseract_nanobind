@@ -7,13 +7,13 @@ tesseract-robotics `==0.36.0.dev20261103` · libclang `clang version 22.1.8` · 
 
 | module | covered | gaps | deviations | accepted | quoted types | type fallbacks |
 |---|---|---|---|---|---|---|
-| tesseract_collision | 278 | 4 | 2 | 14 | 0 | 8 |
+| tesseract_collision | 278 | 4 | 2 | 16 | 0 | 8 |
 | tesseract_command_language | 380 | 1 | 0 | 128 | 0 | 16 |
 | tesseract_common | 262 | 89 | 24 | 59 | 0 | 11 |
 | tesseract_environment | 237 | 9 | 7 | 55 | 0 | 0 |
 | tesseract_geometry | 158 | 8 | 4 | 22 | 0 | 1 |
 | tesseract_kinematics | 105 | 6 | 3 | 16 | 0 | 5 |
-| tesseract_motion_planners | 39 | 4 | 0 | 6 | 0 | 3 |
+| tesseract_motion_planners | 39 | 3 | 0 | 7 | 0 | 3 |
 | tesseract_motion_planners_descartes | 62 | 0 | 0 | 34 | 0 | 4 |
 | tesseract_motion_planners_ompl | 123 | 0 | 1 | 28 | 0 | 0 |
 | tesseract_motion_planners_simple | 104 | 0 | 0 | 29 | 0 | 0 |
@@ -28,7 +28,7 @@ tesseract-robotics `==0.36.0.dev20261103` · libclang `clang version 22.1.8` · 
 | tesseract_time_parameterization | 75 | 0 | 0 | 10 | 0 | 0 |
 | tesseract_urdf | 4 | 5 | 0 | 0 | 0 | 0 |
 | trajopt_ifopt | 334 | 10 | 0 | 47 | 0 | 0 |
-| trajopt_sqp | 188 | 2 | 3 | 33 | 0 | 6 |
+| trajopt_sqp | 188 | 2 | 3 | 34 | 0 | 6 |
 
 Quoted C++ names in the stubs of audited modules (unbound type, or a missing `nb::module_::import_`):
 
@@ -203,6 +203,8 @@ None.
 | `ContactManagerConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
 | `ContactManagersPluginFactory.__init__` | yaml-node | tesseract/collision/contact_managers_plugin_factory.h:126 |
 | `ContactRequest.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
+| `ContactResult.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
+| `ContactResult.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
 | `ContactResult.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
 | `ContactResultMap.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
 | `ContactResultMap.__iter__` | iterator-pair | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
@@ -771,7 +773,6 @@ None.
 | `PlannerResponse.failed_instructions` | field | tesseract/motion_planners/types.h:98 | — | won't fix: Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty. |
 | `PlannerResponse.succeeded_instructions` | field | tesseract/motion_planners/types.h:96 | — | won't fix: Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty. |
 | `isValidState` | function | tesseract/motion_planners/planner_utils.h:79 | — | #333 |
-| `operator==` | function | tesseract/motion_planners/piqp/settings_utils.h:43 | — | #393 |
 
 ### Deviations
 
@@ -787,6 +788,7 @@ None.
 | `PlannerResponse.data` | type-erased-data | tesseract/motion_planners/types.h:101 |
 | `contactCheckProgram` | out-param | tesseract/motion_planners/utils.h:111 |
 | `contactCheckProgram` | out-param | tesseract/motion_planners/utils.h:95 |
+| `operator==` | free-function-as-method | tesseract/motion_planners/piqp/settings_utils.h:43 |
 
 ### Headers audited with another module
 
@@ -1462,6 +1464,7 @@ None.
 | `OSQPEigenSolver.setDefaultOSQPSettings` | unbound-dependency-type | trajopt_sqp/osqp_eigen_solver.h:59 |
 | `OSQPEigenSolver.setWarmStart` | unbound-dependency-type | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `OSQPEigenSolver.solver_` | unbound-dependency-type | trajopt_sqp/osqp_eigen_solver.h:86 |
+| `PIQPSettings.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `QPProblem.setVariables` | sized-double-array | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `QPProblem.setVariables` | sized-double-array | trajopt_sqp/qp_problem.h:51 |
 | `QPSolverStatus.FAILED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
