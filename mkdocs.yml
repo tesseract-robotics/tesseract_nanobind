@@ -234,7 +234,8 @@ extra:
     property: !ENV GOOGLE_ANALYTICS_KEY
   generator: false
 
-# Internal design records: kept in the repository, not published.
+# Local notes under docs/ are git-ignored (.gitignore) and never published; includes and the
+# toolchain's requirements are inputs, not pages.
 exclude_docs: |
   plans/
   superpowers/
