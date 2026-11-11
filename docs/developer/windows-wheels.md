@@ -1,4 +1,4 @@
-# Windows Wheels: Packaging Gotchas
+# Windows wheels: packaging
 
 Notes captured during the [GH-40](https://github.com/tesseract-robotics/tesseract_nanobind/issues/40)
 Windows-wheels-to-PyPI work. Recorded here so future maintainers don't re-walk

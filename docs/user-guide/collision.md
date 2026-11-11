@@ -1,13 +1,48 @@
-# Collision Detection
+# Collision checking
 
-tesseract_robotics provides discrete and continuous collision checking using FCL and Bullet backends.
+<!-- snippet: ambient
+from pathlib import Path
 
-## Quick Collision Check
+from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.geometry import (
+    Box, createDiscreteSignedDistanceField, createMeshFromPath, writeSignedDistanceFieldVDB,
+)
+from tests.docs.doc_assets import enter_scratch_dir, write_stl
 
-The collision API is driven by the environment's contact manager — there is no one-call shortcut on `Robot`. See [`src/tesseract_robotics/examples/tesseract_collision_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_collision_example.py) for the canonical pattern.
+enter_scratch_dir()
+write_stl(Path("model.stl"))
+start_joints = np.zeros(6)
+end_joints = np.full(6, 0.2)
+shapes = [Box(0.1, 0.1, 0.1)]
+shape_poses = [Isometry3d.Identity()]
+pose = Isometry3d.Identity()
+mesh = createMeshFromPath("model.stl")[0]
+verts = np.random.default_rng(0).uniform(-0.2, 0.2, size=(200, 3))
+Path("scan.vdb").write_bytes(
+    writeSignedDistanceFieldVDB(
+        createDiscreteSignedDistanceField(
+            lambda p: float(np.linalg.norm(p)) - 0.3,
+            np.full(3, -1.0), np.full(3, 1.0), np.array([17, 17, 17], dtype=np.int32),
+        )
+    )
+)
+-->
+
+A collision check answers one question about the environment: which pairs of links are closer
+than a threshold, and how close are they? Planners ask it thousands of times per plan; you ask
+it directly to validate a state or a trajectory, to measure clearance, or to test a new
+obstacle. The checks run in **contact managers**, collision worlds that Bullet and FCL
+implement and the environment keeps in sync with its scene.
+
+## Check one state
+
+There is no one-call shortcut on `Robot`: take a contact manager from the environment, give it
+the link poses of the state to check, and run a test.
+[`tesseract_collision_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_collision_example.py)
+is the same pattern as a script.
 
 ```python
-from tesseract_robotics.planning import Robot
+from tesseract_robotics.planning import Robot, box, create_obstacle
 from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
@@ -20,6 +55,9 @@ locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 joint_names = [f"joint_{i + 1}" for i in range(6)]
 joints = np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])
+
+# An obstacle at the flange gives the check something to find
+create_obstacle(robot, "box", box(0.3, 0.3, 0.3), robot.fk("manipulator", joints, "tool0"))
 
 # Update state, then sync the manager with the new link transforms
 robot.set_joints(joints, joint_names=joint_names)
@@ -71,35 +109,91 @@ results.clear()                   # now allowed; kept is unaffected
 A loop variable counts as a reference: after `for i in range(len(results)): r = results[i]`,
 `del r` before reusing `results`.
 
-## Collision Managers
+## Distance, margin and penetration
 
-tesseract supports multiple collision backends:
+`ContactResult.distance` is the signed distance between the two objects' nearest points, in
+metres: positive when they are apart, negative when they penetrate. A manager reports a pair
+only when that distance is below its **margin**, the contact threshold. With a margin of 0 it
+reports touching and penetrating pairs; with a margin of 0.1 it also reports every pair closer
+than 10 cm, which is what a planner needs to push the robot away before it touches anything.
 
-| Manager | Strengths | Use Case |
-|---------|-----------|----------|
-| **FCL** | Fast broad-phase | General purpose |
-| **Bullet** | Continuous collision | Trajectory validation |
-| **BulletCast** | Swept volumes | Time-parameterized paths |
+<figure markdown>
+![Left, a grey square with a dashed rounded outline 100 mm outside it and three circles: red overlapping the square (d = −30 mm), orange inside the outline (d = +35 mm), blue outside it (no contact). Right, reported distance against true distance: a diagonal of filled dots from −60 to 100 mm, open dots beyond 100 mm marked as not reported.](../assets/figures/collision_distance.svg#only-light)
+![Left, a grey square with a dashed rounded outline 100 mm outside it and three circles: red overlapping the square (d = −30 mm), orange inside the outline (d = +35 mm), blue outside it (no contact). Right, reported distance against true distance: a diagonal of filled dots from −60 to 100 mm, open dots beyond 100 mm marked as not reported.](../assets/figures/collision_distance-dark.svg#only-dark)
+<figcaption markdown="span">`ContactResult.distance` is the signed distance, and the margin only decides what is reported. A 0.1 m sphere is swept past a 0.2 m cube against Bullet's default discrete manager with `setDefaultCollisionMargin(0.1)`: every reported distance equals the analytic signed distance (penetration negative), and beyond the 100 mm margin the test returns no contact at all. Left: three states in the z = 0 section with the nearest points the manager returned; the dashed outline is the margin around the cube. Reproduce: `pixi run docs-figures collision_distance`.</figcaption>
+</figure>
 
-### Discrete vs Continuous
+The manager's default margin applies to every pair; a pair override takes precedence:
 
-```mermaid
-graph LR
-    subgraph Discrete
-        A[Config A] --> B{Collision?}
-    end
+```python
+from tesseract_robotics.common import CollisionMarginData
 
-    subgraph Continuous
-        C[Config A] --> D[Config B]
-        D --> E{Swept Volume<br/>Collision?}
-    end
+# Default margin for all pairs (applied to the contact manager)
+manager.setCollisionMarginData(CollisionMarginData(0.02))  # 2cm
+
+# Or set the default margin directly
+manager.setDefaultCollisionMargin(0.02)
+
+# Per-pair override (link-a, link-b, margin)
+manager.setCollisionMarginPair("link_6", "obstacle", 0.05)
 ```
 
-!!! info "When to Use Continuous"
-    - **Discrete**: Fast point checks, obstacle avoidance in planning
-    - **Continuous**: Trajectory validation, fast-moving robots, thin obstacles
+A planner's collision term has its own margin, set in its profile (see
+[Collision in planning](#collision-in-planning)); the manager's margin is what a direct check
+such as the one above uses.
 
-## Discrete Collision Checking
+## Discrete, continuous and LVS checks
+
+A **discrete** check tests one state. A trajectory is a sequence of states, and checking only
+those states misses an obstacle the robot passes through between them. Three remedies, chosen
+with `CollisionEvaluatorType`:
+
+| Evaluator | Checks | Between checks |
+| --- | --- | --- |
+| `DISCRETE` | each trajectory state | nothing is checked |
+| `LVS_DISCRETE` | each state, plus interpolated states no more than `longest_valid_segment_length` apart | nothing is checked: a thin obstacle needs a short segment |
+| `LVS_CONTINUOUS` | each interpolated segment as a cast: every link swept from its start to its end pose | covered; the cast is the convex hull of the two poses, so short segments keep it close to the links' real arcs |
+| `CONTINUOUS` | each trajectory segment as one cast | covered, with the same convex-hull approximation over the whole segment |
+
+<figure markdown>
+![Four top-view panels of a cube path crossing a thin grey wall. DISCRETE: three green squares, none on the wall. LVS_DISCRETE 25 cm: five green squares that jump over the wall. LVS_DISCRETE 2.5 cm: a dense row of squares, the ones on the wall red. LVS_CONTINUOUS 25 cm: four swept hulls, the one crossing the wall red.](../assets/figures/continuous_collision.svg#only-light)
+![Four top-view panels of a cube path crossing a thin grey wall. DISCRETE: three green squares, none on the wall. LVS_DISCRETE 25 cm: five green squares that jump over the wall. LVS_DISCRETE 2.5 cm: a dense row of squares, the ones on the wall red. LVS_CONTINUOUS 25 cm: four swept hulls, the one crossing the wall red.](../assets/figures/continuous_collision-dark.svg#only-dark)
+<figcaption markdown="span">Discrete checks see only the states they are given. A 0.1 m cube on an x-y gantry crosses a 3 cm wall in one trajectory step; `checkTrajectory` runs on the same three states with each evaluator. DISCRETE checks the waypoints and misses the wall; LVS_DISCRETE with a 25 cm segment length interpolates 5 states and still misses it; at 2.5 cm, 5 of its 38 states hit. LVS_CONTINUOUS casts the cube between the same 25 cm sub-states and catches the wall in the sweep that crosses it. Green: checked and clear; red: in contact. Reproduce: `pixi run docs-figures continuous_collision`.</figcaption>
+</figure>
+
+The task composer's contact check task and TrajOpt's collision terms both take a
+`CollisionCheckConfig` with this type and segment length:
+
+```python
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract_robotics.collision import CollisionEvaluatorType
+
+# TrajOptCollisionConfig(margin, coeff)
+config = TrajOptCollisionConfig(0.025, 20.0)  # 2.5cm margin, coeff=20
+config.collision_margin_buffer = 0.005  # Additional buffer beyond margin
+config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
+config.collision_check_config.longest_valid_segment_length = 0.05  # 5cm interpolation
+```
+
+## Contact managers
+
+The environment builds its managers from the contact manager plugins its SRDF names. The
+example robots use the configuration below; `getDiscreteContactManager()` and
+`getContinuousContactManager()` return a copy of the default one, synchronised with the
+environment's current state.
+
+| Kind | Plugin | Default |
+| --- | --- | --- |
+| discrete | `BulletDiscreteBVHManager` | yes |
+| discrete | `BulletDiscreteSimpleManager` | |
+| discrete | `FCLDiscreteBVHManager` | |
+| continuous | `BulletCastBVHManager` | yes |
+| continuous | `BulletCastSimpleManager` | |
+
+[Contact managers](../examples/collision.md#contact-managers) builds them from the plugin
+factory and switches between them.
+
+### Request options
 
 ```python
 from tesseract_robotics.collision import (
@@ -134,7 +228,10 @@ for i in range(len(results)):
     print(f"{r.link_ids[0]} <-> {r.link_ids[1]}: {r.distance:.4f}m")
 ```
 
-## Continuous Collision Checking
+`ContactTestType.FIRST` stops at the first contact, `CLOSEST` keeps the closest per pair, and
+`ALL` keeps every contact; `LIMITED` stops after a set count.
+
+### Continuous checks
 
 Check for collisions along a motion segment. Each active link needs a start and end transform, set with the three-argument (or two-mapping) `setCollisionObjectsTransform`:
 
@@ -166,7 +263,7 @@ manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
 
 Each continuous `ContactResult` says where along the sweep the contact happened. `cc_time[i]` is in `[0, 1]` for a cast link `i` and `-1` for a static one. `cc_type[i]` is a `ContinuousCollisionType`: `CCType_Time0`, `CCType_Time1`, `CCType_Between`, or `CCType_None` for a link that was not cast.
 
-## Trajectory Checking
+## Check a trajectory
 
 `checkTrajectory` (from `environment`) checks a whole joint trajectory and stops at the first collision. It is a port of the C++ `tesseract::environment::checkTrajectory`, with one difference: C++ fills a `contacts` out-parameter, while Python gets it back as the second element of the returned tuple. That element holds one `ContactResultMap` per checked step or segment.
 
@@ -199,71 +296,7 @@ To check one state or one segment instead of a whole trajectory, use `checkTraje
 `checkTrajectorySegment`; both return a `ContactResultMap`. See
 [Single-state collision checks](../api/environment.md#single-state-collision-checks).
 
-## LVS (Longest Valid Segment)
-
-LVS interpolates between waypoints and checks at discrete points:
-
-```mermaid
-graph LR
-    A[Start] --> B[...]
-    B --> C[...]
-    C --> D[...]
-    D --> E[End]
-
-    B --> F{Check}
-    C --> G{Check}
-    D --> H{Check}
-```
-
-Used in TrajOpt for efficient continuous collision approximation:
-
-```python
-from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.collision import CollisionEvaluatorType
-
-# TrajOptCollisionConfig(margin, coeff)
-config = TrajOptCollisionConfig(0.025, 20.0)  # 2.5cm margin, coeff=20
-config.collision_margin_buffer = 0.005  # Additional buffer beyond margin
-config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
-config.collision_check_config.longest_valid_segment_length = 0.05  # 5cm interpolation
-```
-
-`CollisionEvaluatorType` members (from `collision`): `DISCRETE`, `CONTINUOUS`, `LVS_DISCRETE`, `LVS_CONTINUOUS`.
-
-## Contact Margins
-
-Contact margins define the safety buffer around objects. Use `CollisionMarginData` from `common`:
-
-```python
-from tesseract_robotics.common import CollisionMarginData
-
-# Default margin for all pairs (applied to the contact manager)
-manager.setCollisionMarginData(CollisionMarginData(0.02))  # 2cm
-
-# Or set the default margin directly
-manager.setDefaultCollisionMargin(0.02)
-
-# Per-pair override (link-a, link-b, margin)
-manager.setCollisionMarginPair("link_6", "obstacle", 0.05)
-```
-
-### Margin Visualization
-
-```
-┌──────────────────────────────────────┐
-│                                      │
-│   ┌─────────┐      ┌─────────┐       │
-│   │  Link   │      │Obstacle │       │
-│   │         │ 2cm  │         │       │
-│   │  ┌───┐  │<---->│  ┌───┐  │       │
-│   │  │   │  │margin│  │   │  │       │
-│   │  └───┘  │      │  └───┘  │       │
-│   └─────────┘      └─────────┘       │
-│                                      │
-└──────────────────────────────────────┘
-```
-
-## Allowed Collision Matrix
+## Allowed collision matrix
 
 Skip collision checks for adjacent or always-safe pairs. The ACM lives on the scene graph and is owned by the environment:
 
@@ -293,7 +326,7 @@ robot.env.applyCommand(
 
 Adjacent links already defined in the SRDF are added automatically when the environment is loaded.
 
-## Batch Updates
+## Batch updates
 
 Adding, removing, enabling or moving many objects one call at a time pays a broadphase update
 per call. The batch calls apply one update per batch where the backend supports it, and behave
@@ -306,7 +339,7 @@ specs = [CollisionObjectSpec(name, 0, shapes, shape_poses) for name in ("a", "b"
 assert manager.addCollisionObjects(specs)  # a repeated id: the last entry decides
 
 manager.setCollisionObjectsEnabled(["b"], False)     # or a dict: {"b": False, "c": True}
-manager.setCollisionObjectsTransform(["a", "c"], state.link_transforms)  # ids, then a map
+manager.setCollisionObjectsTransform(["a", "c"], {name: pose for name in "abc"})  # ids, then a map
 pose = manager.getCollisionObjectsTransform("a")
 manager.removeCollisionObjects(["a", "c"])
 ```
@@ -315,7 +348,7 @@ An id the manager does not hold is reported, never silently dropped: `removeColl
 and `setCollisionObjectsEnabled` return `False` (the ids that are present are still applied),
 and `getCollisionObjectsTransform` or a transform map that lacks an id raises `IndexError`.
 
-## Implicit Signed-Distance Shapes
+## Implicit signed-distance shapes
 
 `collideImplicitSDF` finds the contacts between two shapes given as signed-distance callbacks:
 a multi-start search inside each shape's bounding box. `makeImplicitSDFShape` builds one from a
@@ -344,76 +377,25 @@ contacts = collideImplicitSDF(ball, other, config)          # list[ImplicitSDFCo
 `collideImplicitSDF` releases the GIL; a Python callback takes it back for each evaluation, so
 Python shapes are correct but slow.
 
-## Performance Optimization
+## Collision in planning
 
-!!! tip "Reduce Active Objects"
-    Only check links that can actually collide:
+Planners check collisions themselves; you configure them through profiles, not through the
+contact manager. TrajOpt's collision term is a `TrajOptCollisionConfig` (margin, coefficient,
+evaluator type) in its composite profile; OMPL validates sampled states and motions with the
+collision check config of its profile; `TrajOptPipeline`, `FreespacePipeline` and the Descartes
+pipelines finish with a discrete contact check task over the result. The stock profiles are built in
+[`planning/profiles/trajopt.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/planning/profiles/trajopt.py);
+[Costs vs constraints](planning.md#costs-vs-constraints-soft-vs-hard) shows when to make
+collision a cost and when a constraint.
 
-    ```python
-    # Skip static links that can't reach each other
-    active_links = ["link_4", "link_5", "link_6", "tool0"]
-    manager.setActiveCollisionObjects(active_links)
-    ```
+## Collision geometry
 
-!!! tip "Use Appropriate Margin"
-    Larger margins = slower checks. Use the minimum safe margin:
+Every geometry type of `tesseract_robotics.geometry` can be a collision shape: `Box`, `Sphere`,
+`Cylinder`, `Capsule`, `Cone`, `Mesh`, `ConvexMesh`, `Octree` and `SignedDistanceField`
+(discrete managers only). A `Mesh` keeps its triangles; a `ConvexMesh` is a convex hull, which
+fills a concave part's hollows, so a concave part needs several hulls ([convex decomposition](../examples/collision.md#convex-decomposition)).
 
-    - Motion planning: 2-5cm
-    - Final validation: 0-1cm
-    - Real-time: As small as safe
-
-!!! tip "Choose the Right Test Type"
-    ```python
-    from tesseract_robotics.collision import (
-        ContactTestType,
-    )
-
-    # Stop at first collision (fastest)
-    request = ContactRequest(ContactTestType.FIRST)
-
-    # Get all collisions (for debugging)
-    request = ContactRequest(ContactTestType.ALL)
-    ```
-
-## Integration with Planning
-
-Planners automatically use collision checking — configure collision margins through planner profiles rather than calling the contact manager yourself:
-
-```python
-from tesseract_robotics.planning import (
-    MotionProgram, JointTarget, plan_freespace,
-)
-import numpy as np
-
-# Build a program (start/goal joint states)
-program = (
-    MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
-    .move_to(JointTarget(np.zeros(6)))
-    .move_to(JointTarget(np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])))
-)
-
-# OMPL (sampling) — checks collisions at sampled states
-# TrajOpt — would use collision cost/constraint via TrajOptCollisionConfig
-# Descartes (plan_cartesian) — expects Cartesian targets, not joint targets
-result = plan_freespace(robot, program)
-```
-
-Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LVS section above) and are applied via composite profiles — see [`src/tesseract_robotics/planning/profiles.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/planning/profiles.py) for the stock profile builder.
-
-## Collision Geometry Types
-
-| Type | Performance | Accuracy |
-|------|-------------|----------|
-| **Sphere** | Fastest | Low |
-| **Box** | Fast | Medium |
-| **Cylinder** | Fast | Medium |
-| **Capsule** | Fast | Medium |
-| **Mesh** | Slow | High |
-| **ConvexMesh** | Medium | High |
-| **Octree** | Medium | Voxel-discrete |
-| **SignedDistanceField** | Medium | Grid-discrete (concave OK) — discrete managers only |
-
-!!! tip "Use Convex Decomposition"
+!!! tip "Convex hulls"
     For complex meshes, use `makeConvexMesh` to build a convex hull:
 
     ```python
@@ -427,15 +409,15 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
     ```python
     from tesseract_robotics.planning import convex_mesh_from_file
 
-    convex = convex_mesh_from_file("/path/to/mesh.stl")
+    convex = convex_mesh_from_file("model.stl")  # your own mesh file
     ```
 
-## Point Clouds as Collision Obstacles
+## Point clouds as obstacles
 
 Sensor-derived obstacles — depth-camera scans, LiDAR, fused mapping output —
 go through a `geometry.Octree`. Each occupied voxel becomes a
 sub-shape the discrete contact manager checks against the robot, so
-planners and collision queries treat the cloud just like any other
+planners and collision queries treat the cloud like any other
 geometry.
 
 **1. Build the octree and attach it as a link.** 
@@ -473,7 +455,7 @@ create_obstacle(
 need rounder swept volumes.
 
 **2. Margins.** The discrete contact manager applies a margin to every pair
-(see [Contact Margins](#contact-margins)). For an octree obstacle the
+(see [Contact Margins](#distance-margin-and-penetration)). For an octree obstacle the
 defaults work fine — set a single value on the manager:
 
 ```python
@@ -499,7 +481,7 @@ For a full collision-aware vs. collision-disabled comparison with a viewer
 walkthrough, see the
 [Point cloud → Octree](../examples/basic.md#point-cloud-octree-example) example.
 
-## Signed Distance Fields as Collision Obstacles
+## Signed distance fields as obstacles
 
 A `geometry.SignedDistanceField` stores the distance to a surface —
 negative inside, positive outside — sampled on a regular grid, rather than
@@ -637,7 +619,17 @@ tesseract_sdf_collision_example
 pixi run python -m tesseract_robotics.examples.sdf_collision_example
 ```
 
-## Debugging Collisions
+## What goes wrong
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| No contact, though the robot visibly touches the obstacle | the manager still holds the poses it was created with, or the link is not active | `setCollisionObjectsTransform(state.link_transforms)` after every state change; `setActiveCollisionObjects(env.getActiveLinkIds())` |
+| Contacts between neighbouring links in every state | the SRDF's allowed collision matrix lacks the pair | add the pair to the SRDF or with `ModifyAllowedCollisionsCommand` |
+| A contact with `distance > 0` | the margin is above zero: the pair is near, not touching | treat `distance < 0` as collision, or set the margin to 0 |
+| A trajectory passes the check and still hits a thin obstacle | `DISCRETE` checks only the states | `LVS_DISCRETE` with a segment shorter than the obstacle, or `LVS_CONTINUOUS` |
+| An obstacle added to the environment is never reported | the manager was fetched before the obstacle was added | fetch the manager again after changing the environment |
+
+To see what a manager reports in one state:
 
 ```python
 from tesseract_robotics.collision import (
@@ -676,7 +668,8 @@ def debug_collision(robot, joints, joint_names):
             print(f"    PENETRATION: {-r.distance:.4f} m")
 ```
 
-## Next Steps
+## Next steps
 
-- [Motion Planning](planning.md) - Collision-aware planning
-- [Low-Level SQP](low-level-sqp.md) - Real-time collision avoidance
+- [Motion planning](planning.md): collision as a cost or a constraint.
+- [Low-level SQP](low-level-sqp.md): collision constraints in a replanning loop.
+- [Collision examples](../examples/collision.md): contact managers, trajectory checks, convex decomposition.

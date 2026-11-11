@@ -1,17 +1,24 @@
-# Environment & Scene Graph
+# Environment and scene graph
 
-The `Environment` is the central data structure in tesseract_robotics — it owns the robot model, the scene graph of links/joints, the current state, and the collision data. The high-level `Robot` wrapper exposes it via `robot.env`.
+The `Environment` is the robot cell: the scene graph of links and joints, the current joint
+state, the kinematic groups and the collision worlds, all kept consistent with each other. Load
+it from a URDF and SRDF, then change it only through commands: add an obstacle, attach a part to
+the tool, move a fixture. Every planner and checker reads it; `robot.env` is the environment of
+a `Robot`. [Concepts](../concepts/index.md#the-environment) shows how the pieces relate.
 
-## Creating an Environment
+## Creating an environment
 
 === "From URDF/SRDF"
 
     ```python
+    from tesseract_robotics import get_tesseract_support_path
     from tesseract_robotics.planning import Robot
 
+    urdf_dir = get_tesseract_support_path() / "urdf"  # or the directory of your own robot
     robot = Robot.from_files(
-        "/path/to/robot.urdf",
-        "/path/to/robot.srdf",
+        urdf_dir / "abb_irb2400.urdf",
+        urdf_dir / "abb_irb2400.srdf",
+        locator,
     )
     env = robot.env
     ```
@@ -22,8 +29,9 @@ The `Environment` is the central data structure in tesseract_robotics — it own
     from tesseract_robotics.planning import Robot
 
     robot = Robot.from_urdf(
-        "package://my_robot/urdf/robot.urdf",
-        "package://my_robot/urdf/robot.srdf",
+        "package://tesseract/support/urdf/abb_irb2400.urdf",  # package://<your_package>/...
+        "package://tesseract/support/urdf/abb_irb2400.srdf",
+        locator,
     )
     env = robot.env
     ```
@@ -42,7 +50,7 @@ The `Environment` is the central data structure in tesseract_robotics — it own
 !!! info "`Environment.init()` signature"
     `Robot.from_files()` wraps `Environment.init(urdf_path, srdf_path, locator)`. See `src/bindings/environment.cpp` for the other overloads (scene graph, URDF string, etc.).
 
-## Scene Graph Structure
+## Scene graph structure
 
 The scene graph represents the kinematic tree of links and joints:
 
@@ -60,7 +68,7 @@ graph TD
     style H fill:#c8e6c9
 ```
 
-### Accessing Links and Joints
+### Accessing links and joints
 
 ```python
 scene = env.getSceneGraph()
@@ -78,11 +86,11 @@ link = scene.getLink("tool0")
 joint = scene.getJoint("joint_6")
 ```
 
-## Modifying the Scene
+## Modifying the scene
 
 Scene modifications are issued as **commands** applied through `env.applyCommand(...)`. The command classes live in `tesseract_robotics.environment`.
 
-### Adding Objects
+### Adding objects
 
 ```python
 from tesseract_robotics.common import Isometry3d
@@ -128,7 +136,7 @@ env.applyCommand(AddLinkCommand(obstacle_link, obstacle_joint))
     `link.visual.append(v)`. The append method silently fails because
     nanobind returns copies of the underlying C++ vectors.
 
-### Moving Objects
+### Moving objects
 
 `MoveLinkCommand` takes a replacement `Joint` that re-parents the child link.
 
@@ -142,7 +150,7 @@ obstacle_joint.parent_to_joint_origin_transform = Isometry3d(origin)
 env.applyCommand(MoveLinkCommand(obstacle_joint))
 ```
 
-### Removing Objects
+### Removing objects
 
 ```python
 from tesseract_robotics.environment import RemoveLinkCommand
@@ -150,9 +158,9 @@ from tesseract_robotics.environment import RemoveLinkCommand
 env.applyCommand(RemoveLinkCommand("obstacle"))
 ```
 
-## State Management
+## State management
 
-### Getting Current State
+### Getting current state
 
 `env.getState()` returns a `SceneState` whose key fields are:
 
@@ -168,7 +176,7 @@ print(dict(state.joints))          # {'joint_1': 0.0, 'joint_2': 0.0, ...}
 vals = state.getJointValues(["joint_1", "joint_2"])
 ```
 
-### Setting State
+### Setting state
 
 ```python
 # By joint-name dict
@@ -182,15 +190,15 @@ env.setState(joint_names, joint_values)
 
 The `Robot` wrapper exposes the same behaviour via `robot.set_joints({...})` or `robot.set_joints(values, joint_names=[...])`.
 
-### Link Transforms
+### Link transforms
 
 ```python
 tcp_transform = env.getLinkTransform("tool0")
-print(f"TCP position: {tcp_transform.translation()}")  # np.ndarray(3,)
-print(f"TCP rotation:\n{tcp_transform.rotation()}")    # np.ndarray(3, 3)
+print(f"TCP position: {tcp_transform.translation}")  # np.ndarray(3,)
+print(f"TCP rotation:\n{tcp_transform.rotation}")    # np.ndarray(3, 3)
 ```
 
-## Collision Checking
+## Collision checking
 
 Collision checking runs through the environment's discrete (or continuous) contact manager. This is the canonical pattern used throughout the examples:
 
@@ -210,7 +218,7 @@ print(f"Collision-free: {contacts.size() == 0}")
 
 See the [Collision Detection guide](collision.md) for continuous collision, flattening `ContactResultMap` into a vector, and margin configuration.
 
-## Allowed Collision Matrix
+## Allowed collision matrix
 
 The ACM defines which link pairs should be ignored during collision checking. The SRDF typically seeds it with adjacent-link exclusions.
 
@@ -235,7 +243,7 @@ env.applyCommand(
 )
 ```
 
-## Environment Commands
+## Environment commands
 
 All scene modifications use the command pattern. The full list is bound in `src/bindings/environment.cpp`:
 
@@ -252,7 +260,7 @@ All scene modifications use the command pattern. The full list is bound in `src/
 | `ChangeCollisionMarginsCommand` | Change default/pair collision margins |
 | `ModifyAllowedCollisionsCommand` | Add/remove ACM entries |
 
-## Best Practices
+## Best practices
 
 !!! warning "Thread Safety"
     `Environment` methods serialise on an internal reader/writer lock, but the
@@ -264,11 +272,12 @@ All scene modifications use the command pattern. The full list is bound in `src/
     the environment's read lock: concurrent reads proceed, and writers such as
     `setState` or `applyCommand` wait for it to finish.
 
-    With a Python event callback registered, don't change one environment
-    from two Python threads at once: `applyCommand` fires the callback while
-    holding the environment's lock, so a concurrent `setState` can deadlock.
-    [Threading and the GIL](../developer/threading.md#known-limitation-environment-event-callbacks)
-    has the details and the list of calls that release the GIL.
+    Every `Environment` method waits for the environment's lock with the GIL
+    released, so a Python event callback and a second thread that changes the
+    environment do not deadlock. A callback must not change its own
+    environment: the environment holds its lock while the callback runs.
+    [Threading and the GIL](../developer/threading.md#environment-event-callbacks)
+    has the details.
 
 !!! tip "Cloning for Planning"
     Motion planners internally clone the environment. You don't need to
@@ -278,7 +287,7 @@ All scene modifications use the command pattern. The full list is bound in `src/
 env_copy = env.clone()
 ```
 
-## Next Steps
+## Next steps
 
 - [Kinematics Guide](kinematics.md) — Forward and inverse kinematics
 - [Collision Detection](collision.md) — Collision checking details

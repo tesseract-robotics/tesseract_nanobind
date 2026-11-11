@@ -13,10 +13,12 @@
 *[QP]: Quadratic Programming - Optimization with quadratic objective
 *[FCL]: Flexible Collision Library - Collision detection library
 *[ACM]: Allowed Collision Matrix - Defines which link pairs to ignore in collision
-*[LVS]: Longest Valid Segment - Interpolation-based continuous collision checking
+*[LVS]: Longest Valid Segment - subdivide a motion into segments no longer than a set length and check each
 *[RRT]: Rapidly-exploring Random Tree - Sampling-based planning algorithm
 *[PRM]: Probabilistic Roadmap - Multi-query motion planning algorithm
-*[OPW]: Opw Kinematics - Analytical IK for 6-DOF industrial robots
+*[OPW]: Ortho-Parallel basis with spherical Wrist - closed-form IK for most 6-axis industrial arms
 *[KDL]: Kinematics and Dynamics Library - Numerical kinematics solver
 *[ABB]: ABB Ltd - Industrial robotics manufacturer
-*[Hz]: Hertz - Cycles per second (planning frequency)
+*[Hz]: Hertz - cycles per second
+*[TOTG]: Time-Optimal Trajectory Generation - time parameterization along a fixed path
+*[ISP]: Iterative Spline Parameterization - time parameterization by cubic splines

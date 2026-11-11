@@ -11,6 +11,8 @@ Entry point for working with a robot — loads URDF/SRDF, exposes FK/IK, state
 management, and access to the underlying `Environment`.
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
 # Bundled test robots
@@ -19,13 +21,14 @@ robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # From URDF/SRDF (package:// or file:// URLs)
 robot = Robot.from_urdf(
-    "package://my_robot/urdf/robot.urdf",
-    "package://my_robot/urdf/robot.srdf",
+    "package://tesseract/support/urdf/abb_irb2400.urdf",
+    "package://tesseract/support/urdf/abb_irb2400.srdf",
+    locator,
 )
 
 # FK / IK — group_name is the first positional argument
 pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0], "tool0")
-solution = robot.ik("manipulator", target_pose, "tool0", seed=[0, 0, 0, 0, 0, 0])
+solution = robot.ik("manipulator", pose, "tool0", seed=[0, 0, 0, 0, 0, 0])  # IKNoSolutionError if unreachable
 
 # Access the underlying Environment
 env = robot.env
@@ -88,14 +91,6 @@ print(pose.quaternion)  # [qx, qy, qz, qw]
 All three `plan_*` helpers accept an optional `pipeline=` override and a
 `profiles=` `ProfileDictionary`.
 
-## Module API
+## Reference
 
 ::: tesseract_robotics.planning
-    options:
-      show_root_heading: true
-      show_source: false
-      members_order: source
-      heading_level: 3
-      docstring_style: google
-      show_signature_annotations: true
-      separate_signature: true

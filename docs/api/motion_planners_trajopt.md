@@ -1,5 +1,14 @@
 # tesseract_robotics.motion_planners_trajopt
 
+<!-- snippet: ambient
+from tesseract_robotics.command_language import ProfileDictionary
+from tests.docs.doc_assets import joint_program
+
+program = joint_program(robot)
+profiles = ProfileDictionary()
+profile_dict = profiles
+-->
+
 TrajOpt trajectory optimization planner.
 
 ## Overview
@@ -28,7 +37,7 @@ from tesseract_robotics.collision import CollisionEvaluatorType
 from tesseract_robotics.motion_planners_trajopt import TrajOptMotionPlanner
 from tesseract_robotics.motion_planners import PlannerRequest
 
-planner = TrajOptMotionPlanner()
+planner = TrajOptMotionPlanner("TrajOptMotionPlannerTask")  # the namespace of its profiles
 
 request = PlannerRequest()
 request.env = env
@@ -99,8 +108,9 @@ otherwise, and `0.01 * extent` when neither is, with
 ```python
 limits = env.getJointGroup("manipulator").getLimits().joint_limits  # n x 2
 cfg = profile.collision_cost_config.collision_check_config
+fraction = 0.05  # of the joint-range extent
 step = TrajOptDefaultCompositeProfile.computeLongestValidSegmentLength(
-    limits, cfg.longest_valid_segment_fraction, cfg.longest_valid_segment_length
+    limits, fraction, cfg.longest_valid_segment_length
 )
 ```
 
@@ -273,7 +283,7 @@ request.instructions = program
 request.profiles = profiles
 
 # Solve
-planner = TrajOptMotionPlanner()
+planner = TrajOptMotionPlanner("TrajOptMotionPlannerTask")  # the namespace of its profiles
 response = planner.solve(request)
 
 if response.successful:
@@ -298,10 +308,6 @@ export TRAJOPT_LOG_THRESH=ERROR  # FATAL, ERROR, WARN, INFO, DEBUG, TRACE
 4. **Use LVS_DISCRETE** for better collision coverage
 5. **Tune coefficients** - higher = stricter enforcement
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.motion_planners_trajopt
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

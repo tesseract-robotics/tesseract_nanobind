@@ -1,5 +1,20 @@
 # tesseract_robotics.collision
 
+<!-- snippet: ambient
+from pathlib import Path
+
+from tests.docs.doc_assets import enter_scratch_dir, write_stl
+
+enter_scratch_dir()
+write_stl(Path("model.stl"))
+from tesseract_robotics.collision import ContactRequest, ContactTestType
+
+link_transforms = env.getState().link_transforms
+link_transforms_start = link_transforms
+link_transforms_end = link_transforms
+request = ContactRequest(ContactTestType.ALL)
+-->
+
 Collision detection managers and contact queries.
 
 ## Contact Managers
@@ -9,7 +24,7 @@ Collision detection managers and contact queries.
 Checks collision at a single configuration.
 
 ```python
-from tesseract_robotics.collision import DiscreteContactManager
+from tesseract_robotics.collision import ContactResultMap, DiscreteContactManager
 
 # Get from environment
 manager = env.getDiscreteContactManager()
@@ -30,7 +45,7 @@ my_manager.contactTest(result_map, request)
 Checks collision along swept motion.
 
 ```python
-from tesseract_robotics.collision import ContinuousContactManager
+from tesseract_robotics.collision import ContactResultMap, ContinuousContactManager
 
 # Get from environment
 manager = env.getContinuousContactManager()
@@ -57,9 +72,11 @@ Loads contact manager plugins (Bullet, FCL) from a YAML config and creates manag
 ```python
 from pathlib import Path
 
+from tesseract_robotics import get_tesseract_support_path
 from tesseract_robotics.collision import ContactManagersPluginFactory
 
-factory = ContactManagersPluginFactory(Path("contact_manager_plugins.yaml"), locator)
+config = get_tesseract_support_path() / "urdf" / "contact_manager_plugins.yaml"
+factory = ContactManagersPluginFactory(config, locator)
 
 plugins = factory.getDiscreteContactManagerPlugins()  # dict[str, PluginInfo]
 factory.addDiscreteContactManagerPlugin("MyBullet", plugins["BulletDiscreteBVHManager"])
@@ -172,12 +189,18 @@ other length raises `TypeError`. Every read returns a new list, so
 
 ### ContactResultMap
 
-Map from an ordered link pair `(link_a, link_b)` (`link_a` does not sort after
-`link_b`) to a `ContactResultVector`. `count()` is the number of contacts,
+Map from a `LinkIdPair`, in the order the manager reported the two links (`at` also takes a
+`(str, str)` tuple in that order), to a `ContactResultVector`. `count()` is the number of contacts,
 `size()` / `len()` the number of pairs that have at least one.
 
 ```python
 from tesseract_robotics.collision import ContactResultMap
+from tesseract_robotics.planning import Pose, box, create_obstacle
+
+# A box around the robot's base gives the manager something to report
+create_obstacle(robot, "obstacle", box(0.6, 0.6, 0.6), Pose.from_xyz(0.0, 0.0, 0.0))
+manager = env.getDiscreteContactManager()
+manager.setCollisionObjectsTransform(env.getState().link_transforms)
 
 result_map = ContactResultMap()
 manager.contactTest(result_map, request)
@@ -186,14 +209,15 @@ print(f"{result_map.size()} contact pairs, {result_map.count()} contacts")
 print(result_map.getSummary())
 
 # Read: every value is a copy, never a view into the map
-for (link_a, link_b), contacts in result_map:      # (key, ContactResultVector) pairs
-    print(link_a, link_b, len(contacts))
-contacts = result_map.at(("base_link", "link_1"))  # KeyError if absent
-as_dict = result_map.getContainer()                # dict[tuple[str, str], ContactResultVector]
+for pair, contacts in result_map:                  # (LinkIdPair, ContactResultVector) pairs
+    print(pair.first(), pair.second(), len(contacts))
+pair, _ = next(iter(result_map))
+contacts = result_map.at((str(pair.first()), str(pair.second())))  # KeyError if absent
+as_dict = result_map.getContainer()                # dict[LinkIdPair, ContactResultVector]
 
 # Drop every contact that involves the gripper (the vector is live only during the call)
 def drop_gripper(key, contacts):
-    if "gripper" in key:
+    if "gripper" in (str(key.first()), str(key.second())):
         contacts.clear()
 
 result_map.filter(drop_gripper)
@@ -263,7 +287,10 @@ Generate convex hulls for collision. `makeConvexMesh` turns a `Mesh` into a `Con
 import numpy as np
 from tesseract_robotics.collision import ConvexHullError, createConvexHull, makeConvexMesh
 
-convex = makeConvexMesh(mesh)  # mesh: geometry.Mesh
+from tesseract_robotics.geometry import createMeshFromPath
+
+mesh = createMeshFromPath("model.stl")[0]  # a geometry.Mesh
+convex = makeConvexMesh(mesh)
 
 points = [np.array([x, y, z]) for x in (0.0, 1.0) for y in (0.0, 1.0) for z in (0.0, 1.0)]
 n_faces, vertices, faces = createConvexHull(points)
@@ -290,6 +317,8 @@ params.max_convex_hulls = 16
 params.fill_mode = FillMode.SURFACE_ONLY
 
 # vertices: list of 3-vectors; faces: flat int32 array of [3, i0, i1, i2] per triangle
+vertices = [np.array(v) for v in ((0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1))]
+faces = np.array([3, 0, 2, 1, 3, 0, 1, 3, 3, 0, 3, 2, 3, 1, 2, 3], dtype=np.int32)
 hulls = ConvexDecompositionVHACD(params).compute(vertices, faces, verbose=False)  # list[ConvexMesh]
 ```
 
@@ -342,10 +371,6 @@ if not results.empty():
             print(f"Penetration: {c.link_ids} depth={-c.distance:.4f}")
 ```
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.collision
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

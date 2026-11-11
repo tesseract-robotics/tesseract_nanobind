@@ -21,12 +21,11 @@ The `*_to_file` / `*_from_file` helpers always write and read XML, whatever the
 path suffix: there is no format detection. For a binary file, write the bytes of
 `*_to_binary` yourself.
 
-`task_composer_log_to_file` / `task_composer_log_from_file` take a `str` or an
-`os.PathLike` (`pathlib.Path`), write and read exactly that path (upstream appends
-`.tclx` to a path without a suffix; these do not), and raise `OSError`
-(`FileNotFoundError`, `PermissionError`, ...) when the file cannot be written or read;
-`task_composer_log_to_file` returns `None`. The other `*_file` helpers take a `str`
-and return `True` as upstream does.
+The `*_file` helpers take a `str` or an `os.PathLike` (`pathlib.Path`) and write and read
+exactly that path (upstream appends `.tclx` to a task composer log path without a suffix; these
+do not). A `*_to_file` helper returns `None`; every one raises `OSError` (`FileNotFoundError`,
+`PermissionError`, ...) naming the path when the file cannot be written or read. `*_to_binary`
+returns `bytes` and `*_from_binary` takes them.
 
 !!! note "A `TaskComposerLog` can hold planner profiles"
     This module registers every planner profile type (TrajOpt, TrajOptIfopt, OMPL,
@@ -35,9 +34,6 @@ and return `True` as upstream does.
     round-trips on every platform. A process that loads an archive needs nothing but
     this module: importing it links the planner libraries.
 
+## Reference
+
 ::: tesseract_robotics.serialization
-    options:
-      show_root_heading: true
-      show_source: false
-      members_order: source
-      heading_level: 3

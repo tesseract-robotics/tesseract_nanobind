@@ -1,5 +1,5 @@
 site_name: tesseract_robotics
-site_description: Python bindings for Tesseract Motion Planning Framework
+site_description: Python bindings for the Tesseract motion planning framework — environment, kinematics, collision checking, motion planning and task composition.
 site_url: https://tesseract-robotics.github.io/tesseract_nanobind/
 repo_url: https://github.com/tesseract-robotics/tesseract_nanobind
 repo_name: tesseract-robotics/tesseract_nanobind
@@ -12,26 +12,33 @@ theme:
     edit: material/pencil
     view: material/eye
   palette:
-    - scheme: default
-      primary: indigo
-      accent: deep purple
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    - scheme: slate
-      primary: indigo
-      accent: deep purple
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
-        name: Switch to light mode
+        name: Follow the system theme
   font:
     text: Inter
     code: JetBrains Mono
   features:
+    - navigation.instant
+    - navigation.instant.progress
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
     - navigation.path
     - navigation.top
     - navigation.indexes
@@ -43,28 +50,24 @@ theme:
     - content.code.annotate
     - content.tabs.link
     - content.tooltips
-    - announce.dismiss
+    - content.action.edit
     - toc.follow
 
 plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
-  - exclude:
-      glob:
-        - QUICKSTART.md
-        - superpowers/**
-        - plans/**
   - mkdocstrings:
       enable_inventory: false
       handlers:
         python:
           paths: [src]
           options:
+            # Each API page puts its directive under `## Reference`: members are h3 below it.
+            show_root_heading: false
+            heading_level: 3
             show_source: false
-            show_root_heading: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
-            heading_level: 2
             members_order: source
             docstring_style: google
             show_if_no_docstring: true
@@ -130,76 +133,91 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started:
+  - Getting started:
     - Installation: getting-started/installation.md
     - Quickstart: getting-started/quickstart.md
-    - Core Concepts: getting-started/concepts.md
-  - User Guide:
-    - Environment & Scene Graph: user-guide/environment.md
+  - Concepts:
+    - concepts/index.md
+    - Frames and poses: concepts/frames.md
+    - Python and C++: concepts/bindings.md
+    - Glossary: concepts/glossary.md
+  - User guide:
+    - Environment and scene graph: user-guide/environment.md
     - Kinematics: user-guide/kinematics.md
-    - Collision Detection: user-guide/collision.md
-    - Motion Planning: user-guide/planning.md
-    - Task Composer: user-guide/task-composer.md
-    - Serialization: user-guide/serialization.md
-    - Low-Level SQP API: user-guide/low-level-sqp.md
+    - Collision checking: user-guide/collision.md
+    - Motion planning: user-guide/planning.md
+    - Task composer: user-guide/task-composer.md
+    - Low-level SQP: user-guide/low-level-sqp.md
     - Viewer: user-guide/viewer.md
+    - Serialization: user-guide/serialization.md
+    - Program emitters: user-guide/emitters.md
   - Examples:
     - examples/index.md
-    - Basic Examples: examples/basic.md
-    - Geometry Examples: examples/geometry.md
-    - Kinematics Examples: examples/kinematics.md
-    - Collision Examples: examples/collision.md
-    - Environment Examples: examples/environment.md
-    - Planning Examples: examples/planning.md
-    - OMPL Examples: examples/ompl.md
-    - Online Planning: examples/online-planning.md
-    - Python Constraints: examples/python-constraints.md
-  - API Reference:
+    - Planning: examples/planning.md
+    - OMPL: examples/ompl.md
+    - Online planning: examples/online-planning.md
+    - Python constraints: examples/python-constraints.md
+    - Basics: examples/basic.md
+    - Kinematics: examples/kinematics.md
+    - Collision: examples/collision.md
+    - Environment: examples/environment.md
+    - Geometry: examples/geometry.md
+  - API reference:
     - api/index.md
-    - High-Level:
-      - tesseract_robotics.planning: api/planning.md
-    - Core Modules:
-      - tesseract_robotics.common: api/common.md
-      - tesseract_robotics.geometry: api/geometry.md
-      - tesseract_robotics.scene_graph: api/scene_graph.md
-      - tesseract_robotics.urdf: api/urdf.md
-      - tesseract_robotics.srdf: api/srdf.md
-      - tesseract_robotics.state_solver: api/state_solver.md
-      - tesseract_robotics.environment: api/environment.md
-      - tesseract_robotics.collision: api/collision.md
-      - tesseract_robotics.kinematics: api/kinematics.md
-      - tesseract_robotics.serialization: api/serialization.md
-    - Planning Modules:
-      - tesseract_robotics.command_language: api/command_language.md
-      - tesseract_robotics.motion_planners: api/motion_planners.md
-      - tesseract_robotics.motion_planners_ompl: api/motion_planners_ompl.md
-      - tesseract_robotics.motion_planners_trajopt: api/motion_planners_trajopt.md
-      - tesseract_robotics.motion_planners_descartes: api/motion_planners_descartes.md
-      - tesseract_robotics.motion_planners_simple: api/motion_planners_simple.md
-      - tesseract_robotics.task_composer: api/task_composer.md
-    - SQP Modules:
-      - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md
-      - tesseract_robotics.trajopt_sqp: api/trajopt_sqp.md
-  - Changelog: CHANGELOG.md
-  - Migration Guides:
+    - High level:
+      - planning: api/planning.md
+    - World model:
+      - common: api/common.md
+      - geometry: api/geometry.md
+      - scene_graph: api/scene_graph.md
+      - urdf: api/urdf.md
+      - srdf: api/srdf.md
+      - state_solver: api/state_solver.md
+      - environment: api/environment.md
+      - collision: api/collision.md
+      - kinematics: api/kinematics.md
+      - serialization: api/serialization.md
+    - Planning:
+      - command_language: api/command_language.md
+      - motion_planners: api/motion_planners.md
+      - motion_planners_ompl: api/motion_planners_ompl.md
+      - motion_planners_trajopt: api/motion_planners_trajopt.md
+      - motion_planners_trajopt_ifopt: api/motion_planners_trajopt_ifopt.md
+      - motion_planners_descartes: api/motion_planners_descartes.md
+      - motion_planners_simple: api/motion_planners_simple.md
+      - task_composer: api/task_composer.md
+      - task_composer_planning: api/task_composer_planning.md
+      - time_parameterization: api/time_parameterization.md
+    - Low-level SQP:
+      - trajopt_ifopt: api/trajopt_ifopt.md
+      - trajopt_sqp: api/trajopt_sqp.md
+    - Tooling:
+      - viewer: api/viewer.md
+      - emitters: api/emitters.md
+      - build_identity: api/build_identity.md
+  - Release notes:
+    - Changelog: CHANGELOG.md
     - Breaking API changes: breaking-changes.md
-    - "tesseract 0.35 → 0.36 (upstream main)": changes-0.36.md
-    - "tesseract 0.33 → 0.35": changes.md
+    - "Tesseract 0.35 → 0.36": changes-0.36.md
+    - "Tesseract 0.33 → 0.35": changes.md
   - Developer:
     - developer/index.md
-    - Binding API Audit: developer/binding-api-audit.md
-    - Binding Audit Coverage: developer/binding-audit-coverage.md
-    - Threading and the GIL: developer/threading.md
-    - How the Binaries Are Built: developer/binaries.md
-    - The Native Stack Build: developer/native-stack.md
-    - Program Emitters: developer/emitters.md
-    - SWIG to Nanobind Migration: developer/migration.md
-    - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md
-    - TrajOpt Collision Memory: developer/trajopt-collision-memory.md
-    - Windows Wheel Gotchas: developer/windows-wheels.md
-    - macOS Wheel Gotchas: developer/macos-wheels.md
-    - Linux Wheel Gotchas: developer/linux-wheels.md
-    - Building Against Upstream Main: developer/upstream-main.md
+    - Build and release:
+      - The native stack build: developer/native-stack.md
+      - How the binaries are built: developer/binaries.md
+      - Wheel build caching: developer/wheel-caching.md
+      - Building against upstream main: developer/upstream-main.md
+      - Linux wheels: developer/linux-wheels.md
+      - macOS wheels: developer/macos-wheels.md
+      - Windows wheels: developer/windows-wheels.md
+    - Binding internals:
+      - Binding conventions: developer/binding-conventions.md
+      - Binding API audit: developer/binding-api-audit.md
+      - Binding audit coverage: developer/binding-audit-coverage.md
+      - Threading and the GIL: developer/threading.md
+      - TrajOpt-Ifopt constraints: developer/trajopt_ifopt_missing_constraints.md
+      - TrajOpt collision memory: developer/trajopt-collision-memory.md
+      - SWIG to nanobind: developer/migration.md
 
 extra:
   version:
@@ -215,6 +233,13 @@ extra:
     provider: google
     property: !ENV GOOGLE_ANALYTICS_KEY
   generator: false
+
+# Internal design records: kept in the repository, not published.
+exclude_docs: |
+  plans/
+  superpowers/
+  includes/
+  requirements.txt
 
 extra_css:
   - stylesheets/extra.css

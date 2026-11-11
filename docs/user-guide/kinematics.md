@@ -1,8 +1,17 @@
 # Kinematics
 
-tesseract_robotics provides forward and inverse kinematics through **kinematic groups** defined in the SRDF. The high-level `Robot` wrapper exposes them as `robot.fk(...)` / `robot.ik(...)`.
+<!-- snippet: ambient
+trajectory = [np.zeros(6), np.full(6, 0.1)]
+-->
 
-## Kinematic Groups
+Forward kinematics maps joint values to link poses; inverse kinematics finds the joint values
+that put a link at a pose. Both run on a **kinematic group**, a set of joints named in the SRDF
+(`"manipulator"`), with the solvers the SRDF's kinematics plugin configuration selects: KDL
+(numerical), OPW and UR (closed form). `robot.fk(...)` and `robot.ik(...)` are the short form;
+the kinematic group gives limits, Jacobians and every IK branch. Angles are rad, lengths m;
+[Frames and poses](../concepts/frames.md) fixes the frame of each pose.
+
+## Kinematic groups
 
 A kinematic group defines a chain of joints for FK/IK calculations:
 
@@ -13,7 +22,7 @@ A kinematic group defines a chain of joints for FK/IK calculations:
 </group>
 ```
 
-### Getting a Kinematic Group
+### Getting a kinematic group
 
 ```python
 from tesseract_robotics.planning import Robot
@@ -26,10 +35,10 @@ manip = robot.env.getKinematicGroup("manipulator")
 print(f"Joint names:     {list(manip.getJointIds())}")
 print(f"Link names:      {list(manip.getLinkIds())}")
 print(f"Base link:       {manip.getBaseLinkId()}")
-print(f"Tip link(s):     {list(manip.getTipLinkIds())}")
+print(f"Tip link(s):     {list(manip.getAllPossibleTipLinkIds())}")
 ```
 
-## Forward Kinematics
+## Forward kinematics
 
 Compute a link's pose from joint values.
 
@@ -52,8 +61,8 @@ Compute a link's pose from joint values.
         `Pose.qx/qy/qz/qw`, `Pose.quaternion`, `Quaterniond.from_xyzw`,
         `q.coeffs()`, and every factory in `common` follow this.
 
-        The Eigen-native `Quaterniond(w, x, y, z)` 4-double ctor exists for
-        interop but is the one exception — prefer `Quaterniond.from_xyzw`.
+        There is no scalar-first constructor: build one with
+        `Quaterniond.from_xyzw(qx, qy, qz, qw)` or `Quaterniond([qx, qy, qz, qw])`.
 
 === "Low-Level API"
 
@@ -62,8 +71,8 @@ Compute a link's pose from joint values.
     transforms = manip.calcFwdKin(joints)
 
     tcp_isometry = transforms["tool0"]
-    print(tcp_isometry.translation())   # method, not property
-    print(tcp_isometry.rotation())
+    print(tcp_isometry.translation)   # np.ndarray(3,), a read-only property
+    print(tcp_isometry.rotation)      # np.ndarray(3, 3)
     ```
 
 ### Pose vs Isometry3d
@@ -92,7 +101,7 @@ combined = pose @ pose2
 iso_combined = iso * iso
 ```
 
-## Inverse Kinematics
+## Inverse kinematics
 
 Find joint values that achieve a target pose.
 
@@ -103,20 +112,21 @@ Find joint values that achieve a target pose.
 
     target = Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0.0, np.pi, 0.0)
 
-    # Returns a single np.ndarray solution, None, or a list if all_solutions=True
-    solution = robot.ik("manipulator", target, "tool0", seed=joints)
-    if solution is not None:
+    from tesseract_robotics.planning import IKNoSolutionError
+
+    # Returns the first solution as an np.ndarray; raises IKNoSolutionError when there is none
+    try:
+        solution = robot.ik("manipulator", target, "tool0", seed=joints)
         print(f"Solution: {solution}")
-    else:
+    except IKNoSolutionError:
         print("No IK solution found")
 
     # Enumerate all solutions (e.g. redundant 7-DOF arms)
     solutions = robot.ik("manipulator", target, "tool0", seed=joints, all_solutions=True)
-    if solutions:
-        print(f"Found {len(solutions)} solution(s)")
+    print(f"Found {len(solutions)} solution(s)")
     ```
 
-    The full signature is `robot.ik(group_name, target_pose, seed=None, tip_link=None, all_solutions=False)` — see `planning/core.py`.
+    The full signature is `robot.ik(group_name, target_pose, tip_link, seed=None, all_solutions=False)`; `tip_link` is required — see `planning/core.py`.
 
 === "Low-Level API"
 
@@ -132,14 +142,22 @@ Find joint values that achieve a target pose.
     solutions = manip.calcInvKin(ik_input, seed)  # list[np.ndarray]
     ```
 
-!!! warning "IK may return `None`"
-    `robot.ik(...)` returns `None` when:
+!!! warning "IK may raise `IKNoSolutionError`"
+    `robot.ik(...)` raises `IKNoSolutionError` (a `RuntimeError`) when:
 
     - the target is outside the workspace,
     - no IK solver is configured in the SRDF,
     - the solver hit its iteration limit.
 
-### IK Solvers
+A closed-form solver returns every branch:
+
+<figure markdown>
+![Four IRB2400 poses side by side, all with the flange at the same RGB-axis target: two reaching forward (wrist + and −) and two with the base turned around and the upper arm leaning back over the base. ---](../assets/figures/ik_branches.svg#only-light)
+![Four IRB2400 poses side by side, all with the flange at the same RGB-axis target: two reaching forward (wrist + and −) and two with the base turned around and the upper arm leaning back over the base. ---](../assets/figures/ik_branches-dark.svg#only-dark)
+<figcaption markdown="span">`Robot.ik(..., all_solutions=True)` returns every branch within the joint limits: four for this tool0 pose on the IRB2400 (0.7, 0.2, 1.4 m, tool z along +x), facing the target or turned half a revolution and leaning back, each with the wrist flipped or not. Joint values in rad; forward kinematics of each lands on the pose. Reproduce: `pixi run docs-figures ik_branches`.</figcaption>
+</figure>
+
+### IK solvers
 
 | Solver | Type | Robots |
 |--------|------|--------|
@@ -201,7 +219,7 @@ joint 3 and joint 5 for manufacturers whose joint directions differ from the con
 `getJointTurns` gives `int(q / π)` per joint: non-zero where a wrist joint is more than
 half a turn from zero.
 
-## Joint Limits
+## Joint limits
 
 ```python
 limits = manip.getLimits()
@@ -217,7 +235,7 @@ acc_limits = limits.acceleration_limits
 
 `Robot.get_joint_limits("manipulator")` returns the same information as a `{joint_name: {lower, upper, velocity, acceleration}}` dict.
 
-### Checking Limits
+### Checking limits
 
 ```python
 def is_within_limits(joints: np.ndarray, manip) -> bool:
@@ -227,7 +245,7 @@ def is_within_limits(joints: np.ndarray, manip) -> bool:
     return bool(np.all(joints >= lower) and np.all(joints <= upper))
 ```
 
-### Sample Grids and Reach
+### Sample grids and reach
 
 The utilities the positioner solvers sample with are callable directly:
 
@@ -259,7 +277,7 @@ joint_velocities = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 tcp_velocity = jacobian @ joint_velocities  # 6D twist [vx, vy, vz, wx, wy, wz]
 ```
 
-### Singularity Detection
+### Singularity detection
 
 ```python
 def manipulability(jacobian: np.ndarray) -> float:
@@ -270,7 +288,7 @@ def is_near_singularity(jacobian: np.ndarray, threshold: float = 0.01) -> bool:
     return manipulability(jacobian) < threshold
 ```
 
-## Tool Frames
+## Tool frames
 
 Define Tool Center Point (TCP) offsets relative to the flange:
 
@@ -285,6 +303,7 @@ flange_pose = robot.fk("manipulator", joints, "tool0")
 tcp_pose = flange_pose @ tool_offset
 
 # For IK, transform the target back into the flange frame
+target_tcp = tcp_pose
 target_flange = target_tcp @ tool_offset.inverse()
 solution = robot.ik("manipulator", target_flange, "tool0")
 ```
@@ -293,12 +312,13 @@ solution = robot.ik("manipulator", target_flange, "tool0")
 instead (`tcp_offset=tool_offset`, or the name of an SRDF group TCP) and the planner applies
 it: see [Frames and the TCP](planning.md#frames-and-the-tcp).
 
-## Working with Multiple Groups
+## Working with multiple groups
 
 Some robots have multiple kinematic groups:
 
+<!-- snippet: skip (needs a robot whose SRDF defines dual-arm and positioner groups; the IRB2400 has only "manipulator") -->
 ```python
-# Dual-arm robot
+# Dual-arm robot (the IRB2400 has one group, "manipulator")
 left_arm  = robot.env.getKinematicGroup("left_arm")
 right_arm = robot.env.getKinematicGroup("right_arm")
 
@@ -306,7 +326,7 @@ right_arm = robot.env.getKinematicGroup("right_arm")
 full_chain = robot.env.getKinematicGroup("manipulator_with_positioner")
 ```
 
-## Performance Tips
+## Performance tips
 
 !!! tip "Cache kinematic groups"
     Creating a kinematic group walks the SRDF. Cache the group if you're
@@ -328,7 +348,7 @@ full_chain = robot.env.getKinematicGroup("manipulator_with_positioner")
     `getKinematicGroup` hold it. See
     [Threading and the GIL](../developer/threading.md).
 
-## Next Steps
+## Next steps
 
 - [Collision Detection](collision.md) — Check for collisions against the world
 - [Motion Planning](planning.md) — Plan collision-free trajectories

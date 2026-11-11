@@ -1,18 +1,31 @@
 # tesseract_robotics.command_language
 
+<!-- snippet: ambient
+from tesseract_robotics.command_language import (
+    JointWaypoint, JointWaypointPoly, MoveInstruction, MoveInstructionPoly, MoveInstructionType,
+    StateWaypoint, StateWaypointPoly,
+)
+from tesseract_robotics.common import JointState
+
+_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
+seed_state = JointState(_names, np.zeros(6))
+move1 = MoveInstruction(JointWaypointPoly(JointWaypoint(_names, np.zeros(6))), MoveInstructionType.FREESPACE, "DEFAULT")
+move2 = MoveInstruction(JointWaypointPoly(JointWaypoint(_names, np.full(6, 0.1))), MoveInstructionType.FREESPACE, "DEFAULT")
+-->
+
 Motion program instructions and waypoints.
 
 ## Overview
 
 The command language defines motion tasks as a tree of instructions:
 
-```
-CompositeInstruction (program)
-├── MoveInstruction (freespace to via point)
-├── MoveInstruction (linear to target)
-└── CompositeInstruction (sub-program)
-    ├── MoveInstruction
-    └── MoveInstruction
+```mermaid
+flowchart TD
+    P[CompositeInstruction: program] --> M1[MoveInstruction: freespace to via point]
+    P --> M2[MoveInstruction: linear to target]
+    P --> S[CompositeInstruction: sub-program]
+    S --> M3[MoveInstruction]
+    S --> M4[MoveInstruction]
 ```
 
 ## Waypoints
@@ -62,7 +75,7 @@ wp = CartesianWaypoint(pose)
 
 # With seed (initial joint guess for IK)
 wp = CartesianWaypoint(pose)
-wp.setSeed(seed_state)  # StateWaypointPoly
+wp.setSeed(seed_state)  # a common.JointState
 
 # Wrap in polymorphic type
 wp_poly = CartesianWaypointPoly(wp)
@@ -145,6 +158,7 @@ program.push_back(move2)
 
 # push_back accepts either a single Instruction or a nested CompositeInstruction
 # (0.35+) so raster-style programs can be built the same way they are in C++:
+sub_composite = CompositeInstruction("sub")
 program.push_back(sub_composite)
 
 # Iterate instructions
@@ -324,6 +338,7 @@ The command language uses type erasure. The Poly constructors wrap a concrete ty
 
 ### Wrapping (concrete → polymorphic)
 
+<!-- snippet: skip (call-form listing with placeholder variables (wp, instr, wp_poly), not a script) -->
 ```python
 # Waypoints
 StateWaypointPoly(wp)
@@ -346,6 +361,7 @@ removes the need for an explicit wrap call.
 
 ### Unwrapping (polymorphic → concrete)
 
+<!-- snippet: skip (call-form listing with placeholder variables (wp, instr, wp_poly), not a script) -->
 ```python
 # Waypoints
 wp_poly.asStateWaypoint()
@@ -421,10 +437,6 @@ program.push_back(goal_instr)
 # Program is ready for TaskComposer
 ```
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.command_language
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

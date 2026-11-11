@@ -1,8 +1,26 @@
 # Viewer
 
+<!-- snippet: ambient
+import atexit
+
+from tesseract_robotics.planning import TaskComposer
+from tesseract_robotics.viewer import TesseractViewer
+from tests.docs.doc_assets import joint_program
+
+viewer = TesseractViewer(port=0)
+atexit.register(viewer.close)
+viewer.update_environment(env)
+result = TaskComposer.from_config().plan(robot, joint_program(robot))
+joint_names = robot.get_joint_names("manipulator")
+positions = [np.zeros(6), np.full(6, 0.2)]
+times_s = [0.0, 1.0]
+rows = [[*np.zeros(6), 0.0], [*np.full(6, 0.2), 1.0]]
+results = {"env": env, "trajectory": result.raw_results, "manip_info": result.raw_results.getManipulatorInfo()}
+-->
+
 `tesseract_robotics.viewer` draws a tesseract environment in your browser and animates planned trajectories. It is built on [viser](https://viser.studio). Tesseract owns the kinematics: every link is one viser frame posed from `env.getState(...)`, so rails, positioners and attached objects need no separate handling. After a command that adds or removes links, call `update_environment` again; until then pose updates raise `StaleSceneError`.
 
-## Basic Usage
+## Basic usage
 
 Build an `Environment`, then hand it to the viewer. The viewer serves from construction until `close()`, at `http://127.0.0.1:8000` by default:
 
@@ -16,7 +34,7 @@ Build an `Environment`, then hand it to the viewer. The viewer serves from const
 
 `TesseractViewer(port=...)` picks another port; `port=0` lets the OS choose and `viewer.url` reports it. A taken port raises `ViewerPortInUseError` instead of moving on, because a URL you were given should stay true. `TesseractViewer(host="0.0.0.0")` exposes the viewer to your network; it has no authentication.
 
-## Visualizing a Robot
+## Visualizing a robot
 
 Load a URDF/SRDF pair via `GeneralResourceLocator`, then push the environment into the viewer:
 
@@ -24,7 +42,7 @@ Load a URDF/SRDF pair via `GeneralResourceLocator`, then push the environment in
 --8<-- "src/tesseract_robotics/examples/abb_irb2400_viewer.py:load_robot"
 ```
 
-## Animating a Planned Trajectory
+## Animating a planned trajectory
 
 After running a motion planner, feed the resulting `CompositeInstruction` to `update_trajectory`:
 
@@ -58,7 +76,7 @@ viewer.update_trajectory(Trajectory.build(joint_names, positions, times_s))
 viewer.update_trajectory(Trajectory.from_rows(joint_names, rows))
 ```
 
-### Playback Controls
+### Playback controls
 
 The **Playback** folder in the viewer's control panel exists from construction, so it is there for a browser that connects late.
 
@@ -71,7 +89,7 @@ The **Playback** folder in the viewer's control panel exists from construction, 
 
 Re-pushing an environment that still has the trajectory's joints keeps it playing. An environment without them drops the trajectory with a logged warning.
 
-## TCP Path
+## TCP path
 
 `plot_trajectory` draws the path the program commands, chosen per move by the type of the instruction arriving at each waypoint. MoveL and MoveJ have different true paths, so neither a fitted curve nor straight lines everywhere can draw both. It is the commanded path, not a prediction of the machine's: a controller's blending zones are not in the program and do not appear.
 
@@ -100,7 +118,7 @@ A MoveJ is drawn in `n = max(ceil(max|dtheta| / 1 deg), ceil(max|dd| / 50 mm))` 
 !!! note "Moving working frames"
     A MoveL is straight in its `working_frame`. If the group moves that frame (a part on a positioner), its world path is not a line, and `plot_trajectory` raises `MovingWorkingFrameError` rather than draw one. MoveJ draws normally there.
 
-## Markers and Custom Scene Content
+## Markers and custom scene content
 
 The viewer draws links, visuals and `plot_trajectory`. Anything else goes straight to viser through `viewer.server`. See the [viser documentation](https://viser.studio):
 
@@ -129,7 +147,7 @@ The live viewer looks like the docs' demo players: dark theme, no viser logo, an
 
 All materials are double-sided: sheet-metal meshes often mix face windings, which would otherwise show as holes. Colour comes from the URDF `<material>` on the visual, then the mesh's own material or texture, then tesseract's default grey.
 
-## Industrial Workcells
+## Industrial workcells
 
 --8<-- "docs/demos/players/twc_workcell_positioner_viewer.html"
 
@@ -162,7 +180,7 @@ Path("plan.viser").write_bytes(data)
 
 Each `RecordingPhase` pairs a trajectory with the environment it runs in, so a recording can join a pick, with the part on the table, to a place, with the part on the tool. Add `plot_trajectory` paths first: `record` keeps what is already in the scene. With no phases it records the scene as it stands, and the client shows no timeline.
 
-## API Quick Reference
+## API quick reference
 
 | Member | Purpose |
 |---|---|

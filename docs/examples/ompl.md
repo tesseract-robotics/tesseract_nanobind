@@ -1,4 +1,4 @@
-# OMPL Examples
+# OMPL examples
 
 **OMPL finds collision-free paths by sampling. From Python you choose the planners, how
 long they optimize and the objective that decides when a path is good enough. On a sweep
@@ -29,7 +29,7 @@ tesseract_freespace_ompl_example
 See the source at
 [`freespace_ompl_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_ompl_example.py).
 
-## Hybrid Planning (OMPL + TrajOpt)
+## Hybrid planning (OMPL + TrajOpt)
 
 --8<-- "docs/demos/players/freespace_hybrid_example.html"
 

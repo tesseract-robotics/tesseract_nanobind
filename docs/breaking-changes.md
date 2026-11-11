@@ -1,61 +1,74 @@
 # Breaking API changes
 
-Changes that break existing Python code, newest first, each with what replaces it. The next
-release removes `IfoptQPProblem` and `IfoptProblem`: build a `TrajOptQPProblem` instead, and
-expect different results wherever a cost went in without a penalty type. Its convex evaluators
-take only the QP solution vector. The [changelog](CHANGELOG.md) lists every change; the
-[upgrade guide](changes.md) covers the tesseract upgrades in full.
+The migration table for Python code, newest first: each breaking change with what replaces it. 0.36 is
+a breaking release and removes names outright, with no aliases and no deprecation warnings. The
+[changelog](CHANGELOG.md) is the release log, [0.35 → 0.36](changes-0.36.md) the narrative
+migration with before/after examples, and [0.33 → 0.35](changes.md) the earlier tesseract upgrades.
 
 | Release | What breaks | Use instead |
 |---|---|---|
-| Unreleased | Python modules lose the `tesseract_` prefix (`tesseract_robotics.tesseract_collision` → `tesseract_robotics.collision`, 20 in all); the old names warn for one release | [The new names](#036-module-names) |
-| Unreleased | `TaskComposer.plan` raises `ProfileTypeMismatchError` when a Descartes node's namespace holds a profile only as the other scalar type (`D` for a Cartesian or raster pipeline); `create_descartes_default_profiles(move_profile=…)` refuses a Python subclass of `DescartesMoveProfileD` / `F` | [Register the type the node reads](#descartes-profiles-match-the-nodes-scalar-type) |
-| Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
-| Unreleased | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
-| Unreleased | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/common.md#logging) |
-| Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
-| Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | A collision constraint on a `Var` outside a `NodesVariables` raises `VarNotInVariableSetError` (a `ValueError`) at construction instead of segfaulting on its first `update()` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
-| Unreleased | `Node.getParent` raises `NodeParentUnavailableError` for planner-owned nodes, including inside `create` overrides | [Keep the planner's `Node`s, not their set](#nodegetparent-raises-for-planner-owned-nodes) |
-| Unreleased | `OSQPEigenSolver.update*` raise `QPSizeError` on a wrong-length vector | [Size by `init()`](#osqpeigensolver-updates-check-sizes) |
-| Unreleased | 16 command-language waypoint, instruction and Poly types compare by value and are unhashable | [A stable key, or `id()`](#command-language-types-compare-by-value-and-are-unhashable) |
-| Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` compare by value and are unhashable | [A stable key, or `id()`](#time-parameterization-profiles-compare-by-value-and-are-unhashable) |
-| Unreleased | The seven simple-planner move profiles compare by value and are unhashable | [A stable key, or `id()`](#simple-planner-move-profiles-compare-by-value-and-are-unhashable) |
-| Unreleased | `OMPLSolverConfig.getNumPlanners()` removed | [`len(cfg.planners)`](#omplsolverconfiggetnumplanners-removed) |
-| Unreleased | OMPL, TrajOpt and task-composer planning value types compare by value and are unhashable | [A stable key, or `id()`](#planner-value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | `create_ompl_planner_configurators` raises `ValueError` on a keyword none of the requested planners has | [Drop the keyword](#create_ompl_planner_configurators-rejects-unused-keywords) |
-| Unreleased | 7 TrajOpt-Ifopt and Descartes profiles and waypoint configs compare by value and are unhashable | [A stable key, or `id()`](#trajopt-ifopt-and-descartes-profiles-compare-by-value-and-are-unhashable) |
-| Unreleased | Overriding a hook (`generate`, `create`, `create*`) on a Python subclass of a concrete profile raises `ProfileOverrideNotDispatchedError` at class definition; the override was silently never called | [Subclass the abstract base and hold the concrete profile](#overriding-a-hook-on-a-concrete-profile-raises) |
-| Unreleased | `TaskComposerPluginFactory(str, locator)` and `TaskComposerServer.loadConfig(str, locator)` read the `str` as YAML text | [A `pathlib.Path`](#taskcomposerpluginfactory-a-str-is-yaml-text) |
-| Unreleased | `createTaskComposerPluginFactory`, `createTaskComposerDataStorage`, `TaskComposerKeys.addKeys`, `TaskComposerDataStorage.getAllData`, `TaskComposerNodeInfoContainer.getAllInfos` / `getAbortingNodeInfo` and the container overloads of `getDotgraph` / `saveDotgraph` removed | [The C++ names](#task-composer-compatibility-helpers-removed) |
-| Unreleased | `TaskComposerNode.saveDotgraph` raises `OSError` instead of returning `False`, and returns `None` | [Catch `OSError`](#taskcomposernodesavedotgraph-raises-oserror) |
-| Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | `command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
-| Unreleased | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
-| Unreleased | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
-| Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
-| Unreleased | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
-| Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
-| Unreleased | `create_time_optimal_parameterization(path_tolerance, min_angle_change)`, `create_iterative_spline_parameterization(add_points)`: the ignored arguments are removed | [Set the composite profile's fields](#time-parameterization-factories-take-no-arguments) |
-| Unreleased | `tesseract_robotics.ompl_base` and `tesseract_reeds_shepp_example` removed | [`ompl_base` removed](#ompl_base-removed) |
-| Unreleased | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
-| Unreleased | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
-| Unreleased | `geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
-| Unreleased | `scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
-| Unreleased | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
-| Unreleased | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
-| Unreleased | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
-| Unreleased | `environment.AnyPoly_wrap_EnvironmentConst`, `command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`task_composer.AnyPoly_*`](#anypoly-helpers-only-in-task_composer) |
-| Unreleased | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
-| Unreleased | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `QPSolutionSizeError` (a `ValueError`) on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
-| Unreleased | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
+| 0.36.0 | Python modules lose the `tesseract_` prefix (`tesseract_robotics.tesseract_collision` → `tesseract_robotics.collision`, 20 in all); the old names are gone and raise `ModuleNotFoundError` | [The new names](#036-module-names) |
+| 0.36.0 | `TaskComposer.plan` raises `ProfileTypeMismatchError` when a Descartes node's namespace holds a profile only as the other scalar type (`D` for a Cartesian or raster pipeline); `create_descartes_default_profiles(move_profile=…)` refuses a Python subclass of `DescartesMoveProfileD` / `F` | [Register the type the node reads](#descartes-profiles-match-the-nodes-scalar-type) |
+| 0.36.0 | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
+| 0.36.0 | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
+| 0.36.0 | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/common.md#logging) |
+| 0.36.0 | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
+| 0.36.0 | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
+| 0.36.0 | A collision constraint on a `Var` outside a `NodesVariables` raises `VarNotInVariableSetError` (a `ValueError`) at construction instead of segfaulting on its first `update()` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
+| 0.36.0 | `Node.getParent` raises `NodeParentUnavailableError` for planner-owned nodes, including inside `create` overrides | [Keep the planner's `Node`s, not their set](#nodegetparent-raises-for-planner-owned-nodes) |
+| 0.36.0 | `OSQPEigenSolver.update*` raise `QPSizeError` on a wrong-length vector | [Size by `init()`](#osqpeigensolver-updates-check-sizes) |
+| 0.36.0 | 16 command-language waypoint, instruction and Poly types compare by value and are unhashable | [A stable key, or `id()`](#command-language-types-compare-by-value-and-are-unhashable) |
+| 0.36.0 | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` compare by value and are unhashable | [A stable key, or `id()`](#time-parameterization-profiles-compare-by-value-and-are-unhashable) |
+| 0.36.0 | The seven simple-planner move profiles compare by value and are unhashable | [A stable key, or `id()`](#simple-planner-move-profiles-compare-by-value-and-are-unhashable) |
+| 0.36.0 | `OMPLSolverConfig.getNumPlanners()` removed | [`len(cfg.planners)`](#omplsolverconfiggetnumplanners-removed) |
+| 0.36.0 | OMPL, TrajOpt and task-composer planning value types compare by value and are unhashable | [A stable key, or `id()`](#planner-value-types-compare-by-value-and-are-unhashable) |
+| 0.36.0 | `create_ompl_planner_configurators` raises `ValueError` on a keyword none of the requested planners has | [Drop the keyword](#create_ompl_planner_configurators-rejects-unused-keywords) |
+| 0.36.0 | 7 TrajOpt-Ifopt and Descartes profiles and waypoint configs compare by value and are unhashable | [A stable key, or `id()`](#trajopt-ifopt-and-descartes-profiles-compare-by-value-and-are-unhashable) |
+| 0.36.0 | Overriding a hook (`generate`, `create`, `create*`) on a Python subclass of a concrete profile raises `ProfileOverrideNotDispatchedError` at class definition; the override was silently never called | [Subclass the abstract base and hold the concrete profile](#overriding-a-hook-on-a-concrete-profile-raises) |
+| 0.36.0 | `TaskComposerPluginFactory(str, locator)` and `TaskComposerServer.loadConfig(str, locator)` read the `str` as YAML text | [A `pathlib.Path`](#taskcomposerpluginfactory-a-str-is-yaml-text) |
+| 0.36.0 | `createTaskComposerPluginFactory`, `createTaskComposerDataStorage`, `TaskComposerKeys.addKeys`, `TaskComposerDataStorage.getAllData`, `TaskComposerNodeInfoContainer.getAllInfos` / `getAbortingNodeInfo` and the container overloads of `getDotgraph` / `saveDotgraph` removed | [The C++ names](#task-composer-compatibility-helpers-removed) |
+| 0.36.0 | `TaskComposerNode.saveDotgraph` raises `OSError` instead of returning `False`, and returns `None` | [Catch `OSError`](#taskcomposernodesavedotgraph-raises-oserror) |
+| 0.36.0 | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
+| 0.36.0 | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
+| 0.36.0 | `command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
+| 0.36.0 | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
+| 0.36.0 | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
+| 0.36.0 | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
+| 0.36.0 | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
+| 0.36.0 | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
+| 0.36.0 | `create_time_optimal_parameterization(path_tolerance, min_angle_change)`, `create_iterative_spline_parameterization(add_points)`: the ignored arguments are removed | [Set the composite profile's fields](#time-parameterization-factories-take-no-arguments) |
+| 0.36.0 | `tesseract_robotics.ompl_base` and `tesseract_reeds_shepp_example` removed | [`ompl_base` removed](#ompl_base-removed) |
+| 0.36.0 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
+| 0.36.0 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
+| 0.36.0 | `geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
+| 0.36.0 | `scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
+| 0.36.0 | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
+| 0.36.0 | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
+| 0.36.0 | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
+| 0.36.0 | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
+| 0.36.0 | `environment.AnyPoly_wrap_EnvironmentConst`, `command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`task_composer.AnyPoly_*`](#anypoly-helpers-only-in-task_composer) |
+| 0.36.0 | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
+| 0.36.0 | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `QPSolutionSizeError` (a `ValueError`) on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
+| 0.36.0 | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
+| 0.36.0 | `Quaterniond(w, x, y, z)` and `Quaterniond(coeffs=)` removed | [`from_xyzw`, `Quaterniond([x, y, z, w])`](#quaterniond-takes-xyzw-only) |
+| 0.36.0 | `environment.EventCallbackFn` removed; `addEventCallback(fn)` returns the key; `removeEventCallback(hash=)` is `key=`; `getJointGroup(name=)` is `group_name=` | [Environment events and keywords](#environment-events-and-keywords) |
+| 0.36.0 | `Environment.getStateByMap`, `getStateByNamesAndValues`, `setStateByNamesAndValues`, `getCurrentJointValuesByNames`, `StateSolver.setStateByMap` / `setStateByNamesAndValues`, `JointGroup.calcJacobianWithPoint`, `KinematicGroup.calcInvKinMultiple` removed | [The native overloads](#overload-copies-removed-from-environment-statesolver-and-kinematics) |
+| 0.36.0 | `common.VectorVector3d` and `VectorIsometry3d` removed | [Plain lists](#vectorvector3d-and-vectorisometry3d-removed) |
+| 0.36.0 | Missing ids raise `KeyError`; `as*Instruction()` return views and a wrong cast raises `PolyTypeError`; `applyCommand` is one overload | [Errors and views](#environment-and-poly-lookups-raise-and-casts-are-views) |
+| 0.36.0 | `Isometry3d(matrix)` takes rotations only (`NotRotationError`); a zero quaternion or axis raises `DegenerateRotationError`; `Hyperplane3d.Through` follows Eigen | [Geometry inputs](#geometry-inputs-are-validated) |
+| 0.36.0 | `serialization.*_to_file` return `None` and raise `OSError`; binary archives are `bytes`; `urdf.writeURDFFile` returns the path and raises `URDFWriteError` | [Files and bytes](#serialization-and-urdf-writes-raise-and-bytes-are-bytes) |
+| 0.36.0 | A plugin-factory config path the locator cannot resolve raises `FileNotFoundError`; `trajopt_ifopt` is a package; Python constraint and Descartes profile errors are named | [Named errors](#named-errors-in-the-bindings) |
+| 0.36.0 | `Robot.ik` raises `IKNoSolutionError`; `Robot` mutators return `None` and raise `EnvironmentCommandError`; planning failures are named exceptions | [Planning errors](#the-planning-api-raises-instead-of-returning-flags) |
+| 0.36.0 | `MotionProgram.start_at`, `create_descartes_pipeline_profiles`, `TRAJOPT_PROFILE_NAMES`, `CartesianTarget(position=, quaternion=)`, `TaskComposer(config_path=)` removed; `_create_trajopt_profiles` is `create_trajopt_profile_pair` | [Planning names](#planning-names-removed-or-renamed) |
+| 0.36.0 | `TaskComposer.plan` raises for programming and configuration errors; `plan_ompl` defaults to `FreespacePipeline`; a pipeline without default profiles raises `NoDefaultProfilesError` | [Plan errors](#taskcomposerplan-raises-and-plan_ompl-uses-freespacepipeline) |
+| 0.36.0 | `get_tesseract_resource_path` has one source (the support wheel); `__version__` has no placeholder; `from scene_graph import *` omits `SceneState`; `planning`, `common`, `scene_graph` have no `__all__` | [Package surface](#package-surface) |
+| 0.36.0 | Examples' `main()` raise `PlanningFailedError` when a plan fails | [Examples](#examples-raise-planningfailederror) |
+| 0.36.0 | Emitters take frames from the `ManipulatorInfo` (`frames=`, `UnboundFrameError`); `emit_rapid` returns an `EmittedProgram` and needs a posture solver for confdata; JBI needs a `JbiPulseCalibration`; `SetToolInstruction` raises; names are validated | [Emitters](#emitters-take-frames-from-the-manipulatorinfo) |
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
 | 0.35.0.1 | tesseract 0.35: `package://tesseract_support/` resource URIs | [`package://tesseract/support/`](#resource-uris-moved) |
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
-## Unreleased
+## 0.36.0
 
 ### 0.36 module names
 
@@ -455,7 +468,7 @@ package's `__all__` list, which named the old classes, is gone as well.
 | `ISPMoveProfile` | `IterativeSplineParameterizationMoveProfile` |
 | `ConstantTCPSpeedCompositeProfile` | `ConstantTCPSpeedParameterizationCompositeProfile` |
 
-The earlier Unreleased entries for these profiles (value equality, `createKey()`,
+The earlier entries for these profiles (value equality, `createKey()`,
 `minimum_time_delta`) apply under the new names.
 
 ### Six `trajopt_sqp` enumerators renamed to their C++ names
@@ -684,8 +697,8 @@ not configured, the message lists the configured names.
 | `node = factory.createTaskComposerNode(name)`<br>`if node is None: …` | `try: node = factory.createTaskComposerNode(name)`<br>`except TaskComposerPluginError: …` |
 | `executor = factory.createTaskComposerExecutor(name)`<br>`if executor is None: …` | `try: executor = factory.createTaskComposerExecutor(name)`<br>`except TaskComposerPluginError: …` |
 
-`TaskComposer.plan` still returns a failed `PlanningResult` for an unknown pipeline; its message
-is now the factory's error.
+`TaskComposer.plan` raises `UnknownPipelineError` for an unknown pipeline; only a planner that
+ran and found no solution returns a failed `PlanningResult`.
 
 ### Pre-0.33 collision-margin aliases removed
 
@@ -911,6 +924,191 @@ that sum instead of the first velocity row (0.5).
 [p887]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L887-L903
 [p1118]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L1118-L1162
 [p1163]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L1163-L1186
+
+### `Quaterniond` takes xyzw only
+
+The four-scalar constructor was scalar-first (`w, x, y, z`), the opposite of every other quaternion
+surface in the package. It is gone; `Quaterniond(w, x, y, z)` raises `TypeError`.
+
+| before | after |
+| --- | --- |
+| `Quaterniond(w, x, y, z)` | `Quaterniond.from_xyzw(x, y, z, w)` or `Quaterniond([x, y, z, w])` |
+| `Quaterniond(coeffs=[x, y, z, w])` | `Quaterniond(xyzw=[x, y, z, w])` |
+
+### Environment events and keywords
+
+`EventCallbackFn` wrapped a callable only to hand it to `addEventCallback`. The method takes the
+callable and returns the key.
+
+| before | after |
+| --- | --- |
+| `env.addEventCallback(key, EventCallbackFn(fn))` | `key = env.addEventCallback(fn)` |
+| `env.removeEventCallback(hash=key)` | `env.removeEventCallback(key)` |
+| `env.getJointGroup(name=..., joint_ids=...)` | `env.getJointGroup(group_name=..., joint_ids=...)` |
+
+### Overload copies removed from `Environment`, `StateSolver` and kinematics
+
+Each removed name duplicated a native overload under another name.
+
+| before | after |
+| --- | --- |
+| `Environment.getStateByMap`, `getStateByNamesAndValues` | `Environment.getState` |
+| `Environment.setStateByNamesAndValues` | `Environment.setState(joint_ids, joint_values)` |
+| `Environment.getCurrentJointValuesByNames` | `Environment.getCurrentJointValues(joint_ids)` |
+| `StateSolver.setStateByMap`, `setStateByNamesAndValues` | `StateSolver.setState` |
+| `JointGroup.calcJacobianWithPoint(q, link, p)` | `JointGroup.calcJacobian(q, link, p)` |
+| `KinematicGroup.calcInvKinMultiple(list, seed)` | `KinematicGroup.calcInvKin(list, seed)` |
+
+### `VectorVector3d` and `VectorIsometry3d` removed
+
+| before | after |
+| --- | --- |
+| `common.VectorVector3d([...])` | `[np.array(...), ...]` |
+| `common.VectorIsometry3d([...])` | `[Isometry3d(...), ...]` |
+
+Functions that returned these containers return lists.
+
+### Environment and Poly lookups raise, and casts are views
+
+| before | after |
+| --- | --- |
+| `Environment.getLink` / `getJoint` of a missing id: `RuntimeError` | `KeyError` |
+| `getJointGroup` / `getKinematicGroup` / `getGroupJointIds` / `getLinkTransform`, contact managers by name, unknown id: `RuntimeError` | `KeyError` |
+| `getLink` / `getJoint` returned a reference that dangled after a removal | the shared `Link` / `Joint`, valid after a removal |
+| `ip.asMoveInstruction()` returned a copy | a view: edits write through; `copy.copy(...)` copies |
+| a wrong `as*()` cast raised `RuntimeError` | `PolyTypeError` (a `TypeError`), also for the `WaypointPoly` casts |
+| 20 per-type `applyCommand` overloads | `applyCommand(command)`, one overload |
+| `CompositeInstruction.push_back` / `insert` / `del` / `clear` while Python holds an element | `InstructionHeldError`; drop the reference first |
+
+### Geometry inputs are validated
+
+| before | after |
+| --- | --- |
+| `Isometry3d(matrix)` accepted any 4x4 | `NotRotationError` unless the upper 3x3 is a rotation; the same for the rotation inputs of `AngleAxisd` |
+| a zero quaternion or axis | `DegenerateRotationError`; a non-unit one is normalized |
+| `Hyperplane3d.Through(p0, p1, p2)`: normal (p1 - p0) x (p2 - p0) | normal (p2 - p0) x (p1 - p0), as Eigen; swap `p1` and `p2` for the old plane |
+| `Hyperplane3d` / `ParametrizedLine3d` degenerate: `ValueError` for small inputs | `DegenerateGeometryError` (a `ValueError`), only for exactly-zero vectors |
+
+### Serialization and URDF writes raise, and bytes are `bytes`
+
+```python
+# 0.35
+ok = serialization.environment_to_file(env, "env.xml")   # False on failure
+blob = serialization.environment_to_binary(env)          # list[int]
+urdf.writeURDFFile(env, package_path, "robot")           # None, failures silent
+
+# 0.36
+serialization.environment_to_file(env, Path("env.xml"))  # None; OSError on failure
+blob = serialization.environment_to_binary(env)          # bytes
+path = urdf.writeURDFFile(env, package_path, "robot")    # package_path/urdf/robot.urdf
+```
+
+Files are written and read exactly at `path` (`str` or `os.PathLike`, no suffix appended).
+`writeURDFFile` raises `URDFWriteError` with the nested cause; `urdf_name` is a stem.
+
+### Named errors in the bindings
+
+| before | after |
+| --- | --- |
+| a plugin-factory config path the locator cannot resolve: a crash | `FileNotFoundError` (`ContactManagersPluginFactory`, `KinematicsPluginFactory`, `TaskComposerPluginFactory`, `TaskComposerServer.loadConfig`) |
+| `CartAxis` constraint with a zero axis: `RuntimeError` | `DegenerateAxisError` (a `ValueError`) |
+| `python_constraints`: bare `ValueError` | `BoundsShapeError`, `InvertedBoundsError`, `ClearanceMarginError` |
+| a Descartes Python profile whose `create*` returns the wrong type: `AttributeError` on a worker | `ProfileReturnTypeError` (a `TypeError`) at creation |
+| `ContactResultVector[-1]` | works |
+| `ContactResultMap.filter` passed a reference | passes a copy, copied back into the map |
+| `OSQPEigenSolver` without `setAdaptiveRhoInterval` or getters | both OSQP classes have `set*` / `get*` for every setting |
+| `tesseract_robotics/trajopt_ifopt.pyi`, a flat module | the package `tesseract_robotics.trajopt_ifopt`; imports are unchanged |
+
+### The planning API raises instead of returning flags
+
+```python
+# 0.35
+q = robot.ik("tool0", pose)
+if q is None:
+    ...
+if not robot.add_link(link, joint):
+    ...
+
+# 0.36
+try:
+    q = robot.ik("tool0", pose)           # ndarray
+except IKNoSolutionError:
+    ...
+robot.add_link(link, joint)               # None; EnvironmentCommandError on refusal
+```
+
+`remove_link`, `move_link`, `add_allowed_collision`, `set_collision_margin` and `create_obstacle`
+behave like `add_link`. Planning failures are named exceptions in `tesseract_robotics.planning.errors`,
+each a subclass of the builtin it replaces. `Robot.build(env)` validates the environment and
+`RobotState` checks its name and position counts.
+
+### Planning names removed or renamed
+
+| before | after |
+| --- | --- |
+| `MotionProgram.start_at(...)` | `add_target(...)` |
+| `create_descartes_pipeline_profiles` | `create_descartes_default_profiles` |
+| `CartesianTarget(position=p, quaternion=q)` | `CartesianTarget.from_xyz_quat(p, q)`; `CartesianTarget(pose)` |
+| `TRAJOPT_PROFILE_NAMES` | `STANDARD_PROFILE_NAMES` |
+| `planning.profiles._create_trajopt_profiles` | `planning.profiles.create_trajopt_profile_pair` (returns composite, move) |
+| `TaskComposer(config_path=...)` | removed; the config comes from `get_task_composer_config_path()` |
+
+`planning.profiles` is a package (`trajopt`, `ompl`, `descartes`, `time_param`, `pipelines`,
+`names`); `STANDARD_PROFILE_NAMES` and the other name lists are tuples. `num_threads` is not capped
+to the core count and must be at least 1.
+
+### `TaskComposer.plan` raises, and `plan_ompl` uses `FreespacePipeline`
+
+| before | after |
+| --- | --- |
+| an unknown pipeline, a malformed program or a missing pipeline port: `successful=False` | `UnknownPipelineError` or the matching named error; `successful=False` only when a planner ran and found no solution |
+| a pipeline outside the default-profile table planned with an empty dictionary | `NoDefaultProfilesError` |
+| `plan_ompl(...)` ran `OMPLPipeline` | runs `FreespacePipeline`; pass `pipeline="OMPLPipeline"` for raw OMPL |
+| `warmup(["Bad"])` skipped a pipeline that did not load | `PipelineWarmupError` |
+| `plan` seeded the caller's `CompositeInstruction` in place | seeds a copy |
+| a target without a profile defaulted to `DEFAULT` over `MotionProgram(profile=...)` | inherits the program's profile |
+
+### Package surface
+
+| before | after |
+| --- | --- |
+| `get_tesseract_resource_path()` fell back to an environment's `share/` | the support distribution only; `SupportDataNotFoundError` otherwise |
+| `__version__` fell back to a placeholder | the installed distribution's version |
+| `from tesseract_robotics.scene_graph import *` included `SceneState` | `from tesseract_robotics.scene_graph import SceneState` |
+| `planning`, `common`, `scene_graph` defined `__all__` | no `__all__`; `import *` exports every public name |
+| trajectory points always carried `time` | `time` only where a time parameterization set velocities |
+| `mesh_from_file` on a missing file | `ResourceNotFoundError`; `AmbiguousMeshError` for several meshes |
+
+### Examples raise `PlanningFailedError`
+
+The examples' `main()` returned a failed result after printing. They raise `PlanningFailedError`,
+and `online_planning_sqp_example` raises when the initial solve does not converge or a replanning
+QP step fails. Catch the error where you called `run()` or `main()`.
+
+### Emitters take frames from the `ManipulatorInfo`
+
+Each move now carries its working frame, TCP frame and TCP offset from its `ManipulatorInfo`.
+Every dialect resolves them through a required frame binding and raises `UnboundFrameError` for
+a frame it does not know.
+
+| before | after |
+| --- | --- |
+| `emit_krl(program)` | `emit_krl(program, frames=krl_frames(...))` |
+| `emit_ls(program)` | `emit_ls(program, frames=ls_frames(...), config=resolver)` |
+| `emit_jbi(program)`, `JbiProfile(tool=...)` | `emit_jbi(program, frames=jbi_frames(...), calibration=JbiPulseCalibration(...))`; no `tool` field |
+| `emit_urscript(program)` | `emit_urscript(program, frames=ur_frames(...))` |
+| `emit_rapid(program, profiles)` returned a `str`; fixed `[1, 0, 0, 0]` confdata | returns an `EmittedProgram`; `frames=rapid_frames(...)`, `posture=OpwPostureSolver(...)`; `cf1/cf4/cf6` from the seed joints |
+| JBI joint degrees under `///POSTYPE PULSE` | integer encoder pulses from the calibration; a Cartesian move raises |
+| `SetToolInstruction` emitted a tool command | `UnsupportedInstructionError` in every dialect |
+| names rewritten to fit the dialect | `IdentifierError` |
+| more than six joint values: extra axes dropped | `ExternalAxisError` on KRL, LS, JBI and URScript |
+| KRL FREESPACE Cartesian move | `MissingConfigurationError` (a PTP to a frame needs Status and Turn) |
+| `RapidEmitterError`, `Config.neutral_for`, `rapid.utils`, `core.naming.safe_identifier`, `jbi.backend.MissingSeedError`, `UnknownKinematicTopologyError`, `ExternalAxisUnitError` | removed; the errors are named per failure mode (`InvalidProfileError`, `InvalidLayoutError`, `InvalidDeclarationError`, `ProgramStructureError`, ...) |
+| `Trajectory.from_composite(program)` of an untimed program | `UntimedTrajectoryError` unless `untimed_step_s=` is given (also `TesseractViewer.update_trajectory`) |
+
+The RAPID DSL declares typed objects with a `.name` (`Robtarget`, `Jointtarget`, `Tooldata`,
+`Workobject`, `Speed`, `Zone`, `Pos`, `RapidBool`); `Tooldata` and `Workobject` take `Pose`s in
+metres, `Speed` and `Zone` take SI values, and statements run inside `with RapidWriter() as w:`.
 
 ## 0.35.0.1
 

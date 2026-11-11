@@ -1,4 +1,4 @@
-# macOS Wheels: arm64 CI Gotchas
+# macOS wheels: arm64 CI
 
 Notes captured during the 0.35.0.x release-pipeline hardening
 ([PR #98](https://github.com/tesseract-robotics/tesseract_nanobind/pull/98)),

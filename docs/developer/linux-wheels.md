@@ -1,4 +1,4 @@
-# Linux Wheel Gotchas
+# Linux wheels
 
 ## libstdc++ is never bundled — and must never be
 

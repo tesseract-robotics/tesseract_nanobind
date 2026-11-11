@@ -1,5 +1,11 @@
 # tesseract_robotics.trajopt_ifopt
 
+<!-- snippet: ambient
+from tests.docs.doc_assets import sqp_scene
+
+globals().update(sqp_scene(robot))
+-->
+
 Variables and constraint sets for the low-level SQP solver, and how each set becomes a
 constraint or a cost of a `TrajOptQPProblem`.
 See the [Low-Level SQP guide](../user-guide/low-level-sqp.md) for the user-guide walkthrough.
@@ -39,6 +45,7 @@ subclass of `NodesVariables`, `getParent()` returns that very object. A referenc
 ```python
 from tesseract_robotics.trajopt_ifopt import Bounds, Node, NodesVariables
 
+joint_bounds = [Bounds(-3.14, 3.14)] * len(joint_names)
 nodes = []
 for k, q in enumerate(initial_states):
     node = Node(f"waypoint_{k}")
@@ -55,7 +62,7 @@ Factory helper. Builds the full hierarchy from a list of initial states.
 ```python
 from tesseract_robotics.trajopt_ifopt import Bounds, createNodesVariables
 
-bounds = Bounds(-3.14, 3.14)
+bounds = [Bounds(-3.14, 3.14)] * len(joint_names)  # one Bounds per joint
 nodes_variables = createNodesVariables(
     "trajectory", joint_names, initial_states, bounds
 )
@@ -148,6 +155,12 @@ an upper-bound row by default; `RangeBoundHandling.KEEP_AS_IS` keeps it as one r
 (trajopt#606).
 
 ```python
+from tesseract_robotics import trajopt_ifopt as ti
+
+n_dof = len(joint_names)
+from tesseract_robotics import trajopt_sqp as tsqp
+
+problem = tsqp.TrajOptQPProblem(nodes_variables)
 band = [ti.Bounds(-0.1, 0.1)] * n_dof          # rad per step
 problem.addConstraintSet(ti.JointVelConstraint(band, vars_list, np.ones(n_dof), "VelocityLimit"))
 ```
@@ -236,6 +249,15 @@ directly (see [changes](../changes.md)).
   `getJacobian()` (a Python `ConstraintSet` subclass's included).
 
 ```python
+from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics.trajopt_ifopt import calcNumericalConstraintGradient
+
+vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
+my_constraint = ti.JointPosConstraint(
+    np.zeros(len(joint_names)), vars_list[0], np.ones(len(joint_names)), "mine"
+)
+my_constraint.linkWithVariables(nodes_variables)
+
 numerical = calcNumericalConstraintGradient(nodes_variables, my_constraint)
 assert np.allclose(numerical.toarray(), my_constraint.getJacobian().toarray(), atol=1e-6)
 ```
@@ -248,19 +270,11 @@ base for a rule written as `f(q)` on one waypoint's joints, and the rules built 
 
 ::: tesseract_robotics.trajopt_ifopt.python_constraints
     options:
-      show_root_heading: true
       show_source: true
-      members_order: source
-      heading_level: 3
 
-## Module API
+## Reference
 
 ::: tesseract_robotics.trajopt_ifopt
-    options:
-      show_root_heading: true
-      show_source: false
-      members_order: source
-      heading_level: 3
 
 ## See also
 

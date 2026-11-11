@@ -1,4 +1,4 @@
-# API Changes: 0.34 → 0.35
+# API changes: 0.34 → 0.35
 
 ## C++ Dependency Versions
 
@@ -56,10 +56,6 @@ find_package(tesseract REQUIRED
 
 Same pattern for `tesseract_planning`: one `find_package(tesseract_planning REQUIRED COMPONENTS ...)` replaces all the per-subpackage calls.
 
-### dependencies file rename
-
-`dependencies.rosinstall` → `dependencies.repos` (matches upstream's ros2 vcs-tool convention). File format unchanged (YAML, `vcs import` reads both extensions).
-
 ### ruckig: switch to Levi-Armstrong fork
 
 `tesseract_planning` 0.35.0 pins ruckig at `Levi-Armstrong/ruckig.git @ cpack-v0.9.2` (a fork with a cpack patch). We had been diverging on upstream `pantor/ruckig @ v0.15.3`; this release brings us back in line with what upstream CI builds against.
@@ -99,29 +95,6 @@ In 0.34, the `tesseract_serialization_bindings.cpp` had a hand-rolled mirror of 
 - `tesseract_time_parameterization_bindings.cpp` → `tesseract::time_parameterization`
 
 Three files (simple/task_composer/time_param) reference `CompositeInstruction` (lives in command_language) — they additionally get a `tcl = tesseract::command_language` alias.
-
-### Test suite status (macOS arm64)
-
-Post-upgrade: **560 passed, 7 failed, 14 skipped** (vs pre-upgrade: 352 passed, 95 failed, 92 errors on first build, before any Python-side fixes).
-
-The 7 remaining failures are all `tests/benchmarks/test_parallel_scaling.py` "harder problem" stress cases throwing `Planning failed: ErrorTask: Error (Abort Triggered)`. Likely an algorithmic-tolerance change in 0.35's task composer rather than a binding-layer break. Out of scope for the upgrade milestone.
-
-## Migration Checklist
-
-- [x] Bump versions in `dependencies.repos`
-- [x] Switch to `Levi-Armstrong/ruckig` fork
-- [x] Rename `dependencies.rosinstall` → `dependencies.repos`
-- [x] Update build script + CI workflows to reference new filename
-- [x] Apply upstream sed scripts (tesseract + tesseract_planning `MIGRATION.md`) to `src/` and `CMakeLists.txt`
-- [x] Manual sweep for nanobind-specific cases sed misses (namespace aliases, redundant cereal registrations)
-- [x] Rebuild C++ workspace (`pixi run build-cpp`)
-- [x] Rebuild bindings — all 23 modules import clean
-- [x] Update resource paths (`__init__.py`, `env.sh`, CMakeLists)
-- [x] Rewrite `package://tesseract_support/` URIs across tests/examples
-- [x] Run test suite; document Python-side breaks
-- [ ] Triage 7 `parallel_scaling` benchmark regressions (likely tolerance change, not binding break)
-- [ ] Verify Linux + Windows wheel builds
-- [ ] Update CLAUDE.md re: cereal Windows-DLL workaround (now obsoleted by upstream)
 
 ---
 

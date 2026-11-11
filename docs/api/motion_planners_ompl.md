@@ -1,5 +1,14 @@
 # tesseract_robotics.motion_planners_ompl
 
+<!-- snippet: ambient
+from tesseract_robotics.command_language import ProfileDictionary
+from tests.docs.doc_assets import joint_program
+
+program = joint_program(robot)
+profiles = ProfileDictionary()
+profile_dict = profiles
+-->
+
 OMPL (Open Motion Planning Library) planner bindings.
 
 ## Overview
@@ -24,7 +33,7 @@ The OMPL motion planner. It derives from `MotionPlanner`
 from tesseract_robotics.motion_planners_ompl import OMPLMotionPlanner
 from tesseract_robotics.motion_planners import PlannerRequest
 
-planner = OMPLMotionPlanner()
+planner = OMPLMotionPlanner("OMPLMotionPlannerTask")  # the namespace of its profiles
 
 request = PlannerRequest()
 request.env = env
@@ -201,7 +210,7 @@ request.instructions = program
 request.profiles = profiles
 
 # Solve
-planner = OMPLMotionPlanner()
+planner = OMPLMotionPlanner("OMPLMotionPlannerTask")  # the namespace of its profiles
 response = planner.solve(request)
 
 if response.successful:
@@ -219,10 +228,6 @@ else:
 4. **Lower collision resolution** (`longest_valid_segment_length`) for narrow passages
 5. **OMPL finds paths, not smooth trajectories** - use TrajOpt for smoothing
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.motion_planners_ompl
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

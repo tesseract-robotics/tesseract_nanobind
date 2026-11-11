@@ -1,4 +1,4 @@
-# API Changes: 0.35 → 0.36 (upstream main)
+# API changes: 0.35 → 0.36
 
 !!! info "0.36.0.0rc1"
     `0.36.0.0rc1` is a pre-release (`pip install --pre tesseract-robotics-nanobind`). Its wheels
@@ -16,12 +16,6 @@
     merges upstream drops out of the table; the final 0.36.0.x builds from the upstream tag.
     #792 makes `isValidState` bindable (#333); #629 and #794 use tesseract's
     `PerThreadContactManager` (tesseract#1394).
-
-!!! warning "Unreleased"
-    This page tracks the `upstream-main` branch (issue #141, PR #161), which builds
-    against tesseract, trajopt and tesseract_planning `master` ahead of the 0.36 release
-    (the commits in `dependencies.rosinstall`, built by `scripts/native_stack.py`).
-    Released wheels (0.35.0.x) still expose the 0.35 API.
 
 Each section below names what was removed or renamed and shows the 0.35 call next to
 its 0.36 replacement.
@@ -406,6 +400,128 @@ task_composer_log_to_file(log, "failing_plan.tclx")
 
 Building the bindings now requires the Descartes, TrajOpt and TrajOptIfopt components; CMake stops
 if one is missing instead of skipping its modules.
+
+## Python surface: constructors, callbacks and failures that raise
+
+The audit of the Python surface removed duplicate spellings and made failures raise a named
+exception instead of returning a flag, `None` or a wrong value. No aliases remain; the full
+list is in [breaking changes](breaking-changes.md).
+
+### Quaternions are xyzw
+
+The four-scalar constructor was scalar-first, unlike every other quaternion surface.
+
+```python
+# 0.35
+q = Quaterniond(w, x, y, z)
+
+# 0.36
+q = Quaterniond.from_xyzw(x, y, z, w)          # or Quaterniond([x, y, z, w])
+```
+
+### Event callbacks return their key
+
+```python
+# 0.35
+env.addEventCallback(7, EventCallbackFn(on_event))
+env.removeEventCallback(hash=7)
+
+# 0.36
+key = env.addEventCallback(on_event)           # a plain callable
+env.removeEventCallback(key)
+```
+
+The event a callback receives owns its data, so a callback may keep it.
+
+### Cartesian targets take a pose
+
+```python
+# 0.35
+target = CartesianTarget(position=[0.6, 0.1, 0.8], quaternion=[0, 0, 0, 1])
+
+# 0.36
+target = CartesianTarget(Pose.from_xyz_quat(0.6, 0.1, 0.8, 0, 0, 0, 1))
+target = CartesianTarget.from_xyz_quat([0.6, 0.1, 0.8], [0, 0, 0, 1])   # same target
+```
+
+### `Robot.ik` and the `Robot` mutators raise
+
+```python
+# 0.35
+q = robot.ik("tool0", pose)
+if q is None:
+    return
+if not robot.add_link(link, joint):
+    return
+
+# 0.36
+try:
+    q = robot.ik("tool0", pose)                # ndarray
+except IKNoSolutionError:
+    return
+robot.add_link(link, joint)                    # None; EnvironmentCommandError if refused
+```
+
+### Serialization and URDF writes
+
+```python
+# 0.35
+if not serialization.environment_to_file(env, "env.xml"):
+    ...
+blob = serialization.environment_to_binary(env)    # list[int]
+
+# 0.36
+try:
+    serialization.environment_to_file(env, Path("env.xml"))
+except OSError:
+    ...
+blob = serialization.environment_to_binary(env)    # bytes
+```
+
+### Examples raise `PlanningFailedError`
+
+```python
+# 0.35
+ok = main()          # printed "planning failed", returned a failed result
+
+# 0.36
+from tesseract_robotics.examples.failures import PlanningFailedError
+
+try:
+    main()
+except PlanningFailedError as error:
+    print(error)
+```
+
+### Emitters: frames, postures and pulses
+
+Each move carries its working frame, TCP frame and TCP offset from its `ManipulatorInfo`. The
+emitter takes a binding from those names to the controller's data and raises `UnboundFrameError`
+for an unbound name. RAPID confdata needs an arm-posture solver and the seed joints; JBI needs
+the pulse calibration, since its positions are encoder pulses.
+
+```python
+# 0.35
+module = emit_rapid(composite, {"weld": RapidProfile(tool="tool0", wobj="wobj0")})
+jbi = emit_jbi(composite, {"weld": JbiProfile(tool=1)})
+
+# 0.36
+result = emit_rapid(
+    composite,
+    {"weld": RapidProfile.build(speed="v100", zone="fine")},
+    frames=rapid_frames(work_objects={"base_link": "wobj0"}, tools={"tool0": "tool0"}),
+    posture=OpwPostureSolver(opw_parameters),
+)
+module = result.text                           # an EmittedProgram, with its identity header
+result = emit_jbi(
+    composite,
+    {"weld": JbiProfile.build()},
+    frames=jbi_frames(tools={"tool0": 1}),
+    calibration=JbiPulseCalibration(pulses_per_rad=pulses_per_rad, zero_pulses=zero_pulses),
+)
+```
+
+[Program emitters](user-guide/emitters.md) has a complete, tested example per dialect.
 
 ## New in 0.36: batch collision updates, sample grids, config schemas
 

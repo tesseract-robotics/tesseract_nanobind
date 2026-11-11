@@ -1,31 +1,66 @@
-# Motion Planning
+# Motion planning
 
-tesseract_robotics provides multiple motion planners for different use cases. The
-high-level `tesseract_robotics.planning` API exposes three module-level entry
-points — `plan_freespace`, `plan_ompl`, and `plan_cartesian` — each accepting a
-`MotionProgram` describing the waypoints. Under the hood these dispatch to
-`TaskComposer` pipelines, so you can drop down to `TaskComposer.plan(...)` when
-you need a specific pipeline variant.
+<!-- snippet: ambient
+from tesseract_robotics.planning import JointTarget, MotionProgram, Pose
 
-## Planner Comparison
+joint_values = np.zeros(6)
+pose = Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.0, -1.0, 0.0, 0.0)
+program = (
+    MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+    .set_joint_names(robot.get_joint_names("manipulator"))
+    .move_to(JointTarget(joint_values))
+    .move_to(JointTarget(np.full(6, 0.2)))
+)
+programs = [program]
+waypoints = [pose]
+-->
 
-| Planner | Type | Speed | Quality | Use Case |
-|---------|------|-------|---------|----------|
-| **OMPL** | Sampling | Medium | Good | Free-space, complex environments |
-| **TrajOpt** | Optimization | Fast | Excellent | Cartesian paths, smoothing |
-| **TrajOptIfopt** | SQP/OSQP | Very Fast | Excellent | Real-time replanning |
-| **Descartes** | Graph Search | Slow | Optimal | Dense Cartesian toolpaths |
-| **Simple** | Interpolation | Instant | N/A | Joint-space interpolation |
+A planner turns a program, a list of waypoints, into a collision-free trajectory. Four planner
+families are bound, each with different guarantees; the `planning` module wraps the common
+cases in three calls, `plan_freespace`, `plan_ompl` and `plan_cartesian`, that run a whole
+task composer pipeline: plan, check collisions, time-parameterize. This page covers choosing a
+planner, the settings that matter for each, costs and constraints, and what to do when a plan
+fails.
 
-## Quick Planning
+## Choosing a planner
 
-All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
-`JointTarget` / `CartesianTarget` waypoints.
+```mermaid
+flowchart TD
+    Q0{"Replanning every tick<br/>from the last solution?"}
+    Q0 -->|yes| S["Low-level SQP<br/>TrajOpt-Ifopt"]
+    Q0 -->|no| Q1{"Are the targets a dense<br/>Cartesian toolpath?"}
+    Q1 -->|yes| D["plan_cartesian<br/>Descartes"]
+    Q1 -->|no| Q2{"Must the path go<br/>around obstacles?"}
+    Q2 -->|"yes, or unsure"| O["plan_ompl<br/>OMPL, then TrajOpt"]
+    Q2 -->|"no: the straight path<br/>is nearly right"| T["plan_freespace<br/>TrajOpt"]
+```
 
-=== "OMPL (Freespace)"
+| Planner | Kind | Use for | What it guarantees |
+| --- | --- | --- | --- |
+| OMPL | sampling | free space among obstacles | probabilistically complete: finds a path if one exists, given enough time; nothing within a fixed time |
+| TrajOpt | sequential convex optimization | smoothing, Cartesian paths, constraints | a local optimum of the costs; constraints hold where they are evaluated |
+| TrajOpt-Ifopt | SQP with OSQP | replanning from a warm start | as TrajOpt |
+| Descartes | graph search over IK solutions | dense Cartesian toolpaths | the minimum-cost path through the sampled solutions: optimal for that discretization, not for the continuous problem |
+| Simple | interpolation | seeds, joint moves | none; no collision checking |
 
-    `plan_ompl` defaults to the `FreespacePipeline` — OMPL RRTConnect for path
-    finding, TrajOpt for smoothing, and time parameterization.
+On one freespace problem, measured:
+
+<figure markdown>
+![Strip plots of 20 seeds per planner (OMPL, OMPL + TrajOpt, TrajOpt, TrajOptIfopt) with median bars, for joint path length, TCP path length, minimum clearance, planner-task time (log scale) and whole-pipeline time. OMPL is spread wide and long; the TrajOpt variants are tight; pipeline times all sit near 500–600 ms.](../assets/figures/planner_comparison.svg#only-light)
+![Strip plots of 20 seeds per planner (OMPL, OMPL + TrajOpt, TrajOpt, TrajOptIfopt) with median bars, for joint path length, TCP path length, minimum clearance, planner-task time (log scale) and whole-pipeline time. OMPL is spread wide and long; the TrajOpt variants are tight; pipeline times all sit near 500–600 ms.](../assets/figures/planner_comparison-dark.svg#only-dark)
+<figcaption markdown="span">On upstream's freespace example (IIWA 14, joint_a1 −0.4 → 0.4 rad past a 0.15 m sphere), TrajOpt and OMPL + TrajOpt find the same short path (median 0.86 rad, 0.46 m of TCP travel, 5 mm clearance: TrajOpt's safety margin); raw OMPL (first RRTConnect solution, no smoothing) travels 5.8 rad and keeps 25 mm; TrajOptIfopt converges to a longer path (1.75 rad). Planner-node times differ by 10×, from 5 ms (TrajOptIfopt) to 65 ms (OMPL + TrajOpt), but each whole pipeline takes about 0.5 s, dominated by its other tasks. N = 20 seeds, one process each, first plan after `TaskComposer.warmup`, OMPL with one planner thread; Apple M1 Max (10 logical CPUs), macOS 15.3.2, 1-min load 20 during the run (other work on the host: absolute times are pessimistic). Descartes is not compared: it follows Cartesian paths and has no joint-to-joint query. Data: `docs/assets/figures/data/planner_comparison.json` (hardware, OS, library build, git commit, seeds, raw rows). Re-measure: `pixi run docs-figures-measure planner_comparison`, then `pixi run docs-figures planner_comparison`.</figcaption>
+</figure>
+
+## Plan with the high-level calls
+
+All three calls take a `Robot` and a `MotionProgram`, and return a `PlanningResult`. Each loads
+the planning plugins unless you pass `composer=`; hold one `TaskComposer` when you plan more than
+once ([Plugin warmup](task-composer.md#plugin-warmup)).
+
+=== "plan_ompl"
+
+    `FreespacePipeline`: parallel RRTConnect finds a path, TrajOpt smooths it, a discrete contact
+    check validates it and iterative spline parameterization times it.
 
     ```python
     import numpy as np
@@ -47,11 +82,11 @@ All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
             print(state.positions)
     ```
 
-=== "TrajOpt (Freespace)"
+=== "plan_freespace"
 
-    `plan_freespace` drives the `TrajOptPipeline` — pure optimization-based
-    freespace planning. Ideal when the direct path is roughly correct and just
-    needs smoothing plus collision margin enforcement.
+    `TrajOptPipeline`: TrajOpt optimizes the program, then the same contact check and time
+    parameterization run. TrajOpt is a local method: use it when the straight path is nearly
+    collision-free.
 
     ```python
     from tesseract_robotics.planning import plan_freespace
@@ -59,11 +94,11 @@ All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
     result = plan_freespace(robot, program)
     ```
 
-=== "Cartesian (Descartes)"
+=== "plan_cartesian"
 
-    `plan_cartesian` drives the `DescartesDPipeline` — Descartes graph search for
-    precise Cartesian paths, with TrajOpt smoothing. Use this when the program
-    contains `CartesianTarget` waypoints and you need tool-pose accuracy.
+    `DescartesDPipeline`: Descartes searches the IK solutions of every Cartesian waypoint for the
+    cheapest joint path, then the contact check and time parameterization run. Use it when the
+    program is a sequence of `CartesianTarget` poses the tool must hit.
 
     ```python
     from tesseract_robotics.planning import CartesianTarget, Pose, plan_cartesian
@@ -77,37 +112,11 @@ All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
     result = plan_cartesian(robot, program)
     ```
 
-=== "Hybrid (OMPL + TrajOpt)"
+`TaskComposer.plan(robot, program, pipeline=...)` runs any other pipeline by name.
 
-    For hybrid planning (OMPL for global search, TrajOpt for local refinement)
-    use the `FreespacePipeline` directly via `TaskComposer` — it chains OMPL,
-    TrajOpt, and time parameterization in one call.
+## OMPL
 
-    ```python
-    from tesseract_robotics.planning import TaskComposer
-
-    composer = TaskComposer.from_config()
-    result = composer.plan(robot, program, pipeline="FreespacePipeline")
-    ```
-
-    `plan_ompl(robot, program)` is a shortcut for exactly this pipeline.
-
-## OMPL Planner
-
-Sampling-based planner for complex environments:
-
-```mermaid
-graph LR
-    A[Start] --> B[Sample Random Config]
-    B --> C{Collision Free?}
-    C -->|Yes| D[Add to Tree]
-    C -->|No| B
-    D --> E{Goal Reached?}
-    E -->|No| B
-    E -->|Yes| F[Extract Path]
-```
-
-### OMPL Profiles
+### OMPL profiles
 
 Profiles control per-call planner behaviour. The `create_ompl_default_profiles`
 helper packages sensible defaults (parallel RRTConnect with a 10 s budget):
@@ -268,7 +277,7 @@ planner prices many more states would resolve the per-call cost; this one does n
     and an exception there ends the process (`std::terminate`). Use a Python `stateCost`
     with RRTConnect, or make sure it cannot raise.
 
-### Available OMPL Planners
+### Available OMPL planners
 
 | Planner | Description |
 |---------|-------------|
@@ -281,7 +290,7 @@ planner prices many more states would resolve the per-call cost; this one does n
 
 Use `create_ompl_planner_configurators` to mix planner types inside one profile.
 
-## TrajOpt Planner
+## TrajOpt planner
 
 Optimization-based planner using sequential convex optimization:
 
@@ -294,7 +303,7 @@ graph TD
     D -->|Yes| E[Optimized Trajectory]
 ```
 
-### TrajOpt Costs and Constraints
+### TrajOpt costs and constraints
 
 ```python
 from tesseract_robotics.motion_planners_trajopt import (
@@ -318,7 +327,7 @@ composite_profile.smooth_velocities = True
 composite_profile.smooth_accelerations = True
 ```
 
-### Collision Configuration
+### Collision configuration
 
 ```python
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
@@ -340,7 +349,7 @@ adds no error, so it cannot stand in for the margin. A default-constructed confi
 margin (`default_margin` is `None`): the term then engages only at contact, and TrajOpt
 settles paths on the obstacle's surface, where a later contact check can reject them.
 
-## Costs vs Constraints (Soft vs Hard)
+## Costs vs constraints (soft vs hard)
 
 TrajOpt distinguishes between **costs** (soft constraints) and **constraints** (hard constraints):
 
@@ -349,7 +358,7 @@ TrajOpt distinguishes between **costs** (soft constraints) and **constraints** (
 | **Cost** | Penalized, can be violated | Added to objective function | Preferences, nice-to-haves |
 | **Constraint** | Must be satisfied exactly | Strict equality/inequality | Safety-critical requirements |
 
-### When to Use Each
+### When to use each
 
 **Use Costs (Soft) for:**
 
@@ -365,7 +374,7 @@ TrajOpt distinguishes between **costs** (soft constraints) and **constraints** (
 - Joint limits (physical limits)
 - Orientation requirements (e.g., tool must be vertical)
 
-### Example: Collision as Cost vs Constraint
+### Example: collision as cost vs constraint
 
 ```python
 from tesseract_robotics.motion_planners_trajopt import (
@@ -382,8 +391,8 @@ profile.collision_cost_config.contact_manager_config.default_margin = 0.025  # 2
 profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
-# HARD: Collision as constraint - must be satisfied at solution
-# Guarantees collision-free result (but may fail to find solution)
+# HARD: Collision as constraint - the optimizer must satisfy it at the checked states
+# (with DISCRETE: the trajectory's waypoints; the motion between them is not checked)
 profile.collision_constraint_config.enabled = True
 profile.collision_constraint_config.contact_manager_config.default_margin = 0.01  # 1cm (tighter)
 profile.collision_constraint_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
@@ -393,11 +402,15 @@ profile.collision_constraint_config.collision_check_config.type = CollisionEvalu
     Use **both** cost and constraint:
 
     1. Cost with larger margin (2.5cm) guides optimization away from obstacles
-    2. Constraint with tighter margin (1cm) ensures final solution is collision-free
+    2. Constraint with tighter margin (1cm) keeps the solution clear of obstacles at the checked states
 
-    The cost helps the optimizer explore, while the constraint guarantees safety.
+    The cost helps the optimizer explore, while the constraint pushes the solution clear of
+    obstacles at the checked states. `DISCRETE` checks the waypoints only: a thin obstacle can
+    sit between two collision-free waypoints. Use `LVS_DISCRETE` or `LVS_CONTINUOUS` (or
+    `CONTINUOUS`) to check the motion between waypoints, and verify the result with a
+    contact check (the `ContactCheckTask` the pipelines run).
 
-### Example: Cartesian Pose as Cost vs Constraint
+### Example: Cartesian pose as cost vs constraint
 
 ```python
 from tesseract_robotics.motion_planners_trajopt import TrajOptDefaultMoveProfile
@@ -415,7 +428,7 @@ plan_profile.cartesian_constraint_config.enabled = True
 plan_profile.cartesian_constraint_config.coeff = [1, 1, 1, 1, 1, 1]
 ```
 
-### Coefficient Interpretation
+### Coefficient interpretation
 
 The `coeff` values control how strongly violations are penalized:
 
@@ -437,7 +450,7 @@ plan_profile.cartesian_cost_config.coeff = [10, 10, 10, 10, 10, 0]
     - Add constraints incrementally
     - If planning fails, check if constraints are feasible
 
-## Descartes Planner
+## Descartes planner
 
 Graph-search planner for dense Cartesian toolpaths:
 
@@ -478,7 +491,7 @@ result = plan_cartesian(robot, program, profiles=profiles)
     raises `ProfileTypeMismatchError` if a pipeline would find only the other type (see the
     [Descartes API page](../api/motion_planners_descartes.md#scalar-types-d-and-f)).
 
-### Custom Edge / State Evaluators in Python
+### Custom edge / state evaluators in Python
 
 When the default cost function (joint-space distance) does not fully satisfy your
 requirements, you can subclass the evaluator interfaces directly in Python to
@@ -712,11 +725,20 @@ the C++ reader's error.
 The Descartes profiles have no YAML constructor upstream, so they have no `from_yaml`. Put a
 loaded profile in a `ProfileDictionary` with `addProfile`, as any other profile.
 
-## Motion Types
+## Motion types
 
 Motion type is set via the `MotionProgram` builder methods:
 
-### Freespace Motion
+A raster combines the three: a freespace approach, then linear strokes joined by linear
+step-overs.
+
+<figure markdown>
+![Left, the IRB2400 over a plate with the raster drawn on it and a dashed arc from above for the approach. Right, the plate zoomed: five parallel blue strokes joined by short orange step-overs, with a blue downward tick and a short red tick at each waypoint; "start" and "end" labels.](../assets/figures/raster_toolpath.svg#only-light)
+![Left, the IRB2400 over a plate with the raster drawn on it and a dashed arc from above for the approach. Right, the plate zoomed: five parallel blue strokes joined by short orange step-overs, with a blue downward tick and a short red tick at each waypoint; "start" and "end" labels.](../assets/figures/raster_toolpath-dark.svg#only-dark)
+<figcaption markdown="span">A zigzag raster planned with `CartesianPipeline` (Descartes, then TrajOpt): five 50 cm strokes 5 cm apart, 35 cm above base_link, tool down, joined by linear step-overs, after a freespace approach from home. Path and glyphs are forward kinematics of the planned joint states: blue strokes, orange step-overs, the dashed approach is the TCP under joint-space interpolation (not a straight line). Glyphs: TCP z (tool axis, blue) and x (red) at every planned state; the strokes stay on the plane to within 1 mm. Reproduce: `pixi run docs-figures raster_toolpath`.</figcaption>
+</figure>
+
+### Freespace motion
 
 Any collision-free path between configurations. Use `move_to(...)`:
 
@@ -725,7 +747,7 @@ program.move_to(JointTarget(joint_values))
 program.move_to(CartesianTarget(pose))  # freespace to pose
 ```
 
-### Linear Motion
+### Linear motion
 
 Straight-line Cartesian path. Use `linear_to(...)`:
 
@@ -740,7 +762,7 @@ program.linear_to(CartesianTarget(pose))
     - Collision-free swept volume
     - Within joint velocity limits
 
-### Circular Motion
+### Circular motion
 
 Arc motion (specialized planners). Use `circular_to(...)`:
 
@@ -757,7 +779,7 @@ in the working frame; profiles and move types stay with the caller.
 
 | Factory | Shape | Poses | Used by |
 |---|---|---|---|
-| `zigzag_square()` | 1 m × 1 m square outline at z = 0.5 m, then 11 zigzag lines at 0.1 m spacing | `OUTLINE_POSE_COUNT + 2 * ZIGZAG_LINE_COUNT` = 27 | the RAPID golden test (`tests/emitters/rapid/test_zigzag_square.py`) |
+| `zigzag_square()` | 0.8 m × 0.8 m square outline (x 0.6 to 1.4 m, y −0.4 to 0.4 m, z = 0.4 m), then 11 zigzag lines at 0.08 m spacing, tool down | `OUTLINE_POSE_COUNT + 2 * ZIGZAG_LINE_COUNT` = 27 | the RAPID golden test (`tests/emitters/rapid/test_zigzag_square.py`) |
 | `circle(radius_m, n_waypoints, center=, z_m=)` | horizontal circle, tool down, evenly spaced, counter-clockwise from `+X`, start not repeated | `n_waypoints` (≥ 3) | the Descartes pool measurements of #140 (84 to 419 waypoints on the IRB 2400) |
 
 ```python
@@ -773,15 +795,12 @@ contour = circle(0.25, 210, center=(0.8, 0.0), z_m=0.6)
 
 `tests/conftest.py` serves the zigzag square as the `zigzag_square_poses` fixture.
 
-!!! warning "The zigzag square is not tool down"
-    Its orientation, `ZIGZAG_QUAT_XYZW = (0, 0, 1, 0)`, is 180° about world Z,
-    so the TCP z-axis stays on world +Z. It reads like Eigen's scalar-first
-    `Quaterniond(0, 0, 1, 0)` (180° about Y, tool down) taken as scalar-last.
-    The RAPID golden locks it, so it stays until that golden is regenerated on
-    purpose. `circle` uses the real tool-down orientation, `TOOL_DOWN_QUAT_XYZW
-    = (1, 0, 0, 0)`.
+!!! note "Orientation and reach"
+    Every zigzag pose has `ZIGZAG_QUAT_XYZW = (0, 1, 0, 0)`: 180° about the working frame's
+    y axis, so the TCP z axis points along −z, into the workpiece. The default placement is one
+    the IRB 2400 reaches tool down at every pose.
 
-## Program Structure
+## Program structure
 
 Use the `MotionProgram` builder — it handles all the poly-type wrapping
 automatically. For reference, the equivalent low-level call would be:
@@ -807,45 +826,16 @@ ceremony, and the planning entry points accept either form.
 
 ## Frames and the TCP
 
-A `MotionProgram` names its frames; the planning API never picks one for you:
+A `MotionProgram` names its `tcp_frame` and `working_frame`, and optionally a `tcp_offset`; the
+planner puts `tcp_frame` · `tcp_offset` on each Cartesian target, expressed in `working_frame`.
+[Frames and poses](../concepts/frames.md) defines each frame with a figure and a worked check;
+[TCP offsets](../api/environment.md#tcp-offsets) has the lookup rule of a named offset.
+`Robot.fk` and `Robot.ik` take a link, not a named TCP: apply or strip the offset yourself (see
+[Tool frames](kinematics.md#tool-frames)).
 
-| Argument | Meaning | ABB IRB2400 example |
-|---|---|---|
-| `tcp_frame` (required) | the link the TCP is attached to | `"tool0"` |
-| `working_frame` (required) | the link `CartesianTarget` poses are relative to | `"base_link"` |
-| `tcp_offset` (keyword, optional) | offset from `tcp_frame`: a named TCP or an `Isometry3d` | `"laser"` |
+## Planning with constraints
 
-The planner puts the tool, `T(tcp_frame) * tcp_offset`, on each Cartesian target. A named
-offset is resolved by the environment at plan time, first from the SRDF `group_tcps` of the
-program's group, then from find-TCP callbacks; a link name there is an error (use it as
-`tcp_frame`). The full rule, with upstream sources, is under
-[TCP offsets](../api/environment.md#tcp-offsets); the SRDF side is under
-[Named TCPs](../api/srdf.md#named-tcps-group_tcps).
-
-```python
-import numpy as np
-from tesseract_robotics.planning import CartesianTarget, MotionProgram, Pose
-from tesseract_robotics.common import Isometry3d
-
-# a named TCP from abb_irb2400.srdf's <group_tcps group="manipulator">
-welder = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link", tcp_offset="welder")
-
-# or an explicit offset: a tool 10 cm along tool0's z axis
-offset = np.eye(4)
-offset[2, 3] = 0.10
-program = MotionProgram(
-    "manipulator", tcp_frame="tool0", working_frame="base_link", tcp_offset=Isometry3d(offset)
-).move_to(CartesianTarget(Pose.from_xyz(0.8, 0.0, 1.0)))
-```
-
-`Robot.get_manipulator_info(group, tcp_frame, working_frame, tcp_offset=...)` builds the same
-`ManipulatorInfo` for the low-level API. `Robot.fk` / `Robot.ik` take a link (`tip_link`), not
-a named TCP: apply or strip the offset yourself (see
-[Tool Frames](kinematics.md#tool-frames)).
-
-## Planning with Constraints
-
-### Orientation Constraints
+### Orientation constraints
 
 Keep end-effector upright (e.g., carrying a glass). The `UPRIGHT` profile is
 pre-baked by `create_trajopt_upright_profiles`:
@@ -864,7 +854,7 @@ Equivalent manual setup:
 plan_profile.cartesian_constraint_config.coeff = [0, 0, 0, 5, 5, 5]
 ```
 
-### Joint Constraints
+### Joint constraints
 
 Weight individual joints to lock or favour them:
 
@@ -873,7 +863,7 @@ Weight individual joints to lock or favour them:
 plan_profile.joint_constraint_config.coeff = [100, 1, 1, 1, 1, 1]
 ```
 
-## Handling Planning Failures
+## Handling planning failures
 
 Each debug step below plans again, so hold one composer and pass it to every
 call; without `composer=`, each call reloads the task composer plugins.
@@ -912,7 +902,7 @@ if not result.successful:
     result = plan_ompl(robot, program, profiles=profiles, composer=composer)
 ```
 
-## Trajectory Output
+## Trajectory output
 
 ```python
 if result.successful:
@@ -931,7 +921,16 @@ and timing are populated by pipelines that include time parameterization
 (`FreespacePipeline`, `CartesianPipeline`, etc.); pure OMPL output has positions
 only. `result.to_numpy()` returns an `(N, num_joints)` array of positions.
 
-## Performance Tips
+The time stamps come from the pipeline's time parameterization task, which moves along the
+planned path as fast as the joint limits allow. With TOTG:
+
+<figure markdown>
+![Three stacked plots over 4.2 s for six joints: smooth joint positions; triangular velocity profiles staying within ±0.4 of the limit lines; piecewise-constant accelerations that repeatedly touch the ±1 limit lines.](../assets/figures/time_parameterization.svg#only-light)
+![Three stacked plots over 4.2 s for six joints: smooth joint positions; triangular velocity profiles staying within ±0.4 of the limit lines; piecewise-constant accelerations that repeatedly touch the ±1 limit lines.](../assets/figures/time_parameterization-dark.svg#only-dark)
+<figcaption markdown="span">TOTG times a path against the URDF limits: here no joint reaches its velocity limit, and outside the blends at the two interior configurations one joint is always on its acceleration limit. The IRB2400 path runs through four joint configurations (dotted lines mark the interior two), 40 waypoints per segment, `TimeOptimalTrajectoryGeneration` with the default composite profile. Velocity and acceleration are fractions of each joint's limit; acceleration is the change of TOTG's waypoint velocities over each interval (Δv/Δt). Reproduce: `pixi run docs-figures time_parameterization`.</figcaption>
+</figure>
+
+## Performance tips
 
 !!! tip "Warm-Start via FreespacePipeline"
     The `FreespacePipeline` (what `plan_ompl` runs by default) already does
@@ -952,12 +951,11 @@ only. `result.to_numpy()` returns an `(N, num_joints)` array of positions.
     ```
 
 !!! tip "Hold and Pre-Load One Composer"
-    Every `TaskComposer.from_config()` loads the task composer plugins, about
-    4.3 s on macOS arm64, and a `plan_*()` call without `composer=` builds a
-    new one each time. Build one composer at startup, warm the pipelines you
-    will run, and pass it to every call. A warmup only pays off on the composer
-    that then plans: a 419-waypoint Descartes solve takes 0.47 s through a held,
-    warmed composer versus about 5 s through `plan_cartesian` without one (#137).
+    Every `TaskComposer.from_config()` loads the task composer plugins
+    (0.3 to 1.0 s on an Apple M1 Max), and a `plan_*()` call without `composer=` builds a new
+    one each time. Build one composer at startup, warm the pipelines you will
+    run, and pass it to every call. A warmup only pays off on the composer that
+    then plans.
 
     ```python
     from tesseract_robotics.planning import TaskComposer, plan_cartesian, plan_ompl
@@ -970,8 +968,8 @@ only. `result.to_numpy()` returns an `(N, num_joints)` array of positions.
 
 !!! tip "Cache the Composer and the Profiles"
     For repeated plans, hold both the composer and the `ProfileDictionary`.
-    The composer is the large saving: it skips the plugin load (about 4.3 s on
-    macOS arm64) that every `plan_*()` call without `composer=` repeats.
+    The composer is the larger saving: it skips the plugin load that every
+    `plan_*()` call without `composer=` repeats.
     Caching profiles saves the work the profile factory helpers do to build
     them, which is far smaller; on its own it leaves the plugin load in every
     call.
@@ -991,7 +989,7 @@ only. `result.to_numpy()` returns an `(N, num_joints)` array of positions.
         result = plan_ompl(robot, program, profiles=freespace_profiles, composer=composer)
     ```
 
-## Next Steps
+## Next steps
 
 - [Task Composer](task-composer.md) - Complex multi-step planning
-- [Low-Level SQP](low-level-sqp.md) - Real-time trajectory optimization
+- [Low-Level SQP](low-level-sqp.md) - Trajectory optimization

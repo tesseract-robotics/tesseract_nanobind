@@ -1,5 +1,26 @@
 # tesseract_robotics.common
 
+<!-- snippet: ambient
+import numpy as np
+from tesseract_robotics.common import Isometry3d
+
+pose1 = Isometry3d.Identity()
+pose2 = Isometry3d.Identity()
+noisy_rotation = np.eye(3) + 1e-7
+stack = np.array([np.eye(4), np.eye(4)])
+joint_group = env.getJointGroup("manipulator")
+kin_group = env.getKinematicGroup("manipulator")
+q = np.zeros(6)
+T_new_base = Isometry3d.Identity()
+R = np.eye(3)
+t1 = Isometry3d.Identity()
+t2 = Isometry3d.Identity()
+target = t2
+source = t1
+source_perturbed = t1
+target_perturbed = t2
+-->
+
 Common types, utilities, and resource handling.
 
 !!! note "Eigen arguments take arrays, lists and tuples"
@@ -82,10 +103,10 @@ qx, qy, qz, qw = q.coeffs()
 rotation_matrix = q.toRotationMatrix()
 ```
 
-!!! warning "Eigen's 4-double ctor is scalar-first — avoid in Python"
-    `Quaterniond(w, x, y, z)` exists for direct Eigen interop but is the
-    one signature in the binding that breaks the project convention. Use
-    `Quaterniond.from_xyzw(qx, qy, qz, qw)` everywhere else.
+!!! warning "No scalar-first constructor"
+    Eigen's `Quaterniond(w, x, y, z)` is not bound: four scalars raise
+    `TypeError`. Use `Quaterniond.from_xyzw(qx, qy, qz, qw)` or
+    `Quaterniond([qx, qy, qz, qw])`; reorder when porting C++.
 
     `q.coeffs()`, `q.vec()`, the `Quaterniond(Vector4d)` ctor, and `Pose`'s
     quaternion-returning factories all use scalar-last `[qx, qy, qz, qw]`.
@@ -150,8 +171,11 @@ is a `(6,)` array `[vx, vy, vz, wx, wy, wz]`; a jacobian is `(6, n)`.
 
 ```python
 import numpy as np
-from tesseract_robotics.common import jacobianChangeBase, jacobianChangeRefPoint
+from tesseract_robotics.common import Isometry3d, jacobianChangeBase, jacobianChangeRefPoint
 
+joint_group = env.getJointGroup("manipulator")
+q = np.zeros(6)
+T_new_base = Isometry3d.Identity()
 J = joint_group.calcJacobian(q, "tool0")    # (6, n), Fortran order, in the group base frame
 jacobianChangeBase(J, T_new_base)           # rotate every column into T_new_base, in place
 jacobianChangeRefPoint(J, [0.0, 0.0, 0.1])  # v += ω × p, in place
@@ -183,6 +207,7 @@ calcTransformError(t1, t2)           # error of t1.inverse() * t2
 # results jumps by ~2π near the angle-axis ±π boundary; this does not.
 d = calcJacobianTransformErrorDiff(target, source, source_perturbed)
 d = calcJacobianTransformErrorDiff(target, target_perturbed, source, source_perturbed)
+lower_tol, upper_tol = np.full(6, -1.0), np.full(6, 1.0)
 d = calcJacobianTransformErrorDiff(target, source, source_perturbed, lower_tol, upper_tol)
 
 v = np.array([-2.0, 0.5, 3.0])
@@ -301,26 +326,30 @@ acm.removeAllowedCollision("link_1", "link_2")
 acm.clearAllowedCollisions()
 ```
 
-An ACM converts to and from its entries, a `dict` keyed on ordered link pairs. The
-constructor orders each key, so `("link_b", "link_a")` is stored as `("link_a", "link_b")`:
+An ACM converts to and from its entries, a `dict[LinkIdPair, str]`. The constructor takes
+`LinkIdPair` or `(str, str)` keys and orders each pair, so `("link_b", "link_a")` is stored as
+`("link_a", "link_b")`. A `LinkIdPair` is unordered and never equals a tuple: index the entries
+dict with a `LinkIdPair`, not a tuple.
 
 ```python
 from tesseract_robotics.common import (
-    AllowedCollisionMatrix, getAllowedCollisions, makeOrderedLinkPair,
+    AllowedCollisionMatrix, LinkIdPair, getAllowedCollisions,
 )
 
 acm = AllowedCollisionMatrix({("link_b", "link_a"): "Adjacent links"})
-entries = acm.getAllAllowedCollisions()  # {("link_a", "link_b"): "Adjacent links"}
+entries = acm.getAllAllowedCollisions()  # {LinkIdPair(link_a, link_b): "Adjacent links"}
+assert entries[LinkIdPair("link_b", "link_a")] == "Adjacent links"
+assert ("link_a", "link_b") not in entries  # a tuple never equals a LinkIdPair
 
-acm.removeAllowedCollision("link_a")     # drop every entry involving link_a
-acm.reserveAllowedCollisionMatrix(100)   # pre-size; entries unchanged
 print(acm)                               # one "link=<a> link=<b> reason=<r>" line per entry
-
-makeOrderedLinkPair("link_b", "link_a")  # ("link_a", "link_b")
+acm.reserveAllowedCollisionMatrix(100)   # pre-size; entries unchanged
 
 # Links allowed to collide with any of the given links; each partner once unless
 # remove_duplicates=False. The order follows the dict's, so treat it as a set.
-getAllowedCollisions(["link_a"], entries)
+assert {str(link) for link in getAllowedCollisions(["link_a"], entries)} == {"link_b"}
+
+acm.removeAllowedCollision("link_a")     # drop every entry involving link_a
+assert not acm.getAllAllowedCollisions()
 ```
 
 ### CollisionMarginData
@@ -590,16 +619,14 @@ interpreter, holds nothing of Python's at exit.
 
 ## Container Types
 
-| Type | Description |
-|------|-------------|
-| `TransformMap` | `dict[str, Isometry3d]` - link name to transform |
-| `VectorIsometry3d` | `list[Isometry3d]` |
-| `VectorVector3d` | `list[np.ndarray]` - list of 3D points |
+C++ containers cross as plain Python containers; there are no container classes to import.
 
-## Auto-generated API Reference
+| C++ | Python |
+|-----|--------|
+| `std::vector<Isometry3d>` | `list[Isometry3d]` |
+| `std::vector<Vector3d>` | `list[np.ndarray]` - list of 3D points |
+| link-name to transform maps | `dict[LinkId, Isometry3d]`; a `str` key finds an id-keyed entry |
+
+## Reference
 
 ::: tesseract_robotics.common._common
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

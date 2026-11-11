@@ -1,5 +1,11 @@
 # tesseract_robotics.srdf
 
+<!-- snippet: ambient
+from tesseract_robotics.common import Isometry3d
+
+offset = Isometry3d.Identity()
+-->
+
 The semantic robot description: groups, group states and TCPs (`KinematicsInformation`), the
 allowed collision matrix, collision margins, calibration and the kinematics and contact-manager
 plugin configs. `SRDFModel.initFile` / `initString` parse an SRDF against the `SceneGraph` of
@@ -74,9 +80,6 @@ name a YAML file, parsed into `kinematics_information.kinematics_plugin_info`,
 `contact_managers_plugin_config.yaml` and `calibration_config.yaml` beside the SRDF and
 references it by that file name, so a saved model reloads equal to itself.
 
+## Reference
+
 ::: tesseract_robotics.srdf
-    options:
-      show_root_heading: true
-      show_source: false
-      members_order: source
-      heading_level: 3

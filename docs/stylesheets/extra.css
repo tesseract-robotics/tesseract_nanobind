@@ -1,105 +1,152 @@
-/* Custom styles for tesseract_robotics documentation */
+/* tesseract_robotics documentation: one restrained palette, light and dark. */
 
-/* Code block styling */
-.md-typeset code {
-  font-size: 0.85em;
+/* Palette: ink header, teal accent. The accent is the only saturated colour on a page. */
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1d2738;
+  --md-primary-fg-color--light: #3a4760;
+  --md-primary-fg-color--dark: #121926;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgb(255 255 255 / 70%);
+  --md-accent-fg-color: #0b7f86;
+  --md-accent-fg-color--transparent: rgb(11 127 134 / 10%);
+  --md-typeset-a-color: #0b6f75;
+  --tr-rule: rgb(0 0 0 / 9%);
+  --tr-surface: #f6f7f9;
 }
 
-/* Table styling */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #121926;
+  --md-primary-fg-color--light: #2a3448;
+  --md-primary-fg-color--dark: #0b1019;
+  --md-accent-fg-color: #4cc3c3;
+  --md-accent-fg-color--transparent: rgb(76 195 195 / 12%);
+  --md-typeset-a-color: #6fd0cf;
+  --md-default-bg-color: #12161d;
+  --md-code-bg-color: #1a1f28;
+  --tr-rule: rgb(255 255 255 / 9%);
+  --tr-surface: #181d26;
+}
+
+/* Typography: a measure that reads, tighter headings, tabular figures in tables. */
+.md-typeset {
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.md-typeset h1 {
+  color: var(--md-default-fg-color);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.md-typeset h2 {
+  border-top: 1px solid var(--tr-rule);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-top: 2.2em;
+  padding-top: 1.2em;
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+}
+
+.md-typeset code {
+  font-size: 0.86em;
+}
+
+/* Tables: hairlines, no fills; numbers align. */
 .md-typeset table:not([class]) {
-  font-size: 0.85em;
+  border: 1px solid var(--tr-rule);
+  border-radius: 0.3rem;
+  box-shadow: none;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .md-typeset table:not([class]) th {
-  background-color: var(--md-primary-fg-color--light);
-  color: var(--md-primary-bg-color);
+  background: var(--tr-surface);
+  color: var(--md-default-fg-color);
+  font-weight: 600;
 }
 
-/* Admonition customization */
-.md-typeset .admonition.tip,
-.md-typeset details.tip {
-  border-color: #00c853;
+.md-typeset table:not([class]) td,
+.md-typeset table:not([class]) th {
+  border-top: 1px solid var(--tr-rule);
 }
 
-.md-typeset .tip > .admonition-title,
-.md-typeset .tip > summary {
-  background-color: rgba(0, 200, 83, 0.1);
+/* Code blocks: a quiet surface and a hairline instead of a heavy fill. */
+.md-typeset pre > code {
+  border: 1px solid var(--tr-rule);
+  border-radius: 0.3rem;
 }
 
-/* API reference styling */
+/* Admonitions: hairline box, coloured left rule, no drop shadow. */
+.md-typeset .admonition,
+.md-typeset details {
+  border-width: 0 0 0 3px;
+  border-radius: 0.2rem;
+  box-shadow: none;
+  background: var(--tr-surface);
+  font-size: 0.74rem;
+}
+
+/* Figures: centred, with a caption in the muted text colour. */
+.md-typeset figure {
+  margin: 1.6em auto;
+}
+
+.md-typeset figure img {
+  border-radius: 0.2rem;
+}
+
+.md-typeset figcaption {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  max-width: 42rem;
+}
+
+/* Mermaid diagrams: centred, room around them. */
+.md-typeset .mermaid {
+  margin: 1.6em 0;
+  text-align: center;
+}
+
+/* Grid cards: hairline borders, accent on hover. */
+.md-typeset .grid.cards > ul > li,
+.md-typeset .grid > .card {
+  border: 1px solid var(--tr-rule);
+  border-radius: 0.3rem;
+  box-shadow: none;
+}
+
+.md-typeset .grid.cards > ul > li:hover,
+.md-typeset .grid > .card:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: none;
+}
+
+/* The landing page hero: the demo player full width, a one-line lede below it. */
+.md-typeset .tr-lede {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0.8em 0 1.4em;
+}
+
+/* API reference: signatures on the code surface, headings in the body weight. */
 .doc-heading {
   font-weight: 600;
 }
 
 .doc-signature {
   font-size: 0.9em;
-  background: var(--md-code-bg-color);
-  padding: 0.5em 1em;
-  border-radius: 0.25em;
 }
 
-/* Mermaid diagram styling */
-.mermaid {
-  text-align: center;
-  margin: 1em 0;
-}
-
-/* Grid cards for examples index */
-.grid.cards > ul {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1em;
-  list-style: none;
-  padding: 0;
-}
-
-.grid.cards > ul > li {
-  padding: 1em;
-  border: 1px solid var(--md-default-fg-color--lightest);
-  border-radius: 0.25em;
-}
-
-/* Keyboard shortcut styling */
 .md-typeset kbd {
   box-shadow: 0 2px 0 1px var(--md-default-fg-color--lighter);
-}
-
-/* Module listing styling */
-.module-table th:first-child,
-.module-table td:first-child {
-  font-family: var(--md-code-font-family);
-  font-size: 0.85em;
-}
-
-/* Dark mode adjustments */
-[data-md-color-scheme="slate"] {
-  --md-code-bg-color: #1e1e1e;
-}
-
-/* Tab content styling */
-.md-typeset .tabbed-set {
-  margin-top: 0.5em;
-}
-
-/* Collapsible details */
-.md-typeset details {
-  margin: 1em 0;
-}
-
-.md-typeset details summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-
-/* Warning/Error highlighting in code */
-.highlight .err {
-  background: transparent;
-  color: #f44336;
-}
-
-/* Expected output styling */
-.md-typeset details.example .highlight {
-  font-size: 0.85em;
 }
 
 /* Demo players: one aspect, the one each camera is reviewed at. */
@@ -137,7 +184,7 @@
 
 .demo-player:hover .demo-play,
 .demo-player:focus-visible .demo-play {
-  background: var(--md-primary-fg-color);
+  background: var(--md-accent-fg-color);
 }
 
 .demo-player iframe {
