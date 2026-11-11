@@ -17,6 +17,10 @@ The contract, one `Rule` per clause:
 6. `[Unreleased]:` compares the newest release with `HEAD`.
 7. `[<version>]:` compares the next-older release with `<version>`; the oldest
    release compares from any older version (one that predates the changelog).
+8. No section, the text from a heading to the next heading of any level, exceeds
+   `SECTION_BUDGET` bytes. The docs indexer (zensical) searches each section as one
+   field and fails the build past `SEARCH_FIELD_LIMIT`; a release's Changes list is
+   split under topic sub-headings (`####`) long before it gets there.
 
 Usage:
 
@@ -42,8 +46,16 @@ Version = tuple[int, ...]
 DEFAULT_CHANGELOG = Path(__file__).resolve().parents[1] / "CHANGELOG.md"
 UNRELEASED = "Unreleased"
 HEAD = "HEAD"
+# zensical's search indexer rejects a section whose text exceeds this many bytes
+# (error "exceeds the search index limit ... maximum 131072 bytes"); it has no option.
+SEARCH_FIELD_LIMIT = 131_072  # bytes; 2**17, fixed in the zensical binary
+# Half the limit: a section this long is unreadable as one block, and the margin
+# absorbs the markup the indexer does not count but a renderer may add.
+SECTION_BUDGET = SEARCH_FIELD_LIMIT // 2  # bytes
 
 LEVEL2_HEADING = re.compile(r"^## (?P<text>.*)$")
+ANY_HEADING = re.compile(r"^#{1,6} (?P<text>.*)$")
+CODE_FENCE = re.compile(r"^\s*(```|~~~)")
 BRACKETED = re.compile(r"^\[(?P<name>[^\]]+)\](?P<rest>.*)$")
 RELEASE_DATE = re.compile(r"^ - (?P<date>\d{4}-\d{2}-\d{2})(?=\s|$)")
 # Markdown matches reference labels case-insensitively, so names are keyed lower-cased.
@@ -67,6 +79,7 @@ class Rule(enum.Enum):
     LINK_WITHOUT_RELEASE = "each version link has a release heading"
     UNRELEASED_LINK_MISMATCH = "`[Unreleased]:` compares the newest release with HEAD"
     COMPARE_CHAIN_BROKEN = "`[<version>]:` compares the next-older release with <version>"
+    SECTION_TOO_LARGE = "no section exceeds the search index's field budget"
 
 
 @dataclass(frozen=True)
@@ -361,6 +374,34 @@ def check_compare_chain(
             )
 
 
+def check_section_sizes(text: str) -> Iterator[Violation]:
+    """Clause 8: every section, heading to next heading, stays under `SECTION_BUDGET`.
+
+    Headings inside code fences do not start a section, as the indexer does not
+    see them as headings either.
+    """
+    title, start, size, fenced = "(before the first heading)", 1, 0, False
+    sections: list[tuple[str, int, int]] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        if CODE_FENCE.match(line):
+            fenced = not fenced
+        heading = None if fenced else ANY_HEADING.match(line)
+        if heading:
+            sections.append((title, start, size))
+            title, start, size = heading["text"], number, 0
+        else:
+            size += len(line.encode("utf-8")) + 1
+    sections.append((title, start, size))
+    for title, start, size in sections:
+        if size > SECTION_BUDGET:
+            yield Violation(
+                Rule.SECTION_TOO_LARGE,
+                start,
+                f"section `{title}` is {size} bytes, over {SECTION_BUDGET} "
+                f"(the indexer fails at {SEARCH_FIELD_LIMIT}); split it under `####` sub-headings",
+            )
+
+
 def check(text: str) -> list[Violation]:
     """Every contract violation in a changelog.
 
@@ -386,6 +427,7 @@ def check(text: str) -> list[Violation]:
         *check_release_links(unique, link_index),
         *check_unreleased_link(unique, link_index, unreleased_line),
         *check_compare_chain(unique, link_index),
+        *check_section_sizes(text),
     ]
     return sorted(violations, key=lambda violation: violation.line)
 
