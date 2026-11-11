@@ -114,8 +114,8 @@ what changes is what getters return and what they are called.
 ```python
 env.getLinkIds()            # was getLinkNames(); returns list[LinkId]
 str(env.getRootLinkId())    # the name; LinkId("tool0") == "tool0" is True
-transforms = env.getState().link_transforms   # dict[LinkId, Isometry3d]
-transforms["tool0"]         # str keys still find id-keyed entries
+transforms = env.getState().link_transforms   # dict[str, Isometry3d], as in 0.35
+transforms["tool0"]         # maps stay keyed by name
 ```
 
 | 0.35 | 0.36 |
@@ -168,13 +168,34 @@ label = "link_" + ids[0].name()                # a LinkId is not a str
 assert "base_link" in ids                      # a str equals its id
 ```
 
+### Maps keyed by a link or joint stay keyed by name
+
+Every map keyed by a link or joint comes back as a plain `dict[str, V]`, as in 0.35:
+`calcFwdKin`, `SceneState.joints` / `floating_joints` / `link_transforms` /
+`joint_transforms`, `getLinkTransforms(ids, values)`, `getCurrentFloatingJointValues`,
+`getFloatingJointValues`, the joint-limit commands' `getLimits`,
+`ContactManagerConfig.modify_object_enabled`, `KinematicsInformation.group_states` /
+`group_tcps`, `CalibrationInfo.joints` and the keys of `SceneGraph.getAdjacencyMap`.
+`transforms["tool0"]` is exactly typed. A map you pass in may be keyed by names or ids.
+Maps keyed by a `LinkIdPair` (`getAllAllowedCollisions`, `ContactResultMap`) keep the pair:
+a tuple key would be ordered.
+
+```python
+# 0.36
+transforms = env.getState().link_transforms    # dict[str, Isometry3d]
+tool0 = transforms["tool0"]
+assert all(type(name) is str for name in transforms)
+state_copy = env.getState()
+state_copy.link_transforms = transforms        # names or ids both convert back
+```
+
 ### State solver: ids, and no `{name: value}` Jacobian
 
 `StateSolver` follows the same rename: `getJointIds()`, `getActiveJointIds()`,
 `getFloatingJointIds()`, `getBaseLinkId()`, `getLinkIds()`, `getActiveLinkIds()`,
 `getStaticLinkIds()`, `isActiveLinkId(link_id)`, `hasLinkId(link_id)`. Keyword arguments
 follow: `joint_names=` → `joint_ids=`, `link_name=` → `link_id=`. `SceneState.joints`,
-`link_transforms` and `joint_transforms` are keyed by id.
+`link_transforms` and `joint_transforms` stay keyed by name (see below).
 
 `getJacobian` lost its `{name: value}` overload; upstream 0.36 has none. Pass the
 values in solver order, or the ids next to the values.

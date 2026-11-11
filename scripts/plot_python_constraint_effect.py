@@ -16,6 +16,8 @@ import numpy as np
 from tesseract_robotics.trajopt_ifopt.python_constraints import HoldAxis
 
 ex = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
+# One warm-started SQP step per tick, the unit this figure compares (the example takes up to 10).
+ONE_SQP_STEP = 1
 TARGET = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 
@@ -30,7 +32,7 @@ def carry_level(vars_, manip, env):
 
 def series(extra, replans=30):
     with contextlib.redirect_stdout(io.StringIO()):
-        r = ex.run(extra_constraints=extra, num_replan=replans)
+        r = ex.run(extra_constraints=extra, num_replan=replans, sqp_steps_per_tick=ONE_SQP_STEP)
     manip = r["robot"].env.getKinematicGroup("manipulator")
     axis = manip.calcFwdKin(TARGET)["tool0"].rotation[:, 2]
     n, steps = len(r["joint_names"]), r["steps"]

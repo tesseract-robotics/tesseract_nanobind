@@ -297,14 +297,25 @@ The `ConstraintType` enum from `trajopt_sqp` no longer exists. If you referenced
 
 ### Warm-starting SQP
 
-Use `NodesVariables.setVariables()` to set warm-start values:
+Seed the variables with the previous trajectory when you build them, then build the problem on
+those:
 
 ```python
-# Set warm-start from previous trajectory
-nodes_variables.setVariables(trajectory.flatten())
+from tesseract_robotics.trajopt_ifopt import createNodesVariables
+
+seeded = createNodesVariables("trajectory", joint_names, list(previous_trajectory), bounds)
+# ... a TrajOptQPProblem(seeded) with the constraint and cost sets, setup(), then:
 solver.init(problem)
 solver.stepSQPSolver()
 ```
+
+To move an existing problem, call `problem.setVariables(x)`: it updates every component, the
+constraints included. See [online planning](examples/online-planning.md#2-warm-start-from-the-previous-solution).
+
+!!! warning
+    Earlier versions of this page showed `nodes_variables.setVariables(trajectory.flatten())`
+    after `setup()`. That only writes the values: the collision constraints keep evaluating the
+    trajectory they were set up with, so the solver reports convergence without moving the plan.
 
 ## Migration Checklist
 

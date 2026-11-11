@@ -57,6 +57,7 @@ migration with before/after examples, and [0.33 → 0.35](changes.md) the earlie
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| 0.36.0 | Maps keyed by a link or joint (`calcFwdKin`, `SceneState.link_transforms`, `getLinkTransforms`, …) are `dict[str, V]`; `0.36.0.0rc1` keyed them by `LinkId` / `JointId` | [Index by name](#maps-keyed-by-a-link-or-joint-are-keyed-by-name) |
 | 0.36.0 | Python modules lose the `tesseract_` prefix (`tesseract_robotics.tesseract_collision` → `tesseract_robotics.collision`, 20 in all); the old names are gone and raise `ModuleNotFoundError` | [The new names](#036-module-names) |
 | 0.36.0 | `TaskComposer.plan` raises `ProfileTypeMismatchError` when a Descartes node's namespace holds a profile only as the other scalar type (`D` for a Cartesian or raster pipeline); `create_descartes_default_profiles(move_profile=…)` refuses a Python subclass of `DescartesMoveProfileD` / `F` | [Register the type the node reads](#descartes-profiles-match-the-nodes-scalar-type) |
 | 0.36.0 | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
@@ -175,6 +176,37 @@ guards). Both layouts import the same way. The C++ binding sources moved from
 `src/tesseract_<name>/tesseract_<name>_bindings.cpp` to `src/bindings/<name>.cpp`; build
 scripts and forks that name the old paths need the new ones. Upstream C++ names (the
 `tesseract_collision::` namespaces, `find_package(tesseract_collision)`, the headers) did not change.
+
+### Maps keyed by a link or joint are keyed by name
+
+`0.36.0.0rc1` returned every map keyed by a link or joint as `dict[LinkId, V]` /
+`dict[JointId, V]`. A `str` lookup worked at runtime but no type checker accepts it, so 0.36.0
+returns `dict[str, V]` keyed by name, as 0.35 did: `calcFwdKin`, `SceneState.joints` /
+`floating_joints` / `link_transforms` / `joint_transforms`, `getLinkTransforms(ids, values)`,
+`getCurrentFloatingJointValues`, `getFloatingJointValues`, the joint-limit commands'
+`getLimits`, `ContactManagerConfig.modify_object_enabled`, `KinematicsInformation.group_states`
+/ `group_tcps`, `CalibrationInfo.joints` and the keys of `SceneGraph.getAdjacencyMap`. Inputs
+accept names or ids as keys. `LinkIdPair`-keyed maps are unchanged.
+
+| before (`0.36.0.0rc1`) | after |
+| --- | --- |
+| `poses[LinkId("tool0")]` | `poses["tool0"]` |
+| `{lid.name(): tf for lid, tf in state.link_transforms.items()}` | `state.link_transforms` |
+| `[jid.name() for jid in state.joints]` | `list(state.joints)` |
+
+<!-- snippet: skip (0.36.0.0rc1 API, removed in 0.36.0) -->
+```python
+# 0.36.0.0rc1
+poses = robot.env.getState().link_transforms   # dict[LinkId, Isometry3d]
+names = [lid.name() for lid in poses]
+```
+
+```python
+# 0.36.0
+poses = robot.env.getState().link_transforms   # dict[str, Isometry3d]
+names = list(poses)
+tool0 = poses["tool0"]
+```
 
 ### Descartes profiles match the node's scalar type
 
