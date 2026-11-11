@@ -1,10 +1,10 @@
-"""Emitter exception taxonomy — one named class per failure mode.
+"""Emitter exception taxonomy: one named class per failure mode.
 
-Every exception carries structured fields; the message is derived. Brand
-packages add subclasses but never raise bare ``EmitterError``. Messages are
-chosen so the existing RAPID dispatcher tests (which match on substrings like
-the quoted profile name, "CIRCULAR", "no leaf instructions") keep passing after
-the reseat.
+Every exception carries structured fields; the message is derived from them and
+states what was found against what was expected. Brand packages raise these
+classes, never a bare `EmitterError`. Validation errors also subclass the
+matching builtin (`ValueError`, `NameError`, `RuntimeError`) so generic callers
+can still catch them by kind.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ class EmitterError(Exception):
 
 
 class EmptyProgramError(EmitterError):
-    """The ``CompositeInstruction`` has zero leaf instructions after the walk."""
+    """The `CompositeInstruction` has zero leaf instructions after the walk."""
 
     def __init__(self, description: str) -> None:
         self.description = description
@@ -25,8 +25,12 @@ class EmptyProgramError(EmitterError):
 
 
 class UnsupportedInstructionError(EmitterError):
-    """An instruction kind the IR cannot represent (notably CIRCULAR: tesseract's
-    ``MoveInstructionPoly`` carries no via point)."""
+    """An instruction the IR or the target dialect cannot represent exactly.
+
+    Examples: CIRCULAR moves (tesseract's `MoveInstructionPoly` carries no via
+    point), a tool change on a controller whose tool follows the frame binding,
+    a named signal on a controller that only numbers its IO.
+    """
 
     def __init__(self, what: str) -> None:
         self.what = what
@@ -46,24 +50,41 @@ class MissingProfileError(EmitterError):
 
 
 class MissingConfigurationError(EmitterError):
-    """A Cartesian move needs a robot configuration but none can be derived.
+    """A Cartesian move needs a robot configuration that cannot be derived exactly.
 
-    For formats that *require* config flags (Fanuc ``CONFIG : 'N U T, …'``) when
-    no seed joints and no profile ``default_config`` exist. KRL does not hit this
-    (status/turn optional, omitted in v1). Never guess silently.
+    Raised when the waypoint has no seed joints, when the caller supplied no
+    posture/configuration resolver for a dialect that needs one, or when the
+    controller's configuration rule for the move is not determinable from the
+    plan. Never guessed.
     """
 
-    def __init__(self, move_index: int, brand: str) -> None:
+    def __init__(self, move_index: int, brand: str, reason: str) -> None:
         self.move_index = move_index
         self.brand = brand
+        self.reason = reason
         super().__init__(
-            f"{brand}: Cartesian move #{move_index} requires a robot configuration; "
-            f"waypoint has no seed joints and the profile has no default_config"
+            f"{brand}: Cartesian move #{move_index} requires a robot configuration: {reason}"
         )
 
 
-class IdentifierError(EmitterError):
-    """A program/signal identifier cannot be made legal for the target language."""
+class SingularPostureError(EmitterError):
+    """A seed configuration lies exactly on a posture boundary (shoulder, elbow or wrist).
+
+    On the boundary the configuration bit the controller needs has no defined
+    value, so the emitter refuses rather than pick a side.
+    """
+
+    def __init__(self, quantity: str, joints: Sequence[float]) -> None:
+        self.quantity = quantity
+        self.joints = tuple(joints)
+        super().__init__(
+            f"seed joints {self.joints} put {quantity} exactly on its boundary; "
+            "the configuration bit is undefined there"
+        )
+
+
+class IdentifierError(EmitterError, ValueError):
+    """A program/signal/variable identifier is not legal in the target language."""
 
     def __init__(self, name: str, brand: str, reason: str) -> None:
         self.name = name
@@ -72,52 +93,33 @@ class IdentifierError(EmitterError):
         super().__init__(f"{brand}: identifier {name!r} is not emittable: {reason}")
 
 
+class UnemittableTextError(EmitterError, ValueError):
+    """Free text (comment, pendant message) that would break out of its syntax."""
+
+    def __init__(self, text: str, brand: str, reason: str) -> None:
+        self.text = text
+        self.brand = brand
+        self.reason = reason
+        super().__init__(f"{brand}: text {text!r} is not emittable: {reason}")
+
+
 class ExternalAxisError(EmitterError):
-    """Joint state carries more axes than the backend is configured to emit."""
+    """A move carries more joint values than the backend can emit."""
 
     def __init__(self, got: int, supported: int, brand: str) -> None:
         self.got = got
         self.supported = supported
         self.brand = brand
         super().__init__(
-            f"{brand}: move carries {got} joint values but the profile supports "
-            f"{supported} (6 robot + declared external axes); declare external axes"
-        )
-
-
-class UnknownKinematicTopologyError(EmitterError):
-    """A group has no ROP/REP-classifiable external-axis structure.
-
-    Raised by the classification layer (which owns the URDF/SRDF) when it cannot
-    decide which joints are the arm vs. the external axes. Never guessed.
-    """
-
-    def __init__(self, group: str, reason: str) -> None:
-        self.group = group
-        self.reason = reason
-        super().__init__(f"group {group!r} has no classifiable external-axis topology: {reason}")
-
-
-class ExternalAxisUnitError(EmitterError):
-    """An external axis's declared kind/unit contradicts its actual joint type.
-
-    E.g. a joint declared ``ROTARY`` (degrees) whose URDF type is ``prismatic``
-    (metres → millimetres). Emitting either unit would be silently wrong.
-    """
-
-    def __init__(self, joint_name: str, declared: str, expected: str) -> None:
-        self.joint_name = joint_name
-        self.declared = declared
-        self.expected = expected
-        super().__init__(
-            f"external axis {joint_name!r} declared {declared} but its joint type implies {expected}"
+            f"{brand}: move carries {got} joint values but this emitter supports "
+            f"{supported}; external axes are not emitted for {brand}"
         )
 
 
 class UncoordinatedTargetError(EmitterError):
     """A coordinated move's waypoint joints do not match the external-axis layout.
 
-    The split is by joint name, so a mismatched joint set cannot be resolved —
+    The split is by joint name, so a mismatched joint set cannot be resolved:
     the layout naming a joint the waypoint lacks (an omitted external DOF), or the
     waypoint carrying a joint the layout does not classify, both raise here rather
     than guess a slot assignment.
@@ -135,4 +137,127 @@ class UncoordinatedTargetError(EmitterError):
         super().__init__(
             f"coordinated waypoint joints {self.waypoint_names} do not match the "
             f"external-axis layout; missing {self.missing}, unexpected {self.extra}"
+        )
+
+
+class InvalidLayoutError(EmitterError, ValueError):
+    """An `ExternalAxisLayout` / `ExternalAxisSpec` violates its invariants."""
+
+
+class InvalidProfileError(EmitterError, ValueError):
+    """A brand motion profile was built with an out-of-range or empty field."""
+
+
+class InvalidEventError(EmitterError, ValueError):
+    """An IR event was built with a value outside its domain (e.g. a negative dwell)."""
+
+
+class InvalidDeclarationError(EmitterError, ValueError):
+    """A DSL data declaration (tooldata, zonedata, …) has an out-of-domain field."""
+
+
+class UnboundFrameError(EmitterError):
+    """A move's working or TCP frame has no controller frame in the binding."""
+
+    def __init__(self, frame: str, role: str, brand: str, available: Sequence[str]) -> None:
+        self.frame = frame
+        self.role = role
+        self.brand = brand
+        self.available = sorted(available)
+        super().__init__(
+            f"{brand}: {role} frame {frame!r} has no controller binding; bound: {self.available}"
+        )
+
+
+class TcpOffsetError(EmitterError):
+    """A move's `tcp_offset` cannot be represented by the target controller."""
+
+    def __init__(self, brand: str, reason: str) -> None:
+        self.brand = brand
+        self.reason = reason
+        super().__init__(f"{brand}: tcp_offset not representable: {reason}")
+
+
+class InvalidFrameBindingError(EmitterError, ValueError):
+    """A frame binding maps a frame to a controller handle outside its valid range."""
+
+
+class ToolConflictError(EmitterError):
+    """Moves in one program bind to different tools where the format allows only one."""
+
+    def __init__(self, brand: str, tools: Sequence[int]) -> None:
+        self.brand = brand
+        self.tools = sorted(set(tools))
+        super().__init__(
+            f"{brand}: one position table can carry one tool, but the moves bind to {self.tools}"
+        )
+
+
+class MissingCalibrationError(EmitterError):
+    """A unit conversion needs controller calibration data the caller did not supply."""
+
+    def __init__(self, brand: str, what: str) -> None:
+        self.brand = brand
+        self.what = what
+        super().__init__(f"{brand}: {what}")
+
+
+class InvalidCalibrationError(EmitterError, ValueError):
+    """Supplied calibration data is malformed (wrong axis count, zero or non-finite ratio)."""
+
+
+class ProgramStructureError(EmitterError):
+    """A DSL statement was written where the target grammar forbids it.
+
+    E.g. a RAPID `PROC` inside a `WHILE`, a `PERS` declaration inside a routine,
+    a data declaration after the first statement of a routine.
+    """
+
+    def __init__(self, brand: str, what: str, scope: Sequence[str]) -> None:
+        self.brand = brand
+        self.what = what
+        self.scope = list(scope)
+        where = " > ".join(self.scope) if self.scope else "top level"
+        super().__init__(f"{brand}: {what} is not allowed at {where}")
+
+
+class UndeclaredVariableError(EmitterError, NameError):
+    """An assignment targets a variable that is not declared (or is `CONST`)."""
+
+    def __init__(self, name: str, brand: str, reason: str) -> None:
+        self.name = name
+        self.brand = brand
+        super().__init__(f"{brand}: cannot assign {name!r}: {reason}")
+
+
+class NoActiveWriterError(EmitterError, RuntimeError):
+    """A DSL statement ran with no writer of its brand active in the current context."""
+
+    def __init__(self, writer: str) -> None:
+        self.writer = writer
+        super().__init__(
+            f"no active {writer}: open one with `with {writer}() as w:` before writing statements"
+        )
+
+
+class ProgramFileCountError(EmitterError, ValueError):
+    """`EmittedProgram.text` was read on a program that does not hold exactly one file."""
+
+    def __init__(self, filenames: Sequence[str]) -> None:
+        self.filenames = list(filenames)
+        super().__init__(
+            f".text requires exactly one file; this has {len(self.filenames)}: "
+            f"{self.filenames}. Use .files[<name>]."
+        )
+
+
+class MissingManipulatorInfoError(EmitterError):
+    """A move has no working or TCP frame after combining its `ManipulatorInfo` chain."""
+
+    def __init__(self, field: str, move_index: int) -> None:
+        self.field = field
+        self.move_index = move_index
+        super().__init__(
+            f"move #{move_index} has an empty ManipulatorInfo.{field} after combining the "
+            "composite and move ManipulatorInfo; set it on the program or the move"
         )

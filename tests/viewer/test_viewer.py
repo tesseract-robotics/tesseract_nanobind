@@ -1,6 +1,7 @@
 """TesseractViewer: viser server lifecycle and scene state."""
 
 import asyncio
+import gc
 import socket
 import threading
 import time
@@ -47,6 +48,7 @@ from tesseract_robotics.viewer.errors import (
     UnknownJointError,
     UnsupportedGeometryError,
     UnsupportedMoveTypeError,
+    UntimedTrajectoryError,
     ViewerCloseTimeoutError,
     ViewerPortInUseError,
     ViserLoopTimeoutError,
@@ -81,10 +83,23 @@ JOINT_NAMES = [f"joint_{i + 1}" for i in range(6)]
 Q = np.array([0.3, -0.2, 0.1, 0.4, -0.5, 0.6])
 
 
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+# [s] Per-test bound: ten times the slowest test measured in this file (2.12 s, test_browser_drag_pauses_and_scrubs),
+# rounded up to a multiple of 5 s, and never under 60 s: the bound includes fixture setup, and a
+# cold CI worker (Windows above all) spends seconds loading plugins before the first test runs.
+# A deadlock or hang never ends; this fails it instead of
+# waiting for the session-wide timeout.
+TEST_TIMEOUT_S = 60
+pytestmark = pytest.mark.timeout(TEST_TIMEOUT_S)
+
+
+def _open_viewer() -> tuple[TesseractViewer, int]:
+    """A viewer on an OS-assigned port, and that port: no probe-then-bind race."""
+    viewer = TesseractViewer(port=0)
+    return viewer, viewer.server.get_port()
+
+
+def _wait_player(viewer: TesseractViewer, iterations: int) -> None:
+    assert viewer.wait_player_iterations(iterations, PLAYER_ADVANCE_TIMEOUT_S)
 
 
 def _assert_port_free(port: int) -> None:
@@ -123,13 +138,12 @@ def _add_link(env, name, geometry):
 
 @pytest.fixture
 def viewer():
-    with TesseractViewer(port=_free_port()) as viewer:
+    with TesseractViewer(port=0) as viewer:
         yield viewer
 
 
 def test_serving_on_construction():
-    port = _free_port()
-    viewer = TesseractViewer(port=port)
+    viewer, port = _open_viewer()
     try:
         socket.create_connection(("127.0.0.1", port), timeout=CONNECT_TIMEOUT_S).close()
         assert viewer.url == f"http://127.0.0.1:{port}"
@@ -138,17 +152,46 @@ def test_serving_on_construction():
 
 
 def test_close_releases_port_and_is_idempotent():
-    port = _free_port()
-    viewer = TesseractViewer(port=port)
+    viewer, port = _open_viewer()
     viewer.close()
     _assert_port_free(port)
     viewer.close()
 
 
 def test_context_manager_closes():
-    port = _free_port()
-    with TesseractViewer(port=port):
-        pass
+    with TesseractViewer(port=0) as viewer:
+        port = viewer.server.get_port()
+    _assert_port_free(port)
+
+
+def test_context_manager_keeps_the_original_exception(monkeypatch):
+    """A close() timeout while an exception propagates must not replace that exception."""
+    monkeypatch.setattr("tesseract_robotics.viewer.viewer.PLAYER_JOIN_TIMEOUT_S", 2 * PLAYBACK_DT_S)
+    release = threading.Event()
+    entered = threading.Event()
+
+    def wedged_tick():
+        entered.set()
+        release.wait()
+
+    try:
+        with pytest.raises(KeyError, match="original") as caught:
+            with TesseractViewer(port=0) as viewer:
+                viewer._tick = wedged_tick
+                assert entered.wait(PLAYER_ADVANCE_TIMEOUT_S)
+                raise KeyError("original")
+        assert any("closing the viewer then failed" in note for note in caught.value.__notes__)
+    finally:
+        release.set()
+
+
+def test_an_unclosed_viewer_releases_its_port_when_collected():
+    viewer, port = _open_viewer()
+    player = viewer._player
+    del viewer
+    gc.collect()
+    player.join(PLAYER_ADVANCE_TIMEOUT_S)
+    assert not player.is_alive()
     _assert_port_free(port)
 
 
@@ -192,8 +235,7 @@ def test_joint_positions_move_tool0(viewer, env):
 
 
 def test_serve_forever_closes_on_keyboard_interrupt(monkeypatch):
-    port = _free_port()
-    viewer = TesseractViewer(port=port)
+    viewer, port = _open_viewer()
 
     def interrupt(_seconds):
         socket.create_connection(("127.0.0.1", port), timeout=CONNECT_TIMEOUT_S).close()
@@ -248,16 +290,19 @@ def test_update_trajectory_from_composite(viewer, env):
         waypoints.append(StateWaypointPoly(wp))
     composite = _composite(waypoints)
     _load_paused(viewer, composite)
-    assert viewer._gui_time.max == Trajectory.from_composite(composite).duration_s
+    assert viewer._gui_time.max == Trajectory.from_composite(composite).duration_s == 1.5
 
 
-def test_joint_waypoint_composite_plays(viewer, env):
-    """Review Focus 4: joint waypoints carry no time; index is time."""
+def test_joint_waypoint_composite_needs_an_explicit_step(viewer, env):
+    """Joint waypoints carry no time: the caller places them on a clock, or it raises."""
     viewer.update_environment(env)
     waypoints = [
         JointWaypointPoly(JointWaypoint(JOINT_NAMES, q)) for q in (np.zeros(6), Q, np.zeros(6))
     ]
-    _load_paused(viewer, _composite(waypoints))
+    with pytest.raises(UntimedTrajectoryError):
+        viewer.update_trajectory(_composite(waypoints))
+    viewer.update_trajectory(_composite(waypoints), untimed_step_s=1.0)
+    viewer._gui_play.value = False
     assert viewer._gui_time.max == 2.0
     viewer.show_time(1.0)
     xyz, _ = link_poses(env, JOINT_NAMES, Q)["tool0"]
@@ -277,10 +322,7 @@ def test_subset_joint_trajectory_poses_by_its_own_names(viewer, env):
 def test_player_advances_time(viewer, env):
     viewer.update_environment(env)
     viewer.update_trajectory(_two_waypoints())
-    deadline = time.monotonic() + PLAYER_ADVANCE_TIMEOUT_S
-    while viewer._gui_time.value == 0.0 and time.monotonic() < deadline:
-        time.sleep(PLAYBACK_DT_S)
-    assert viewer._gui_time.value > 0.0
+    _wait_for(viewer, lambda: viewer._gui_time.value > 0.0)
 
 
 def test_update_joint_positions_stops_playback(viewer, env):
@@ -314,6 +356,24 @@ def test_plot_trajectory_single_waypoint_draws_axes_only(viewer, env):
     assert len(axes.batched_positions) == 1
 
 
+def test_update_environment_clears_plots(viewer, env):
+    viewer.update_environment(env)
+    manip = ManipulatorInfo("manipulator", "base_link", "tool0")
+    viewer.plot_trajectory(Trajectory.build(JOINT_NAMES, [Q], [0.0]), manip)
+    assert viewer._plot_handles
+    viewer.update_environment(env)
+    assert viewer._plot_handles == []
+
+
+def test_plot_trajectory_draws_an_untimed_program(viewer, env):
+    viewer.update_environment(env)
+    manip = ManipulatorInfo("manipulator", "base_link", "tool0")
+    waypoints = [JointWaypointPoly(JointWaypoint(JOINT_NAMES, q)) for q in (np.zeros(6), Q)]
+    viewer.plot_trajectory(_composite(waypoints), manip)
+    _, axes = viewer._plot_handles
+    assert len(axes.batched_positions) == 2
+
+
 def test_plot_trajectory_failure_draws_nothing(viewer, env):
     viewer.update_environment(env)
     manip = ManipulatorInfo("manipulator", "base_link", "tool0")
@@ -325,7 +385,7 @@ def test_plot_trajectory_failure_draws_nothing(viewer, env):
 
 
 def test_close_joins_player():
-    viewer = TesseractViewer(port=_free_port())
+    viewer = TesseractViewer(port=0)
     player = viewer._player
     assert player.is_alive()
     viewer.close()
@@ -339,10 +399,11 @@ def test_update_trajectory_restarts_playback(viewer, env):
     assert viewer._gui_play.value is True
 
 
-def _wait_for(condition):
+def _wait_for(viewer, condition):
+    """Re-check `condition` after each player iteration, until it holds or time runs out."""
     deadline = time.monotonic() + PLAYER_ADVANCE_TIMEOUT_S
     while not condition() and time.monotonic() < deadline:
-        time.sleep(PLAYBACK_DT_S)
+        viewer.wait_player_iterations(1, PLAYER_ADVANCE_TIMEOUT_S)
     assert condition()
 
 
@@ -379,7 +440,7 @@ def test_update_environment_with_other_joints_drops_the_trajectory(viewer, env, 
     viewer.update_environment(other_env)
     assert viewer._trajectory is None
     assert viewer._gui_time.disabled
-    time.sleep(3 * PLAYBACK_DT_S)
+    _wait_player(viewer, 3)
     assert viewer._player.is_alive()
     with pytest.raises(NoTrajectoryError):
         viewer.show_time(0.0)
@@ -402,13 +463,13 @@ def test_failing_tick_pauses_and_logs_and_player_survives(viewer, log_messages):
     viewer.update_trajectory(_two_waypoints())
     with viewer._pose_lock:
         _add_link(env, "added", tg.Box(0.1, 0.1, 0.1))
-    _wait_for(lambda: viewer._gui_play.value is False)
+    _wait_for(viewer, lambda: viewer._gui_play.value is False)
     assert viewer._player.is_alive()
     assert any("added" in m and m.startswith("ERROR") for m in log_messages)
     # The player is still in service: push again and it plays.
     viewer.update_environment(env)
     viewer.update_trajectory(_two_waypoints())
-    _wait_for(lambda: viewer._gui_time.value > 0.0)
+    _wait_for(viewer, lambda: viewer._gui_time.value > 0.0)
 
 
 def test_added_link_raises_before_any_frame_moves(viewer):
@@ -484,7 +545,7 @@ def test_loop_off_stops_at_the_end(viewer, env):
     traj = Trajectory.build(JOINT_NAMES, [np.zeros(6), Q], [0.0, PLAYBACK_DT_S])
     viewer._gui_loop.value = False
     viewer.update_trajectory(traj)
-    _wait_for(lambda: viewer._gui_play.value is False)
+    _wait_for(viewer, lambda: viewer._gui_play.value is False)
     assert viewer._gui_time.value == traj.duration_s
     xyz, _ = link_poses(env, JOINT_NAMES, Q)["tool0"]
     np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
@@ -494,8 +555,8 @@ def test_loop_on_wraps_to_the_start(viewer, env):
     viewer.update_environment(env)
     traj = Trajectory.build(JOINT_NAMES, [np.zeros(6), Q], [0.0, 3 * PLAYBACK_DT_S])
     viewer.update_trajectory(traj)
-    _wait_for(lambda: viewer._t_s > 0.0)
-    _wait_for(lambda: viewer._t_s == 0.0)
+    _wait_for(viewer, lambda: viewer._t_s > 0.0)
+    _wait_for(viewer, lambda: viewer._t_s == 0.0)
     assert viewer._gui_play.value is True
 
 
@@ -503,7 +564,7 @@ def test_speed_zero_holds_time(viewer, env):
     viewer.update_environment(env)
     viewer._gui_speed.value = 0.0
     viewer.update_trajectory(_two_waypoints())
-    time.sleep(3 * PLAYBACK_DT_S)
+    _wait_player(viewer, 3)
     assert viewer._t_s == 0.0
 
 
@@ -555,7 +616,8 @@ def test_close_waits_out_a_long_push_on_another_thread():
     pusher.start()
     try:
         assert holding.wait(PLAYER_ADVANCE_TIMEOUT_S)
-        time.sleep(2 * PLAYBACK_DT_S)  # The player is now waiting on the pose lock.
+        # Two iterations that found the lock held: the player is in its wait loop.
+        _wait_player(viewer, 2)
         closer.start()
         viewer._player.join(PLAYER_ADVANCE_TIMEOUT_S)
         assert not viewer._player.is_alive(), "a held pose lock must not wedge the player"

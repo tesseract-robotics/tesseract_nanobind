@@ -29,9 +29,9 @@ from tesseract_robotics.environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
 EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent
-# Its main takes a cell from argv and needs ws/src/tesseract_ros_workcell, so it stays out of
-# this canned run. tests/examples/test_twc_rail.py loads both of its cells for real.
-NEEDS_SUBMODULE = {"twc_workcell_positioner_viewer"}
+# Its main loads a cell from the TWC workcell submodule, so it requests the `twc_support`
+# fixture (which fails loud, or skips on an explicit opt-out, when the submodule is missing).
+NEEDS_TWC_SUPPORT = {"twc_workcell_positioner_viewer"}
 
 # Mains that keep their real run(): it plans nothing through a planner, and the main reads
 # the example's own scene (online_planning_sqp: its gantry and estop zones; python_constraints:
@@ -43,6 +43,7 @@ REAL_RUN = {
     "python_constraints_example",
     "scene_graph_example",
     "shapes_viewer",
+    "twc_workcell_positioner_viewer",
     "tesseract_material_mesh_viewer",
     "sdf_collision_example",
 }
@@ -50,6 +51,8 @@ REAL_RUN = {
 JOINT_NAMES = [f"joint_{i + 1}" for i in range(6)]
 # Two IRB2400 configurations for the canned plan [rad].
 CANNED_Q = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.3, -0.2, 0.1, 0.4, -0.5, 0.6]])
+# Their waypoint times [s].
+CANNED_TIMES_S = (0.0, 1.0)
 
 # Trajectory positions the fake input() shows, as fractions of the duration.
 SWEEP_FRACTIONS = np.linspace(0.0, 1.0, 5)
@@ -80,8 +83,11 @@ def _canned_results() -> dict[str, object]:
     assert env.init(Path(urdf.getFilePath()), Path(srdf.getFilePath()), locator)
 
     composite = CompositeInstruction()
-    for q in CANNED_Q:
-        waypoint = StateWaypointPoly(StateWaypoint(JOINT_NAMES, q))
+    for t_s, q in zip(CANNED_TIMES_S, CANNED_Q, strict=True):
+        state = StateWaypoint(JOINT_NAMES, q)
+        # Time-parameterized, as a planner's output is: the viewer does not invent a clock.
+        state.setTime(t_s)
+        waypoint = StateWaypointPoly(state)
         move = MoveInstruction(waypoint, MoveInstructionType.FREESPACE)
         composite.push_back(MoveInstructionPoly(move))
 
@@ -141,9 +147,11 @@ def test_viewer_main_returns_an_exit_code(path):
 @pytest.mark.viewer
 @pytest.mark.parametrize(
     "module_name",
-    [_module_name(p) for p in VIEWER_MAIN_FILES if _module_name(p) not in NEEDS_SUBMODULE],
+    [_module_name(p) for p in VIEWER_MAIN_FILES],
 )
-def test_main_runs_and_exits_zero(module_name, monkeypatch, tmp_path):
+def test_main_runs_and_exits_zero(module_name, monkeypatch, tmp_path, request):
+    if module_name in NEEDS_TWC_SUPPORT:
+        request.getfixturevalue("twc_support")
     viewers: list[TesseractViewer] = []
 
     class AnyPortViewer(TesseractViewer):

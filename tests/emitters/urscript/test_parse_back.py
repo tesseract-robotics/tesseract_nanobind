@@ -1,55 +1,57 @@
-"""Parse-back contract: emitted URScript reads back to the intended numeric targets.
+"""Parse-back contract: emitted URScript reads back to the intended targets.
 
-Asserts against the program *inputs* (not a saved file), so a wrong-but-stable
-formatter regression a golden could hide is caught here.
+Joint vectors, the full `p[x, y, z, rx, ry, rz]` pose (rotation vector turned
+back into a matrix), the `set_tcp` pose and the `qnear` seed of the IK move.
 """
 
 from __future__ import annotations
 
+import math
 import re
 
 import numpy as np
 
-from tesseract_robotics.emitters.urscript import UrScriptProfile, emit_urscript
-from tesseract_robotics.planning import CartesianTarget, JointTarget, MotionProgram, Pose
+from tesseract_robotics.emitters.urscript import emit_urscript
+from tests.emitters.urscript.spike import (
+    FRAMES,
+    J1_DEG,
+    J2_DEG,
+    P1,
+    P2,
+    SEED2_DEG,
+    TCP,
+    spike_composite,
+    spike_profiles,
+)
 
-JOINT_TOL_RAD = 1e-5
-POS_TOL_M = 1e-5
+#: Half a display step of the 6-decimal radian and metre fields.
+TOL = 5e-7
 _NUM = r"[-+]?\d+\.\d+"
 
 
-def _movej_joints(src: str) -> list[list[float]]:
-    return [
-        [float(x) for x in re.findall(_NUM, m.group(1))]
-        for m in re.finditer(r"movej\(\[([^\]]*)\]", src)
-    ]
+def _rodrigues(v: np.ndarray) -> np.ndarray:
+    theta = float(np.linalg.norm(v))
+    if theta == 0.0:
+        return np.eye(3)
+    k = v / theta
+    kmat = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+    return np.eye(3) + math.sin(theta) * kmat + (1.0 - math.cos(theta)) * (kmat @ kmat)
 
 
-def _movel_xyz(src: str) -> list[tuple[float, ...]]:
-    pat = rf"movel\(p\[({_NUM}), ({_NUM}), ({_NUM}),"
-    return [tuple(float(g) for g in m.groups()) for m in re.finditer(pat, src)]
+def _vec(text: str) -> np.ndarray:
+    return np.array([float(x) for x in re.findall(_NUM, text)])
 
 
 def test_emitted_urscript_parses_back_to_inputs() -> None:
-    jn = [f"joint_{i}" for i in range(1, 7)]
-    j1 = [0.0, -20.0, 30.0, 0.0, 50.0, 0.0]
-    j2 = [30.0, 10.0, 15.0, 20.0, 40.0, -10.0]
-    prog = MotionProgram(
-        "manipulator", tcp_frame="tool0", working_frame="base_link", profile="SPIKE"
-    )
-    prog.move_to(JointTarget(np.deg2rad(j1), profile="J"))
-    prog.move_to(JointTarget(np.deg2rad(j2), profile="J"))
-    prog.linear_to(CartesianTarget(Pose.from_xyz_rpy([0.6, -0.1, 0.8], [np.pi, 0, 0]), profile="L"))
-    prog.set_joint_names(jn)
-    composite = prog.to_composite_instruction(joint_names=jn)
-
-    src = emit_urscript(
-        composite,
-        {"J": UrScriptProfile.build(), "L": UrScriptProfile.build()},
-        program_name="SPIKE",
-    ).text
-
-    joints = _movej_joints(src)
-    assert np.allclose(joints[0], np.deg2rad(j1), atol=JOINT_TOL_RAD)
-    assert np.allclose(joints[1], np.deg2rad(j2), atol=JOINT_TOL_RAD)
-    assert np.allclose(_movel_xyz(src)[0], [0.6, -0.1, 0.8], atol=POS_TOL_M)
+    src = emit_urscript(spike_composite(), spike_profiles(), frames=FRAMES).text
+    joints = [_vec(m) for m in re.findall(r"movej\(\[([^\]]*)\]", src)]
+    assert np.allclose(joints[0], np.deg2rad(J1_DEG), atol=TOL)
+    assert np.allclose(joints[1], np.deg2rad(J2_DEG), atol=TOL)
+    [tcp] = [_vec(m) for m in re.findall(r"set_tcp\(p\[([^\]]*)\]\)", src)]
+    assert np.allclose(tcp[:3], TCP.translation, atol=TOL)
+    poses = [_vec(m) for m in re.findall(r"(?:movel\(|get_inverse_kin\()p\[([^\]]*)\]", src)]
+    for got, pose in zip(poses, (P1, P2), strict=True):
+        assert np.allclose(got[:3], pose.translation, atol=TOL)
+        assert np.allclose(_rodrigues(got[3:]), pose.rotation_matrix, atol=4 * TOL)
+    [qnear] = [_vec(m) for m in re.findall(r"qnear=\[([^\]]*)\]", src)]
+    assert np.allclose(qnear, np.deg2rad(SEED2_DEG), atol=TOL)

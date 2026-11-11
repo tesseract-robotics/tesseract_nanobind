@@ -63,3 +63,7 @@ class MovingWorkingFrameError(ValueError):
 
 class NamedTcpOffsetError(TypeError):
     """`ManipulatorInfo.tcp_offset` names a link; the path needs a transform."""
+
+
+class UntimedTrajectoryError(ValueError):
+    """A program carries no waypoint times, and no time step was given to place them."""

@@ -1,156 +1,131 @@
-"""Acceptance test — ABB IRB 2400 draws a 1 m × 1 m square outline + zigzag fill
-at 10 cm spacing, emits RAPID, and golden-locks the output.
+"""Acceptance test: an ABB IRB 2400 draws a square outline and zigzag fill, tool down.
 
-Workflow: `MotionProgram → CompositeInstruction → emit_rapid → string` compared
-against the checked-in golden at ``golden/abb_irb2400_zigzag_square.mod``. No
-planner runs — the test exercises the sparse-RAPID path (controller does
-linear interpolation between Cartesian waypoints).
+Workflow: zigzag poses, each seeded with the IRB 2400 IK solution on the branch
+continuous with the previous pose, into a `CompositeInstruction`, through
+`emit_rapid`, golden-compared. No planner runs: the sparse-RAPID path, where the
+controller interpolates linearly between Cartesian waypoints.
 
-Golden regeneration: if the emitter output legitimately changes (precision
-tweak, syntax adjustment), regenerate by running this test once, copying the
-``actual`` output from the unified diff into the golden ``.mod`` file, and
-re-running. Do NOT hand-edit the golden to fit a divergent run.
+The square is the default `zigzag_square` (0.8 m side, 0.4 m above the base),
+placed where the IRB 2400 solves IK for every pose tool down.
+
+Beyond the golden, the emitted module is parse-checked: it passes the RAPID
+grammar checker, and every robtarget parses back to its input position, its
+orientation (scalar-first), and the confdata of its seed.
+
+Golden regeneration: if the emitter output legitimately changes, copy the
+`actual` side of the diff into the golden `.mod` and re-run. Never hand-edit
+the golden to fit a divergent run.
 """
 
 from __future__ import annotations
 
 import difflib
+import math
+import re
 from pathlib import Path
 from typing import Final
 
+import numpy as np
 import pytest
 
-from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.common import GeneralResourceLocator
-from tesseract_robotics.emitters.rapid import RapidProfile, emit_rapid
-from tesseract_robotics.planning import (
-    CartesianTarget,
-    MotionProgram,
-    Pose,
-    Robot,
+from tesseract_robotics.emitters.rapid import Config, RapidProfile, emit_rapid, rapid_frames
+from tesseract_robotics.planning import Pose
+from tesseract_robotics.planning.toolpaths import (
+    OUTLINE_POSE_COUNT,
+    ZIGZAG_LINE_COUNT,
+    ZIGZAG_QUAT_XYZW,
+    zigzag_square,
 )
-from tesseract_robotics.planning.toolpaths import OUTLINE_POSE_COUNT, ZIGZAG_LINE_COUNT
+from tests.emitters.programs import (
+    IRB2400_POSTURE,
+    IRB2400_REFERENCE_SEED,
+    cart_instruction,
+    composite,
+    irb2400_ik,
+)
+from tests.emitters.rapid.rapid_grammar import check_module
 
-#: TCP frame name — the robot link the planner / emitter treats as the tool tip.
-TCP_FRAME: Final[str] = "tool0"
-
-#: Manipulator joint group name in the URDF / SRDF.
-MANIPULATOR: Final[str] = "manipulator"
-
-#: Expected leaf-instruction count: the outline moves plus 2 per zigzag line.
-EXPECTED_INSTRUCTION_COUNT: Final[int] = OUTLINE_POSE_COUNT + 2 * ZIGZAG_LINE_COUNT  # = 27
-
+EXPECTED_MOVES: Final[int] = OUTLINE_POSE_COUNT + 2 * ZIGZAG_LINE_COUNT
+#: Half a display step of the 3-decimal mm field.
+POS_TOL_MM: Final[float] = 5e-4
+#: Half a display step of the 9-decimal quaternion field.
+QUAT_TOL: Final[float] = 5e-10
 GOLDEN: Final[Path] = Path(__file__).parent / "golden" / "abb_irb2400_zigzag_square.mod"
+_NUM = r"-?\d+\.\d+"
+_ROBTARGET = re.compile(
+    rf"MoveL \[\[({_NUM}), ({_NUM}), ({_NUM})\],\[({_NUM}), ({_NUM}), ({_NUM}), ({_NUM})\],"
+    r"\[(-?\d+), (-?\d+), (-?\d+), (\d)\],"
+)
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def poses() -> list[Pose]:
+    return zigzag_square()
 
 
-@pytest.fixture(scope="session")
-def abb_irb2400() -> Robot:
-    """ABB IRB 2400 robot loaded from tesseract_support.
-
-    Session-scoped: loading the URDF + meshes is expensive and the robot
-    isn't mutated by any test in this module.
-    """
-    return Robot.from_tesseract_support(
-        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
-    )
+@pytest.fixture(scope="module")
+def seeds(poses: list[Pose]) -> list[tuple[float, ...]]:
+    out: list[tuple[float, ...]] = []
+    near: tuple[float, ...] = IRB2400_REFERENCE_SEED
+    for pose in poses:
+        near = irb2400_ik(pose, near=near)
+        out.append(near)
+    return out
 
 
-@pytest.fixture
-def zigzag_square_program(zigzag_square_poses: list[Pose]) -> MotionProgram:
-    """The standard zigzag square (`planning.toolpaths.zigzag_square`) as `MoveL`s.
-
-    The outline poses get the ``OUTLINE`` profile, the zigzag endpoints ``RASTER``.
-    """
-    program = MotionProgram(
-        MANIPULATOR, tcp_frame=TCP_FRAME, working_frame="base_link", profile="cartesian_program"
-    )
-    for i, pose in enumerate(zigzag_square_poses):
-        profile = "OUTLINE" if i < OUTLINE_POSE_COUNT else "RASTER"
-        program.linear_to(CartesianTarget(pose, profile=profile))
-    return program
-
-
-@pytest.fixture
-def rapid_profiles() -> dict[str, RapidProfile]:
-    """RAPID variable bindings keyed by tesseract profile name.
-
-    Every profile name appearing on a Move in the program must have an entry,
-    else ``emit_rapid`` raises ``MissingProfileError``. The three planning-
-    internal names (``cartesian_program`` / ``freespace_profile`` / ``DEFAULT``)
-    ride along on instructions even when no planner has run; they all map to
-    the same default profile here.
-    """
-    default = RapidProfile()  # ABB built-in v200 / z10 / tool0 / wobj0
-    profiles: dict[str, RapidProfile] = {
-        "OUTLINE": RapidProfile(speed="v100", zone="fine"),
-        "RASTER": RapidProfile(),  # same as default — explicit for readability
+@pytest.fixture(scope="module")
+def emitted(poses: list[Pose], seeds: list[tuple[float, ...]]) -> str:
+    moves = [
+        cart_instruction(
+            pose, profile="OUTLINE" if i < OUTLINE_POSE_COUNT else "RASTER", seed_rad=q
+        )
+        for i, (pose, q) in enumerate(zip(poses, seeds, strict=True))
+    ]
+    profiles = {
+        "OUTLINE": RapidProfile.build(speed="v100", zone="fine"),
+        "RASTER": RapidProfile.build(),
     }
-    profiles.update(dict.fromkeys(["cartesian_program", "freespace_profile", "DEFAULT"], default))
-    return profiles
+    frames = rapid_frames(work_objects={"base_link": "wobj0"}, tools={"tool0": "tool0"})
+    return emit_rapid(
+        composite(*moves, description="zigzag"), profiles, frames=frames, posture=IRB2400_POSTURE
+    ).text
 
 
-@pytest.fixture
-def zigzag_composite(zigzag_square_program: MotionProgram, abb_irb2400: Robot):
-    """``MotionProgram`` → ``CompositeInstruction`` without running a planner.
-
-    Sparse-RAPID workflow: the controller does linear interpolation between
-    Cartesian waypoints. Running an offline planner first would convert the
-    program to dense joint trajectories (``MoveAbsJ`` per timestep), defeating
-    the point of ``MoveL``.
-    """
-    joint_names = abb_irb2400.get_joint_names(MANIPULATOR)
-    zigzag_square_program.set_joint_names(joint_names)
-    return zigzag_square_program.to_composite_instruction(joint_names=joint_names)
+def _normalize_version(text: str) -> str:
+    return re.sub(r"(generated by tesseract_robotics\.emitters ).*", r"\1<VERSION>", text)
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
-def _diff(expected: str, actual: str) -> str:
-    """Return a unified diff between two strings; empty if identical."""
-    return "\n".join(
+def test_rapid_emit_abb_irb2400_zigzag_square(emitted: str) -> None:
+    actual = _normalize_version(emitted)
+    expected = GOLDEN.read_text()
+    diff = "\n".join(
         difflib.unified_diff(
-            expected.splitlines(),
-            actual.splitlines(),
-            fromfile="golden",
-            tofile="emit_rapid",
-            lineterm="",
+            expected.splitlines(), actual.splitlines(), "golden", "emit_rapid", lineterm=""
         )
     )
+    assert actual == expected, f"Output diverged from golden:\n{diff}"
 
 
-def test_rapid_emit_abb_irb2400_zigzag_square(
-    zigzag_composite, rapid_profiles: dict[str, RapidProfile]
+def test_zigzag_is_valid_rapid(emitted: str) -> None:
+    check_module(emitted)
+
+
+def test_zigzag_is_tool_down() -> None:
+    rot = Pose.from_xyz_quat([0, 0, 0], list(ZIGZAG_QUAT_XYZW)).rotation_matrix
+    assert np.allclose(rot[:, 2], [0.0, 0.0, -1.0])
+
+
+def test_robtargets_parse_back_to_inputs(
+    emitted: str, poses: list[Pose], seeds: list[tuple[float, ...]]
 ) -> None:
-    """End-to-end: emit the zigzag-square program as RAPID and golden-compare.
-
-    Locks the full ``MODULE`` output — any change in formatter precision,
-    statement ordering, or default profile values trips this test.
-    """
-    actual = emit_rapid(zigzag_composite, rapid_profiles)
-    expected = GOLDEN.read_text()
-    assert actual == expected, f"Output diverged from golden:\n{_diff(expected, actual)}"
-
-
-def test_zigzag_square_program_instruction_count(
-    zigzag_square_program: MotionProgram, abb_irb2400: Robot
-) -> None:
-    """Verifies the program contains exactly ``EXPECTED_INSTRUCTION_COUNT`` leaf moves.
-
-    Locks the determined math: 4 outline edges + 1 closure + 2 × N zigzag
-    endpoints. A regression that drops a corner or doubles a line surfaces here.
-    """
-    joint_names = abb_irb2400.get_joint_names(MANIPULATOR)
-    zigzag_square_program.set_joint_names(joint_names)
-    composite = zigzag_square_program.to_composite_instruction(joint_names=joint_names)
-    instructions = composite.getInstructions()
-    assert len(instructions) == EXPECTED_INSTRUCTION_COUNT, (
-        f"expected exactly {EXPECTED_INSTRUCTION_COUNT} leaf instructions, got {len(instructions)}"
-    )
+    rows = [m.groups() for m in _ROBTARGET.finditer(emitted)]
+    assert len(rows) == EXPECTED_MOVES
+    for row, pose, seed in zip(rows, poses, seeds, strict=True):
+        xyz = np.array([float(v) for v in row[0:3]])
+        q_wxyz = np.array([float(v) for v in row[3:7]])
+        conf = Config(*(int(v) for v in row[7:11]))
+        assert np.allclose(xyz, np.asarray(pose.translation) * 1000.0, atol=POS_TOL_MM)
+        expected_q = np.array([pose.qw, pose.qx, pose.qy, pose.qz])
+        assert np.allclose(q_wxyz, expected_q, atol=QUAT_TOL)
+        assert conf == Config.from_joints(seed, IRB2400_POSTURE.posture(seed))
+        assert conf.cf1 == math.floor(seed[0] / (math.pi / 2))

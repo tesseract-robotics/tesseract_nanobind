@@ -1,23 +1,24 @@
-"""Full-DSL golden parity test.
+"""Full-DSL golden parity and grammar test.
 
-Exercises every DSL class — `Module`, `While`, `Proc`, `For`, `RapidBool`,
-`Tooldata`, `Workobject`, `MoveL`, `MoveJ`, `MoveC`, `MoveAbsJ`, `Robtarget`,
-`Comment`, `AssignVariable`, `TPWrite`, `Stop`, `Zone`, `Speed`, `Pos` —
-plus a direct `RapidWriter.write()` call for raw-line emission — and
-golden-locks the output against a checked-in `.mod` file.
+Exercises every DSL class (`Module`, `Proc`, `While`, `For`, every declaration,
+every statement) in a structurally valid module, golden-locks the output, and
+checks it against the independent RAPID grammar checker.
 """
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
-import pytest
-
-from tesseract_robotics.emitters.rapid import JointTarget, RapidTarget
+from tesseract_robotics.emitters.core.external_axes import ExternalAxisKind, ExternalAxisValue
+from tesseract_robotics.emitters.rapid import Config, ExternalAxis, JointTarget, RapidTarget
+from tesseract_robotics.emitters.rapid.profile import RapidProfile
 from tesseract_robotics.emitters.rapid.rapid_writer import (
     AssignVariable,
     Comment,
+    Conf,
     For,
+    Jointtarget,
     Module,
     MoveAbsJ,
     MoveC,
@@ -28,66 +29,85 @@ from tesseract_robotics.emitters.rapid.rapid_writer import (
     RapidBool,
     RapidWriter,
     Robtarget,
+    SetAO,
+    SetDO,
     Speed,
     Stop,
     Tooldata,
     TPWrite,
+    WaitDI,
+    WaitTime,
     While,
     Workobject,
     Zone,
 )
-from tesseract_robotics.emitters.rapid.targets import Config, ExternalAxis
+from tesseract_robotics.emitters.rapid.syntax import MotionType
 from tesseract_robotics.planning import Pose
+from tests.emitters.rapid.rapid_grammar import check_module
 
 GOLDEN = Path(__file__).parent / "golden" / "full_dsl.mod"
 
 
-@pytest.fixture(autouse=True)
-def _clear_singleton():
-    """Reset RapidWriter between tests so each starts with an empty buffer."""
-    RapidWriter().clear()
-    yield
-    RapidWriter().clear()
+def _full_dsl() -> str:
+    pose = Pose.from_xyz_quat([0.6, -0.1, 0.8], [0.0, 0.707170, 0.0, 0.707170])
+    eax = ExternalAxis.build(
+        [
+            ExternalAxisValue(0.25, ExternalAxisKind.LINEAR),
+            ExternalAxisValue(math.pi / 2, ExternalAxisKind.ROTARY),
+        ]
+    )
+    home = RapidTarget(pose, Config(0, 0, 0, 0))
+    turned = RapidTarget(pose, Config(-1, 0, 1, 1), eax)
+    with RapidWriter() as rapid:
+        with Module("EXAMPLE"):
+            Comment("module data")
+            tool = Tooldata("gun", Pose.from_xyz(0.0, 0.0, 0.2), 2.5, [0.0, 0.0, 0.1])
+            wobj = Workobject("table", Pose.from_xyz(1.0, 0.0, 0.4))
+            speed = Speed(
+                "v_weld",
+                tcp_m_per_s=0.05,
+                ori_rad_per_s=math.radians(100.0),
+                leax_m_per_s=1.0,
+                reax_rad_per_s=math.radians(100.0),
+            )
+            zone = Zone(
+                "z_weld",
+                finepoint=False,
+                pzone_tcp_m=0.001,
+                pzone_ori_m=0.0015,
+                pzone_eax_m=0.0015,
+                zone_ori_rad=math.radians(0.15),
+                zone_leax_m=0.0015,
+                zone_reax_rad=math.radians(0.15),
+            )
+            p_home = Robtarget("p_home", home)
+            j_park = Jointtarget("j_park", JointTarget.build([0, 0, 0, 0, math.pi / 6, 0]))
+            Pos("offset", [0.0, 0.0, 0.1])
+            profile = RapidProfile.build(speed=speed.name, zone=zone.name)
+            with Proc("main"):
+                flag = RapidBool("done", False)
+                Conf(MotionType.LINEAR, True)
+                MoveAbsJ(j_park, profile, tool.name)
+                MoveJ(p_home, profile, tool.name, wobj.name)
+                MoveL(turned, profile, tool.name, wobj.name)
+                MoveC(home, p_home, profile, tool.name, wobj.name)
+                with While("NOT done"):
+                    with For("i", 1, 3):
+                        SetDO("do_torch", True)
+                        WaitTime(0.5)
+                        SetAO("ao_voltage", 24.5)
+                    WaitDI("di_part", True)
+                    AssignVariable(flag, "TRUE")
+                TPWrite('done: "pass" \\ ok')
+                Stop()
+    return rapid.getvalue()
 
 
 def test_full_dsl_golden() -> None:
-    """Full DSL coverage — output byte-for-byte against checked-in golden."""
-    fr = Pose.from_xyz_quat([0.6, -0.1, 0.8], [0.0, 0.707170, 0.0, 0.707170])
-    ext_axe = [1.57, 1.57]
-
-    target_default = RapidTarget(fr, config=Config(0, 0, 0, 0))
-    target_with_ext = RapidTarget(
-        fr, config=Config(2, 0, 1, 0), external_axis=ExternalAxis(ext_axe)
+    assert _full_dsl() == GOLDEN.read_text(), (
+        "Output diverged from full-DSL golden; regenerate the .mod file if the change is intentional."
     )
 
-    rapid = RapidWriter()
 
-    with Module("EXAMPLE"):
-        with While("running"):
-            with Proc("example_proc"):
-                with For("i", 1, 10):
-                    bA = RapidBool("flag_a", False)
-                    assert bA == "flag_a"
-                    bB = RapidBool("flag_b", True)
-                    assert bB == "flag_b"
-                    Tooldata("tool_demo", 0, 0, 0, [1, 0, 0, 0], [0, 0, 0], 25)
-                    Workobject("wobj_demo", 1, 1, 1, [1, 0, 0, 0])
-                    MoveL(target_default)
-                    MoveJ(target_with_ext)
-                    MoveC(target_default, target_default)
-                    MoveAbsJ(JointTarget([0, 0, 0, 0, 0, 0], ExternalAxis(ext_axe)))
-                    rapid.write(f"{bB} := False;")
-                    Robtarget("target01", target_default)
-                    Robtarget("target02", target_with_ext)
-                    Comment("raster pass complete")
-                    assert AssignVariable("flag_b", False) == "flag_b"
-                    TPWrite("message written to teach pendant")
-                    Stop()
-                    assert Zone("zone_demo") == "zone_demo"
-                    assert Speed("v_demo") == "v_demo"
-                    assert Pos("pos_demo", 0, 0, 100) == "pos_demo"
-
-    assert rapid.getvalue() == GOLDEN.read_text(), (
-        "Output diverged from full-DSL golden — regenerate the .mod file if the "
-        "change is intentional."
-    )
+def test_full_dsl_is_valid_rapid() -> None:
+    check_module(_full_dsl())

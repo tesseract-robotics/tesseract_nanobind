@@ -1,15 +1,12 @@
-"""ABB RAPID code emitter — re-exports from the implementation modules."""
+"""ABB RAPID code emitter."""
 
-from .emit import EmptyProgramError as EmptyProgramError
-from .emit import ExternalAxisKind as ExternalAxisKind
-from .emit import ExternalAxisLayout as ExternalAxisLayout
-from .emit import ExternalAxisSpec as ExternalAxisSpec
-from .emit import MissingProfileError as MissingProfileError
-from .emit import RapidEmitterError as RapidEmitterError
-from .emit import UncoordinatedTargetError as UncoordinatedTargetError
-from .emit import UnsupportedInstructionError as UnsupportedInstructionError
+from ..core.external_axes import ExternalAxisKind as ExternalAxisKind
+from ..core.external_axes import ExternalAxisLayout as ExternalAxisLayout
+from ..core.external_axes import ExternalAxisSpec as ExternalAxisSpec
 from .emit import emit_rapid as emit_rapid
 from .profile import RapidProfile as RapidProfile
+from .profile import rapid_frames as rapid_frames
+from .targets import Config as Config
 from .targets import ExternalAxis as ExternalAxis
 from .targets import JointTarget as JointTarget
 from .targets import RapidTarget as RapidTarget

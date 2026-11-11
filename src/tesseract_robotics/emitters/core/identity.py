@@ -1,19 +1,25 @@
-"""Content-addressed emit identity — reproducibility made structural.
+"""Content-addressed emit identity: reproducibility made structural.
 
-Package version + SHA-256 of (a) the canonical IR and (b) the profiles repr,
-embedded as comment header lines in every emitted file. No timestamps in the
-body, so same inputs → byte-identical output and goldens diff meaningfully.
+Package version plus SHA-256 of (a) the canonical IR and (b) the emit-settings
+repr (profiles, frame binding, resolvers). Every `EmittedProgram` carries it, and
+every dialect whose comment syntax can hold the lines embeds it as a header. No
+timestamps in the body, so the same inputs give byte-identical output and goldens
+diff meaningfully.
 """
 
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
-from importlib.metadata import PackageNotFoundError, version
+from dataclasses import dataclass, is_dataclass
+from importlib.metadata import version
+from typing import Final
 
 from .events import ProgramIR
 
 _DIGEST_PREFIX = "sha256:"
+#: Distribution name in `pyproject.toml` `[project] name`; the import package is
+#: `tesseract_robotics`, but metadata is keyed by the distribution.
+_DISTRIBUTION: Final[str] = "tesseract-robotics-nanobind"
 
 
 def _sha256(text: str) -> str:
@@ -21,15 +27,13 @@ def _sha256(text: str) -> str:
 
 
 def _package_version() -> str:
-    try:
-        return version("tesseract_robotics")
-    except PackageNotFoundError:
-        return "0+unknown"
+    """The installed distribution version; raises `PackageNotFoundError` if not installed."""
+    return version(_DISTRIBUTION)
 
 
 @dataclass(frozen=True)
 class EmitIdentity:
-    """Version + digests identifying one emit. Build via ``EmitIdentity.build``."""
+    """Version + digests identifying one emit. Build via `EmitIdentity.build`."""
 
     package_version: str
     ir_digest: str
@@ -52,3 +56,16 @@ class EmitIdentity:
             f"profiles-digest: {self.profiles_digest}",
             "DO NOT EDIT - regenerate from the planning pipeline",
         ]
+
+
+def stable_repr(obj: object) -> str:
+    """Deterministic text for an emit setting (profiles, solvers, resolvers).
+
+    Dataclasses and `None` use `repr`; anything else (a function or a lambda
+    resolver, whose default repr embeds a memory address) is named by its module
+    and qualified name, so the digest does not change between runs.
+    """
+    if obj is None or is_dataclass(obj):
+        return repr(obj)
+    named = obj if hasattr(obj, "__qualname__") else type(obj)
+    return f"{named.__module__}.{named.__qualname__}"

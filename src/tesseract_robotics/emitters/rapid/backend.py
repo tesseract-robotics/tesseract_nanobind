@@ -1,20 +1,29 @@
-"""``RapidBackend`` — consume the core IR, emit RAPID via the existing DSL.
+"""`RapidBackend`: consume the core IR, emit RAPID through the `rapid_writer` DSL.
 
-Drives the ``rapid_writer`` ``MODULE``/``PROC`` DSL so output is byte-identical
-to the pre-reseat inline dispatcher (locked by ``tests/emitters/rapid/
-test_dispatcher.py``). It owns RAPID signal naming: a ``SetDigital`` with
-``key is None`` renders ``do<index>`` (the Timer convention), a named key uses
-``key`` (index 0) or ``key{index}`` (array subscript).
+It owns three RAPID decisions:
+
+- signal naming: a `SetDigital` with `key is None` renders `do<index>` (the
+  Timer convention); a named key renders `key` (index 0) or `key{index}`
+  (array subscript); every name is validated as a RAPID identifier;
+- frames: each move's tool and work object come from the frame binding, by the
+  move's `tcp_frame` / `working_frame`;
+- configuration: every Cartesian target carries exact confdata, from the
+  waypoint's seed joints (`cf1`, `cf4`, `cf6`) and the posture solver (`cfx`).
+  Without a seed or a solver the move raises `MissingConfigurationError`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-
-import numpy as np
+from contextlib import AbstractContextManager
 
 from ..core.backend import ProgramBackend
-from ..core.errors import MissingProfileError
+from ..core.errors import (
+    ExternalAxisError,
+    MissingConfigurationError,
+    MissingProfileError,
+    UnsupportedInstructionError,
+)
 from ..core.events import (
     CartesianMove,
     Dwell,
@@ -26,9 +35,10 @@ from ..core.events import (
     ToolChange,
     WaitDigital,
 )
-from ..core.external_axes import ExternalAxisKind, ExternalAxisValue
-from ..core.units import Metres, Radians, to_degrees, to_millimetres
-from .profile import RapidProfile
+from ..core.frames import FrameBinding, MoveFrames
+from ..core.identity import EmitIdentity
+from ..core.posture import PostureSolver
+from .profile import RapidProfile, ToolName, WobjName
 from .rapid_writer import (
     Comment,
     Module,
@@ -43,50 +53,44 @@ from .rapid_writer import (
     WaitDO,
     WaitTime,
 )
-from .targets import ExternalAxis, JointTarget, RapidTarget
+from .syntax import BRAND, RAPID_IDENTIFIERS
+from .targets import Config, ExternalAxis, JointTarget, RapidTarget
 
-#: RAPID linear external-axis precision (mm) — mirrors the robtarget position `.4f`.
-_EAX_MM_PRECISION = 4
-#: RAPID rotary external-axis precision (deg) — mirrors the jointtarget joint `.2f`.
-_EAX_DEG_PRECISION = 2
-
-
-def _rapid_signal_name(key: str, index: int) -> str:
-    """Named-signal RAPID rendering: bare ``key`` at index 0, else ``key{index}``."""
-    return key if index == 0 else f"{key}{{{index}}}"
+#: Robot axes in a robtarget/jointtarget.
+_ROBAX = 6
 
 
-def _rapid_eax(values: tuple[ExternalAxisValue, ...]) -> ExternalAxis:
-    """Convert SI external-axis values to RAPID eax display tokens.
-
-    LINEAR → millimetres (``.4f``), ROTARY → degrees (``.2f``), through the single
-    ``core.units`` conversion chokepoint. The pre-formatted strings flow through
-    ``format_ext_axis`` unchanged (``str`` is idempotent on ``str``), so unused
-    slots still pad to ``9E+09`` and an empty tuple renders the all-sentinel field.
-    """
-    tokens: list[str] = []
-    for value in values:
-        if value.kind is ExternalAxisKind.LINEAR:
-            tokens.append(f"{to_millimetres(Metres(value.value_si)):.{_EAX_MM_PRECISION}f}")
-        elif value.kind is ExternalAxisKind.ROTARY:
-            tokens.append(f"{to_degrees(Radians(value.value_si)):.{_EAX_DEG_PRECISION}f}")
-        else:  # pragma: no cover - exhaustive over ExternalAxisKind
-            raise AssertionError(f"unhandled ExternalAxisKind: {value.kind!r}")
-    return ExternalAxis(tokens)
+def _signal(prefix: str, key: str | None, index: int) -> str:
+    """RAPID signal name: `<prefix><index>` unnamed, `key` or `key{index}` named."""
+    if key is None:
+        return RAPID_IDENTIFIERS.validate(f"{prefix}{index}")
+    name = RAPID_IDENTIFIERS.validate(key)
+    return name if index == 0 else f"{name}{{{index}}}"
 
 
 class RapidBackend(ProgramBackend):
-    """Stateful RAPID backend; drives the RapidWriter singleton (clears on start)."""
+    """Stateful RAPID backend; writes one `MODULE` with one `PROC` into its own writer."""
 
     def __init__(
-        self, *, profiles: Mapping[str, RapidProfile], module_name: str, proc_name: str
+        self,
+        *,
+        profiles: Mapping[str, RapidProfile],
+        frames: FrameBinding[WobjName, ToolName],
+        posture: PostureSolver | None,
+        module_name: str,
+        proc_name: str,
+        identity: EmitIdentity,
     ) -> None:
         self._profiles = profiles
-        self._module_name = module_name
-        self._proc_name = proc_name
+        self._frames = frames
+        self._posture = posture
+        self._module_name = RAPID_IDENTIFIERS.validate(module_name)
+        self._proc_name = RAPID_IDENTIFIERS.validate(proc_name)
+        self._identity = identity
         self._rapid = RapidWriter()
         self._module: Module | None = None
         self._proc: Proc | None = None
+        self._move_index = 0
 
     def _profile(self, name: str) -> RapidProfile:
         try:
@@ -94,45 +98,79 @@ class RapidBackend(ProgramBackend):
         except KeyError:
             raise MissingProfileError(name, list(self._profiles.keys())) from None
 
+    def _tool(self, frames: MoveFrames) -> ToolName:
+        frames.require_no_offset(BRAND)
+        return self._frames.tool(frames, BRAND)
+
     # ProgramBackend protocol -------------------------------------------
+    def session(self) -> AbstractContextManager[object]:
+        return self._rapid
+
     def prog_start(self) -> None:
-        self._rapid.clear()
         self._module = Module(self._module_name)
         self._module.__enter__()
+        for line in self._identity.header_lines():
+            Comment(line)
         self._proc = Proc(self._proc_name)
         self._proc.__enter__()
 
     def move_joint(self, m: JointMove) -> None:
-        target = JointTarget(
-            np.asarray(m.joints, dtype=np.float64), external_axis=_rapid_eax(m.external_axes)
-        )
-        MoveAbsJ(target, self._profile(m.profile))
+        self._move_index += 1
+        if len(m.joints) != _ROBAX:
+            raise ExternalAxisError(len(m.joints), _ROBAX, BRAND)
+        target = JointTarget.build(m.joints, ExternalAxis.build(m.external_axes))
+        MoveAbsJ(target, self._profile(m.profile), self._tool(m.frames))
 
     def move_cartesian(self, m: CartesianMove) -> None:
-        target = RapidTarget(pose=m.pose, external_axis=_rapid_eax(m.external_axes))
+        self._move_index += 1
         profile = self._profile(m.profile)
+        frames = m.target.frames
+        tool = self._tool(frames)
+        wobj = self._frames.work(frames, BRAND)
+        target = RapidTarget(
+            pose=m.target.pose,
+            config=self._config(m),
+            external_axis=ExternalAxis.build(m.external_axes),
+        )
         if m.kind is MoveKind.LINEAR:
-            MoveL(target, profile)
+            MoveL(target, profile, tool, wobj)
         else:
-            MoveJ(target, profile)
+            MoveJ(target, profile, tool, wobj)
+
+    def _config(self, m: CartesianMove) -> Config:
+        if m.seed_joints is None:
+            raise MissingConfigurationError(
+                self._move_index, BRAND, "the waypoint has no seed joints to derive confdata from"
+            )
+        if len(m.seed_joints) != _ROBAX:
+            raise ExternalAxisError(len(m.seed_joints), _ROBAX, BRAND)
+        if self._posture is None:
+            raise MissingConfigurationError(
+                self._move_index,
+                BRAND,
+                "cfx needs the arm posture; pass emit_rapid(posture=...) "
+                "(e.g. OpwPostureSolver for the robot's OPW parameters)",
+            )
+        return Config.from_joints(m.seed_joints, self._posture.posture(m.seed_joints))
 
     def dwell(self, e: Dwell) -> None:
         WaitTime(e.seconds)
 
     def wait_digital(self, e: WaitDigital) -> None:
-        signal = f"{'di' if e.is_input else 'do'}{e.index}"
+        signal = _signal("di" if e.is_input else "do", None, e.index)
         (WaitDI if e.is_input else WaitDO)(signal, value=e.value)
 
     def set_digital(self, e: SetDigital) -> None:
-        signal = f"do{e.index}" if e.key is None else _rapid_signal_name(e.key, e.index)
-        SetDO(signal, e.value)
+        SetDO(_signal("do", e.key, e.index), e.value)
 
     def set_analog(self, e: SetAnalog) -> None:
-        signal = f"ao{e.index}" if e.key is None else _rapid_signal_name(e.key, e.index)
-        SetAO(signal, e.value)
+        SetAO(_signal("ao", e.key, e.index), e.value)
 
     def tool_change(self, e: ToolChange) -> None:
-        Comment(f"tool change to tool id {e.tool_id}")
+        raise UnsupportedInstructionError(
+            f"RAPID: SetTool({e.tool_id}) has no RAPID equivalent; the tool is an argument of "
+            "every move, taken from the move's tcp_frame through the frame binding"
+        )
 
     def note(self, e: Note) -> None:
         Comment(e.text)

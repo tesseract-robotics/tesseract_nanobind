@@ -28,10 +28,17 @@ _CORNER_SIGNS = np.array(
 
 @dataclass(frozen=True)
 class Floor:
-    """A square floor in the world xy plane: `center_m` (x, y) [m], side `size_m` [m]."""
+    """A square floor parallel to the world xy plane.
+
+    Attributes:
+        center_m: Centre (x, y) [m].
+        size_m: Side length [m].
+        z_m: Height [m]: the lowest point of the scene, so nothing sinks through it.
+    """
 
     center_m: tuple[float, float]
     size_m: float
+    z_m: float
 
     @classmethod
     def under(cls, visuals: Iterable[tuple[NDArray[np.float64], trimesh.Trimesh]]) -> Floor:
@@ -41,19 +48,21 @@ class Floor:
             visuals: `(world_from_mesh 4x4, mesh)` per visual.
 
         Returns:
-            The floor; `MIN_FLOOR_SIZE_M` at the origin for an empty scene.
+            The floor; `MIN_FLOOR_SIZE_M` at the origin, at z = 0, for an empty scene.
         """
         corners = [_world_corners(pose, mesh) for pose, mesh in visuals]
         if not corners:
-            return cls((0.0, 0.0), MIN_FLOOR_SIZE_M)
-        xy = np.concatenate(corners)[:, :2]
+            return cls((0.0, 0.0), MIN_FLOOR_SIZE_M, 0.0)
+        points = np.concatenate(corners)
+        xy = points[:, :2]
         lo, hi = xy.min(axis=0), xy.max(axis=0)
         # On a section line, so the grid's lines fall on whole metres of the world.
         center = np.round((lo + hi) / 2 / FLOOR_SECTION_M) * FLOOR_SECTION_M
         reach = float(np.max(np.maximum(hi - center, center - lo))) + FLOOR_MARGIN_M
         # Whole sections each side of the centre.
         half = math.ceil(reach / FLOOR_SECTION_M) * FLOOR_SECTION_M
-        return cls((float(center[0]), float(center[1])), max(MIN_FLOOR_SIZE_M, 2 * half))
+        size = max(MIN_FLOOR_SIZE_M, 2 * half)
+        return cls((float(center[0]), float(center[1])), size, float(points[:, 2].min()))
 
 
 def _world_corners(pose: NDArray[np.float64], mesh: trimesh.Trimesh) -> NDArray[np.float64]:

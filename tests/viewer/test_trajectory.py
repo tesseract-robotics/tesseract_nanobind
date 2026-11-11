@@ -20,6 +20,7 @@ from tesseract_robotics.viewer.errors import (
     EmptyTrajectoryError,
     TrajectoryShapeError,
     UnplannedWaypointError,
+    UntimedTrajectoryError,
 )
 from tesseract_robotics.viewer.trajectory import Trajectory
 
@@ -67,14 +68,27 @@ def test_empty_raises():
         Trajectory.from_composite(CompositeInstruction())
 
 
-def test_from_composite_joint_waypoints_use_index_time():
+def _joint_composite():
     composite = CompositeInstruction()
     for q in ([0.0, 0.0], [1.0, 1.0], [2.0, 2.0]):
-        wp = JointWaypoint(NAMES, np.array(q))
-        _append(composite, JointWaypointPoly(wp))
-    traj = Trajectory.from_composite(composite)
-    np.testing.assert_array_equal(traj.times_s, [0.0, 1.0, 2.0])
+        _append(composite, JointWaypointPoly(JointWaypoint(NAMES, np.array(q))))
+    return composite
+
+
+def test_from_composite_joint_waypoints_need_an_explicit_step():
+    with pytest.raises(UntimedTrajectoryError, match="untimed_step_s"):
+        Trajectory.from_composite(_joint_composite())
+
+
+def test_from_composite_joint_waypoints_placed_at_the_given_step():
+    traj = Trajectory.from_composite(_joint_composite(), untimed_step_s=0.5)
+    np.testing.assert_array_equal(traj.times_s, [0.0, 0.5, 1.0])
     np.testing.assert_array_equal(traj.positions[2], [2.0, 2.0])
+
+
+def test_from_composite_rejects_a_non_positive_step():
+    with pytest.raises(TrajectoryShapeError, match="untimed_step_s"):
+        Trajectory.from_composite(_joint_composite(), untimed_step_s=0.0)
 
 
 def test_from_composite_state_waypoints_keep_time():
@@ -94,7 +108,7 @@ def test_from_composite_descends_into_child_composites():
     _append(inner, StateWaypointPoly(wp))
     outer = CompositeInstruction()
     outer.push_back(inner)
-    assert Trajectory.from_composite(outer).positions.shape == (1, 2)
+    assert Trajectory.from_composite(outer, untimed_step_s=1.0).positions.shape == (1, 2)
 
 
 def test_from_composite_rejects_cartesian_waypoint():
@@ -104,26 +118,35 @@ def test_from_composite_rejects_cartesian_waypoint():
         Trajectory.from_composite(composite)
 
 
-def test_from_composite_unparameterized_state_waypoints_use_index_time():
+def test_from_composite_unparameterized_state_waypoints_need_an_explicit_step():
     """Time parameterization not run: every state waypoint has t = 0 (descartes output)."""
     composite = CompositeInstruction()
     for q in ([0.0, 0.0], [1.0, 1.0], [2.0, 2.0]):
         _append(composite, StateWaypointPoly(StateWaypoint(NAMES, np.array(q))))
-    traj = Trajectory.from_composite(composite)
+    with pytest.raises(UntimedTrajectoryError):
+        Trajectory.from_composite(composite)
+    traj = Trajectory.from_composite(composite, untimed_step_s=1.0)
     np.testing.assert_array_equal(traj.times_s, [0.0, 1.0, 2.0])
     assert traj.duration_s == 2.0
 
 
-def test_from_composite_mixed_times_that_decrease_raise():
-    """A timed state waypoint then an index-timed joint waypoint: no consistent clock."""
+def test_from_composite_mixed_timed_and_untimed_raise():
+    """A timed state waypoint then an untimed joint waypoint: no consistent clock."""
     composite = CompositeInstruction()
     timed = StateWaypoint(NAMES, np.array([0.0, 0.0]))
     timed.setTime(5.0)
     _append(composite, StateWaypointPoly(timed))
     untimed = JointWaypoint(NAMES, np.array([1.0, 1.0]))
     _append(composite, JointWaypointPoly(untimed))
-    with pytest.raises(TrajectoryShapeError):
-        Trajectory.from_composite(composite)
+    with pytest.raises(TrajectoryShapeError, match="mixes"):
+        Trajectory.from_composite(composite, untimed_step_s=1.0)
+
+
+def test_from_rows_rejects_non_2d_as_a_shape_error():
+    with pytest.raises(TrajectoryShapeError, match="2-D"):
+        Trajectory.from_rows(NAMES, [0.0, 1.0, 2.0])
+    with pytest.raises(EmptyTrajectoryError):
+        Trajectory.from_rows(NAMES, [])
 
 
 def test_from_composite_maps_columns_by_joint_name():
@@ -134,7 +157,8 @@ def test_from_composite_maps_columns_by_joint_name():
     for wp in (first, second):
         _append(composite, StateWaypointPoly(wp))
     np.testing.assert_array_equal(
-        Trajectory.from_composite(composite).positions, [[1.0, 2.0], [1.0, 2.0]]
+        Trajectory.from_composite(composite, untimed_step_s=1.0).positions,
+        [[1.0, 2.0], [1.0, 2.0]],
     )
 
 
@@ -148,7 +172,7 @@ def test_from_composite_rejects_a_different_joint_set(names, q):
     _append(composite, StateWaypointPoly(StateWaypoint(NAMES, np.array([0.0, 0.0]))))
     _append(composite, StateWaypointPoly(StateWaypoint(names, np.array(q))))
     with pytest.raises(TrajectoryShapeError, match="j1"):
-        Trajectory.from_composite(composite)
+        Trajectory.from_composite(composite, untimed_step_s=1.0)
 
 
 def test_build_defaults_to_joint_interpolation():
@@ -172,7 +196,7 @@ def test_from_composite_keeps_each_move_type():
         waypoint = StateWaypointPoly(StateWaypoint(["a"], np.zeros(1)))
         move = MoveInstruction(waypoint, move_type)
         composite.push_back(MoveInstructionPoly(move))
-    assert Trajectory.from_composite(composite).move_types == (
+    assert Trajectory.from_composite(composite, untimed_step_s=1.0).move_types == (
         MoveInstructionType.FREESPACE,
         MoveInstructionType.LINEAR,
     )

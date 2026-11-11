@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
+from tesseract_robotics.emitters.core.errors import InvalidProfileError
 from tesseract_robotics.emitters.urscript.profile import UrScriptProfile
 
 
@@ -17,20 +20,25 @@ def test_defaults_sane() -> None:
 
 
 def test_rejects_non_positive_linear_speed() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidProfileError):
         UrScriptProfile.build(linear_speed_ms=0.0)
 
 
 def test_rejects_non_positive_joint_accel() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidProfileError):
         UrScriptProfile.build(joint_accel_radss=-1.0)
 
 
 def test_rejects_negative_blend() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidProfileError):
         UrScriptProfile.build(blend_radius_m=-0.01)
 
 
 def test_is_frozen() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(AttributeError):
         UrScriptProfile.build().linear_speed_ms = 1.0  # type: ignore[misc]
+
+
+def test_rejects_nan_speed() -> None:
+    with pytest.raises(InvalidProfileError):
+        UrScriptProfile.build(linear_speed_ms=math.nan)

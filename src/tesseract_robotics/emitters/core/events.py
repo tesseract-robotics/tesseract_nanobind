@@ -1,23 +1,25 @@
 """The typed event IR: a brand-independent description of a robot program.
 
-``lower()`` produces a ``ProgramIR`` (a name + ordered tuple of frozen events);
-a ``ProgramBackend`` consumes it. Events are the *semantic* vocabulary shared by
-every controller — smaller than any one vendor language so the walk stays
-brand-free. All quantities SI; poses are ``planning.Pose`` (metres, scalar-last).
+`lower()` produces a `ProgramIR` (a name and an ordered tuple of frozen events);
+a `ProgramBackend` consumes it. Events are the semantic vocabulary shared by
+every controller, smaller than any one vendor language so the walk stays
+brand-free. All quantities are SI. Cartesian targets are `FramedPose`s, so the
+frames a pose is expressed in travel with it in the type.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 
-from tesseract_robotics.planning import Pose
-
+from .errors import InvalidEventError
 from .external_axes import ExternalAxisValue
+from .frames import FramedPose, MoveFrames
 
 
 class MoveKind(Enum):
-    """Interpolation kind (mirrors tesseract MoveInstructionType, minus CIRCULAR)."""
+    """Interpolation kind (mirrors tesseract `MoveInstructionType`, minus CIRCULAR)."""
 
     LINEAR = "LINEAR"
     FREESPACE = "FREESPACE"
@@ -27,25 +29,39 @@ class MoveKind(Enum):
 class JointMove:
     """Absolute joint-space move.
 
-    ``joints`` are the six arm axes in radians. ``external_axes`` are the SI
-    external-axis values split off the coordinated joint vector by ``lower()``
-    when a layout is supplied — empty for a plain (uncoupled) 6-DOF move, in
-    which case ``joints`` is the full waypoint vector unchanged.
+    Attributes:
+        joints: The arm axes in radians. Without an external-axis layout this is
+            the full waypoint vector; backends that emit only six axes raise
+            `ExternalAxisError` on more.
+        profile: tesseract profile name.
+        frames: The move's frames (the tool is still selected for joint moves).
+        external_axes: SI external-axis values split off by `lower()` when a
+            layout is supplied; empty otherwise.
     """
 
     joints: tuple[float, ...]
     profile: str
+    frames: MoveFrames
     external_axes: tuple[ExternalAxisValue, ...] = ()
 
 
 @dataclass(frozen=True)
 class CartesianMove:
-    """Cartesian move to ``pose`` (metres). ``seed_joints`` (radians) is the
-    waypoint IK seed when present (used by backends that derive configuration
-    from joints), else ``None``. ``external_axes`` are the SI external-axis
-    values for the robtarget's ``eax`` field (empty when uncoupled)."""
+    """Cartesian move to `target`.
 
-    pose: Pose
+    Attributes:
+        target: TCP pose in the working frame, tagged with its frames.
+        kind: LINEAR or FREESPACE interpolation.
+        profile: tesseract profile name.
+        seed_joints: The waypoint's seed joints (radians, arm axes only when a
+            layout split them), or `None` when the waypoint carries none. Backends
+            derive the controller's configuration bits from it; it is never
+            emitted as the target.
+        external_axes: SI external-axis values for the target's external-axis
+            field (empty when uncoupled).
+    """
+
+    target: FramedPose
     kind: MoveKind
     profile: str
     seed_joints: tuple[float, ...] | None
@@ -54,17 +70,28 @@ class CartesianMove:
 
 @dataclass(frozen=True)
 class Dwell:
-    """Pause execution for ``seconds`` (>= 0)."""
+    """Pause execution for `seconds`. Build via `Dwell.build` (validates)."""
 
     seconds: float
+
+    @classmethod
+    def build(cls, seconds: float) -> Dwell:
+        """Validate and construct.
+
+        Raises:
+            InvalidEventError: `seconds` is NaN, infinite or negative.
+        """
+        if not math.isfinite(seconds) or seconds < 0.0:
+            raise InvalidEventError(f"Dwell.seconds must be finite and >= 0; got {seconds}")
+        return cls(seconds)
 
 
 @dataclass(frozen=True)
 class WaitDigital:
-    """Block until digital signal reaches ``value``.
+    """Block until a digital signal reaches `value`.
 
-    ``is_input`` selects input vs output; ``index`` is the IO number; ``timeout``
-    is seconds or ``None`` for wait-forever. Backends own signal naming.
+    `is_input` selects input vs output; `index` is the IO number; `timeout`
+    is seconds or `None` for wait-forever. Backends own signal naming.
     """
 
     is_input: bool
@@ -75,11 +102,11 @@ class WaitDigital:
 
 @dataclass(frozen=True)
 class SetDigital:
-    """Drive a digital output to ``value``.
+    """Drive a digital output to `value`.
 
-    ``key is None`` ⇒ unnamed output number ``index`` (backend names it, e.g.
-    RAPID ``do<index>``, KRL ``$OUT[index]``). ``key`` set ⇒ named signal; a
-    nonzero ``index`` is an array subscript (RAPID ``key{index}``).
+    `key is None` means unnamed output number `index` (the backend names it,
+    e.g. RAPID `do<index>`, KRL `$OUT[index]`). `key` set means a named signal;
+    a nonzero `index` is then an array subscript (RAPID `key{index}`).
     """
 
     key: str | None
@@ -89,7 +116,7 @@ class SetDigital:
 
 @dataclass(frozen=True)
 class SetAnalog:
-    """Drive an analog output to ``value``. ``key`` semantics as ``SetDigital``."""
+    """Drive an analog output to `value`. `key` semantics as `SetDigital`."""
 
     key: str | None
     index: int
@@ -98,7 +125,7 @@ class SetAnalog:
 
 @dataclass(frozen=True)
 class ToolChange:
-    """Switch active tool to ``tool_id`` (controller-defined index)."""
+    """Switch the active tool to `tool_id` (controller-defined index)."""
 
     tool_id: int
 
@@ -115,23 +142,30 @@ type Event = (
 )
 
 
-def _event_repr(event: Event) -> str:
-    """Stable value-based repr for canonical serialization (poses via matrix).
+#: Decimals of every float in the canonical form: far below any emitted display
+#: precision (see `core.precision`), and coarse enough that last-bit differences
+#: between platform math libraries (IK seeds, composed poses) cannot change it.
+_CANONICAL_DECIMALS = 9
 
-    ``external_axes`` contributes only when non-empty, so an uncoupled program's
-    canonical form (and thus its content digest) is byte-identical to before the
-    external-axis field existed.
-    """
+
+def _rounded(values: tuple[float, ...] | None) -> tuple[float, ...] | None:
+    return None if values is None else tuple(round(v, _CANONICAL_DECIMALS) for v in values)
+
+
+def _event_repr(event: Event) -> str:
+    """Stable value-based text for canonical serialization (poses via matrix)."""
     if isinstance(event, CartesianMove):
-        rows = event.pose.matrix.round(9).tolist()
-        ext = f",ext={event.external_axes}" if event.external_axes else ""
+        rows = event.target.pose.matrix.round(_CANONICAL_DECIMALS).tolist()
         return (
             f"CartesianMove(kind={event.kind.value},profile={event.profile!r},"
-            f"seed={event.seed_joints}{ext},pose={rows})"
+            f"frames={event.target.frames.canonical()},seed={_rounded(event.seed_joints)},"
+            f"ext={event.external_axes},pose={rows})"
         )
-    if isinstance(event, JointMove) and not event.external_axes:
-        # Match the pre-external-axes dataclass repr exactly (default `, ` spacing).
-        return f"JointMove(joints={event.joints}, profile={event.profile!r})"
+    if isinstance(event, JointMove):
+        return (
+            f"JointMove(joints={_rounded(event.joints)},profile={event.profile!r},"
+            f"frames={event.frames.canonical()},ext={event.external_axes})"
+        )
     return repr(event)
 
 
@@ -143,6 +177,6 @@ class ProgramIR:
     events: tuple[Event, ...] = field(default_factory=tuple)
 
     def canonical(self) -> str:
-        """Deterministic serialization — the input to the content digest."""
+        """Deterministic serialization: the input to the content digest."""
         body = ";".join(_event_repr(e) for e in self.events)
         return f"ProgramIR(name={self.name!r},events=[{body}])"

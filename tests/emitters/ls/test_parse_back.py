@@ -1,58 +1,64 @@
-"""Parse-back contract: emitted LS reads back to the intended numeric targets.
+"""Parse-back contract: emitted LS reads back to the intended targets.
 
-Asserts against the program *inputs* (not a saved file), so a wrong-but-stable
-formatter regression a golden could hide is caught here. We parse the ``/POS``
-table — the canonical source of joint angles (deg) and Cartesian X/Y/Z (mm) —
-which is where Fanuc actually stores the targets the ``/MN`` lines reference.
+Parses the `/POS` table (joint degrees, X/Y/Z mm, W/P/R deg rebuilt as
+`Rz(R) Ry(P) Rx(W)`, CONFIG turn numbers) and the frame lines of `/MN`, and
+compares them with the program inputs.
 """
 
 from __future__ import annotations
 
+import math
 import re
 
 import numpy as np
 
-from tesseract_robotics.emitters.ls import LsProfile, emit_ls
-from tesseract_robotics.planning import CartesianTarget, JointTarget, MotionProgram, Pose
+from tesseract_robotics.emitters.ls import emit_ls
+from tests.emitters.ls.spike import (
+    FRAMES,
+    J1_DEG,
+    J2_DEG,
+    P1,
+    P2,
+    posture_config,
+    spike_composite,
+    spike_profiles,
+)
 
-JOINT_TOL_DEG = 1e-3
-POS_TOL_MM = 1e-3
+JOINT_TOL_DEG = 5e-5
+POS_TOL_MM = 5e-4
+ROT_TOL = 3 * math.radians(5e-5)
 _NUM = r"[-+]?\d+\.\d+"
 
 
-def _pos_joints(text: str) -> list[list[float]]:
-    """All J1..J6 degree tuples from joint-style ``/POS`` entries, in order."""
-    out = []
-    for m in re.finditer(r"J1 = .*?J6 = ([-+]?\d+\.\d+) deg", text, re.DOTALL):
-        block = text[m.start() : m.end()]
-        out.append([float(x) for x in re.findall(rf"J\d = ({_NUM}) deg", block)])
-    return out
-
-
-def _pos_xyz(text: str) -> list[tuple[float, float, float]]:
-    """All (X, Y, Z) mm tuples from Cartesian ``/POS`` entries, in order."""
-    pat = rf"X = ({_NUM}) mm, Y = ({_NUM}) mm, Z = ({_NUM}) mm"
-    return [tuple(float(g) for g in m.groups()) for m in re.finditer(pat, text)]
+def _xyz_fixed(w: float, p: float, r: float) -> np.ndarray:
+    rw, rp, rr = np.radians([w, p, r])
+    rx = np.array([[1, 0, 0], [0, math.cos(rw), -math.sin(rw)], [0, math.sin(rw), math.cos(rw)]])
+    ry = np.array([[math.cos(rp), 0, math.sin(rp)], [0, 1, 0], [-math.sin(rp), 0, math.cos(rp)]])
+    rz = np.array([[math.cos(rr), -math.sin(rr), 0], [math.sin(rr), math.cos(rr), 0], [0, 0, 1]])
+    return rz @ ry @ rx
 
 
 def test_emitted_ls_parses_back_to_inputs() -> None:
-    jn = [f"joint_{i}" for i in range(1, 7)]
-    j1 = [0.0, -20.0, 30.0, 0.0, 50.0, 0.0]
-    j2 = [30.0, 10.0, 15.0, 20.0, 40.0, -10.0]
-    prog = MotionProgram(
-        "manipulator", tcp_frame="tool0", working_frame="base_link", profile="SPIKE"
+    text = emit_ls(spike_composite(), spike_profiles(), frames=FRAMES, config=posture_config).text
+    joints = [
+        [float(x) for x in re.findall(rf"J\d = ({_NUM}) deg", m.group(0))]
+        for m in re.finditer(r"J1 = .*?J6 = [-+]?\d+\.\d+ deg", text, re.DOTALL)
+    ]
+    assert np.allclose(joints[0], J1_DEG, atol=JOINT_TOL_DEG)
+    assert np.allclose(joints[1], J2_DEG, atol=JOINT_TOL_DEG)
+    carts = re.findall(
+        rf"CONFIG : '([NF] [UD] [TB]), (-?\d+), (-?\d+), (-?\d+)',\n"
+        rf"\tX = ({_NUM}) mm, Y = ({_NUM}) mm, Z = ({_NUM}) mm,\n"
+        rf"\tW = ({_NUM}) deg, P = ({_NUM}) deg, R = ({_NUM}) deg",
+        text,
     )
-    prog.move_to(JointTarget(np.deg2rad(j1), profile="J"))
-    prog.move_to(JointTarget(np.deg2rad(j2), profile="J"))
-    prog.linear_to(CartesianTarget(Pose.from_xyz_rpy([0.6, -0.1, 0.8], [np.pi, 0, 0]), profile="L"))
-    prog.set_joint_names(jn)
-    composite = prog.to_composite_instruction(joint_names=jn)
-
-    text = emit_ls(
-        composite, {"J": LsProfile.build(), "L": LsProfile.build()}, program_name="SPIKE"
-    ).text
-
-    joints = _pos_joints(text)
-    assert np.allclose(joints[0], j1, atol=JOINT_TOL_DEG)
-    assert np.allclose(joints[1], j2, atol=JOINT_TOL_DEG)
-    assert np.allclose(_pos_xyz(text)[0], [600.0, -100.0, 800.0], atol=POS_TOL_MM)
+    assert len(carts) == 2
+    for row, pose in zip(carts, (P1, P2), strict=True):
+        assert row[0] == "N U T"
+        assert row[1:4] == ("0", "0", "1")  # J6 at 200 / 190 deg is turn 1
+        vals = [float(v) for v in row[4:]]
+        assert np.allclose(vals[:3], np.asarray(pose.translation) * 1000.0, atol=POS_TOL_MM)
+        assert np.allclose(_xyz_fixed(*vals[3:]), pose.rotation_matrix, atol=ROT_TOL)
+    assert text.count("UF : 0, UT : 1") == 4
+    assert re.search(r"^\s+\d+:UTOOL_NUM=1 ;$", text, re.MULTILINE)
+    assert re.search(r"^\s+\d+:UFRAME_NUM=0 ;$", text, re.MULTILINE)

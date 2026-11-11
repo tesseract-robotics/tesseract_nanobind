@@ -23,6 +23,15 @@ def test_empty_scene_gets_the_smallest_floor_at_the_origin():
     floor = Floor.under([])
     assert floor.center_m == (0.0, 0.0)
     assert floor.size_m == MIN_FLOOR_SIZE_M
+    assert floor.z_m == 0.0
+
+
+def test_floor_sits_at_the_lowest_point_of_the_scene():
+    """A robot on a 0.8 m pedestal whose base frame is the world origin."""
+    floor = Floor.under(
+        [_box_at((0.5, 0.5, 0.8), (0.0, 0.0, -0.4)), _box_at((0.2, 0.2, 1.0), (0.0, 0.0, 0.5))]
+    )
+    assert floor.z_m == pytest.approx(-0.8, abs=1e-12)
 
 
 def test_small_scene_gets_the_smallest_floor():

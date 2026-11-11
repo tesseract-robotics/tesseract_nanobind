@@ -1,39 +1,33 @@
-"""JbiProfile: frozen motion params with a validating .build() factory."""
+"""JbiProfile and the JBI tool binding: validating factories."""
 
 from __future__ import annotations
 
 import pytest
 
-from tesseract_robotics.emitters.jbi.profile import JbiProfile
+from tesseract_robotics.emitters.core.errors import InvalidFrameBindingError, InvalidProfileError
+from tesseract_robotics.emitters.jbi import JbiProfile, jbi_frames
 
 
 def test_defaults_sane() -> None:
     p = JbiProfile.build()
-    assert p.linear_speed_mms == 100.0
-    assert 0.0 < p.joint_speed_percent <= 100.0
-    assert p.tool == 0
+    assert p.linear_speed_mms == 100.0 and 0.0 < p.joint_speed_percent <= 100.0
 
 
-def test_rejects_out_of_range_percent() -> None:
-    with pytest.raises(ValueError):
-        JbiProfile.build(joint_speed_percent=150.0)
-
-
-def test_rejects_zero_percent() -> None:
-    with pytest.raises(ValueError):
-        JbiProfile.build(joint_speed_percent=0.0)
-
-
-def test_rejects_negative_speed() -> None:
-    with pytest.raises(ValueError):
-        JbiProfile.build(linear_speed_mms=-1.0)
-
-
-def test_rejects_negative_tool() -> None:
-    with pytest.raises(ValueError):
-        JbiProfile.build(tool=-1)
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"joint_speed_percent": 150.0}, {"joint_speed_percent": 0.0}, {"linear_speed_mms": -1.0}],
+)
+def test_rejects_out_of_range(kwargs: dict[str, float]) -> None:
+    with pytest.raises(InvalidProfileError):
+        JbiProfile.build(**kwargs)
 
 
 def test_is_frozen() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(AttributeError):
         JbiProfile.build().linear_speed_mms = 1.0  # type: ignore[misc]
+
+
+@pytest.mark.parametrize("tool", [-1, 64])
+def test_tool_numbers_validated(tool: int) -> None:
+    with pytest.raises(InvalidFrameBindingError):
+        jbi_frames(tools={"tool0": tool})
