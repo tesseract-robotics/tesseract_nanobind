@@ -10,8 +10,8 @@ The cross-module inheritance for Profile types now works. We use `nb::class_<Der
 per-module `ProfileDictionary_add*Profile` helpers are removed (#334):
 
 ```python
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
 
 plan_profile = OMPLRealVectorMoveProfile()
 profiles = ProfileDictionary()
@@ -112,8 +112,8 @@ nb::module_::import_("tesseract_robotics.common._common");
 ```python
 from pathlib import Path
 
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.task_composer import TaskComposerPluginFactory
 
 factory = TaskComposerPluginFactory(Path(task_composer_config_file), GeneralResourceLocator())
 ```
@@ -131,12 +131,12 @@ TrajOpt bindings are always built; CMake stops if the component is missing.
 ### Usage (0.33 API)
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptMotionPlanner,
     TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 
 # Create profiles
 plan_profile = TrajOptDefaultMoveProfile()
@@ -209,11 +209,11 @@ input_key = task.getInputPortMappings().single("program")
 Configure waypoint-level TrajOpt behavior via config objects:
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 
 # Plan profile - waypoint constraints
 trajopt_plan_profile = TrajOptDefaultMoveProfile()
@@ -269,11 +269,11 @@ profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", trajopt_composite_pro
 
 **TimeParameterization** (0.33 API):
 ```python
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract_robotics.time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TimeOptimalTrajectoryGenerationCompositeProfile,
 )
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.command_language import ProfileDictionary
 
 # Create TOTG with profile-based configuration
 totg = TimeOptimalTrajectoryGeneration()
@@ -298,7 +298,7 @@ Available config classes:
 When planning Cartesian paths (CartesianWaypoint), TrajOpt needs seed joint states. Use `assignCurrentStateAsSeed()`:
 
 ```python
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
 
 program = CompositeInstruction("DEFAULT")
 # ... add CartesianWaypoint instructions ...
