@@ -114,11 +114,34 @@ def test_values_and_bounds(robot, manip):
     c = PointsDown(var, manip, "tool0", np.radians(30))
     c.linkWithVariables(nodes)
     z = manip.calcFwdKin(Q)["tool0"].rotation[:, 2]
-    # the range [cos 30°, 1] is split into two one-sided rows on the same value
-    np.testing.assert_allclose(c.getValues(), [-z[2], -z[2]])
+    # one row, bounded below: a cosine needs no upper bound, and a row at 1 would sit on its
+    # bound with a vanishing gradient whenever the axis is aligned
+    np.testing.assert_allclose(c.getValues(), [-z[2]])
+    (bound,) = c.getBounds()
+    assert bound.getLower() == pytest.approx(np.cos(np.radians(30)))
+    assert bound.getUpper() == np.inf
+
+
+@pytest.mark.parametrize("rule", ["points_down_numeric", "watch_the_tool"])
+def test_a_cosine_rule_is_one_row_bounded_below(robot, manip, rule):
+    nodes = _nodes(manip, [Q])
+    c = _rules(robot, manip, nodes.getNodes()[0].getVar("joints"))[rule]
+    (bound,) = c.getBounds()
+    assert np.isfinite(bound.getLower()) and bound.getUpper() == np.inf
+
+
+def test_a_range_row_is_split_into_two_one_sided_rows(manip):
+    class FirstJoint(PyConstraint):
+        def f(self, q):
+            return [q[0]]
+
+    nodes = _nodes(manip, [Q])
+    c = FirstJoint("first_joint", nodes.getNodes()[0].getVar("joints"), [-0.5], [0.5])
+    c.linkWithVariables(nodes)
+    np.testing.assert_allclose(c.getValues(), [Q[0], Q[0]])
     lo, hi = c.getBounds()
-    assert lo.getLower() == pytest.approx(np.cos(np.radians(30))) and lo.getUpper() == np.inf
-    assert hi.getLower() == -np.inf and hi.getUpper() == 1.0
+    assert lo.getLower() == -0.5 and lo.getUpper() == np.inf
+    assert hi.getLower() == -np.inf and hi.getUpper() == 0.5
 
 
 def test_mismatched_bounds_raise(manip):

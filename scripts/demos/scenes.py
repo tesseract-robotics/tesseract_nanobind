@@ -100,6 +100,23 @@ def _online_sqp(_composer: TaskComposer) -> Scene:
     return Scene(env, [RecordingPhase(env, trajectory)])
 
 
+def _python_constraints(_composer: TaskComposer) -> Scene:
+    # One phase per act: captions, gauges and glyphs switch between phases, never mid-frame.
+    example = _example("python_constraints_example")
+    results = example.run()
+    env = results["robot"].env
+    phases = [
+        RecordingPhase(env, Trajectory.from_rows(results["joint_names"], act.rows))
+        for act in results["acts"]
+    ]
+    solve_ms = example.act_solve_ms(results)
+    return Scene(
+        env,
+        phases,
+        decorations=[lambda viewer: example.decorate(viewer, results["target"], solve_ms)],
+    )
+
+
 def _pointcloud(_composer: TaskComposer) -> Scene:
     # The collision-aware plan. The example's run builds its own composer.
     return _result_scene(_example("pointcloud_octree_collision_example").run())
@@ -138,6 +155,7 @@ SCENES: dict[str, Callable[[TaskComposer], Scene]] = {
     "online_planning_example": _online,
     "online_planning_sqp_example": _online_sqp,
     "pointcloud_octree_collision_example": _pointcloud,
+    "python_constraints_example": _python_constraints,
     "sdf_collision_example": _sdf,
     "twc_workcell_positioner_viewer": _twc,
     "geometry_showcase_example": lambda c: _static_robot("geometry_showcase_example", c),

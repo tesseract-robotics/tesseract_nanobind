@@ -155,7 +155,9 @@ def _skew_cross_rows(a: np.ndarray, angular_jacobian: np.ndarray) -> np.ndarray:
 class PointsDown(PyConstraint):
     """The tool axis (``axis`` of ``tcp``) stays within ``max_tilt`` of ``down``.
 
-    Value: cos of the angle between the tool axis and ``down``; bounds [cos(max_tilt), 1].
+    Value: cos of the angle between the tool axis and ``down``, at least cos(max_tilt). There
+    is no upper bound: a cosine cannot pass 1, and a row that sits on its bound where its
+    gradient vanishes (the axis aligned) only costs the QP its conditioning.
     Analytic Jacobian from Tesseract's: d(a . down)/dq = down . (omega x a).
     ``CartAxisConeConstraint`` is the C++ form of this rule, on the angle itself.
     """
@@ -172,7 +174,7 @@ class PointsDown(PyConstraint):
         name: str = "points_down",
         **kwargs,
     ):
-        super().__init__(name, var, [np.cos(max_tilt)], [1.0], **kwargs)
+        super().__init__(name, var, [np.cos(max_tilt)], [np.inf], **kwargs)
         self.manip, self.tcp, self.axis, self.analytic = manip, tcp, axis, analytic
         self.down = np.asarray(down, dtype=float) / np.linalg.norm(down)
 
@@ -289,7 +291,11 @@ class ElbowUp(PyConstraint):
 
 
 class WatchTheTool(PyConstraint):
-    """``tcp`` stays in ``camera``'s cone of view, half-angle ``alpha``, both links in one group."""
+    """``tcp`` stays in ``camera``'s cone of view, half-angle ``alpha``, both links in one group.
+
+    Value: cos of the angle between the optical axis and the line to ``tcp``, at least
+    cos(alpha); no upper bound, as for ``PointsDown``.
+    """
 
     def __init__(
         self,
@@ -302,7 +308,7 @@ class WatchTheTool(PyConstraint):
         name: str = "watch_the_tool",
         **kwargs,
     ):
-        super().__init__(name, var, [np.cos(alpha)], [1.0], **kwargs)
+        super().__init__(name, var, [np.cos(alpha)], [np.inf], **kwargs)
         self.manip, self.camera, self.tcp, self.optical_axis = manip, camera, tcp, optical_axis
 
     def f(self, q):
