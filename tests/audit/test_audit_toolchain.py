@@ -137,3 +137,59 @@ def test_a_parse_that_read_an_unlisted_file_is_refused(tmp_path, included):
     source = tmp_path / "a_bindings.cpp"
     with pytest.raises(tc.UnlistedIncludeError, match=included):
         tc.require_listed(source, [source, tmp_path / "a.h", tmp_path / included])
+
+
+def _selection(**changes) -> "tc.Selection":
+    fields = {
+        "audited": [Path("/inc/a.h"), Path("/inc/b.h")],
+        "not_api": [Path("/inc/internal/c.h")],
+        "dependency_roots": ["OsqpEigen/", "ompl-1.7/ompl/"],
+        "dependency_namespaces": ["ompl::"],
+    }
+    return tc.Selection.build(**{**fields, **changes})
+
+
+def test_a_selection_is_a_set_per_field():
+    again = _selection(
+        audited=[Path("/inc/b.h"), Path("/inc/a.h"), Path("/inc/a.h")],
+        dependency_roots=["ompl-1.7/ompl/", "OsqpEigen/"],
+    )
+    assert again == _selection()
+    assert again.canonical() == _selection().canonical()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"audited": [Path("/inc/a.h")]},
+        {"not_api": []},
+        {"audited": [Path("/inc/a.h")], "not_api": [Path("/inc/b.h"), Path("/inc/internal/c.h")]},
+        {"dependency_roots": ["OsqpEigen/"]},
+        {"dependency_namespaces": []},
+    ],
+)
+def test_every_field_of_a_selection_is_part_of_the_key(change):
+    assert _selection(**change).canonical() != _selection().canonical()
+
+
+def test_a_relative_selected_header_is_refused():
+    with pytest.raises(tc.RelativeHeaderError, match="inc/a.h"):
+        _selection(audited=[Path("inc/a.h")])
+    with pytest.raises(tc.RelativeHeaderError, match="c.h"):
+        _selection(not_api=[Path("c.h")])
+
+
+def test_a_sibling_the_main_text_includes_needs_no_listing(tmp_path):
+    """A synthetic TU includes its binding source from its own directory: found first, hashed
+    as a dependency, so no listed dir can shadow it."""
+    source = tmp_path / "a_unincluded_headers.cpp"
+    binding = tmp_path / "a_bindings.cpp"
+    tc.require_listed(source, [source, binding, tmp_path / "a.h"], siblings=[binding])
+    with pytest.raises(tc.UnlistedIncludeError, match="helper.cpp"):
+        tc.require_listed(source, [binding, tmp_path / "helper.cpp"], siblings=[binding])
+
+
+def test_a_sibling_is_in_the_main_files_directory(tmp_path):
+    source = tmp_path / "a_unincluded_headers.cpp"
+    with pytest.raises(tc.NotASiblingError, match="b_bindings.cpp"):
+        tc.require_listed(source, [], siblings=[tmp_path / "other" / "b_bindings.cpp"])

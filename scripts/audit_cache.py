@@ -31,11 +31,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from audit_telemetry import EventLog
-from audit_toolchain import Sha256, Toolchain
+from audit_toolchain import Selection, Sha256, Toolchain
 
 type Json = None | bool | int | float | str | list[Json] | dict[str, Json]
 # Layout of an entry; part of every digest, so a layout change starts a fresh cache.
-ENTRY_FORMAT = 2
+ENTRY_FORMAT = 3
 ENTRY_SUFFIX = ".json"
 LOCK_SUFFIX = ".lock"
 # Read size for hashing a dependency, bytes.
@@ -65,16 +65,31 @@ class FactKey:
     Attributes:
         kind: The fact (`decl`, `bound`, `gil`): one extractor's output.
         source: The TU's main file.
-        toolchain: Everything else the extractor's output depends on.
+        toolchain: Everything else the parse depends on.
+        unsaved: The main file's text when it exists only in memory (a synthetic TU); such
+            a main file is not on disk, so it is no dependency and its text is part of the key.
+        selection: What the extractor reads of the TU that a table decides (`api` facts).
     """
 
     kind: str
     source: Path
     toolchain: Toolchain
+    unsaved: str | None = None
+    selection: Selection | None = None
 
     def digest(self) -> str:
         """The entry's file name: stable across processes and machines."""
-        text = json.dumps([ENTRY_FORMAT, self.kind, str(self.source), self.toolchain.canonical()])
+        selection = None if self.selection is None else self.selection.canonical()
+        text = json.dumps(
+            [
+                ENTRY_FORMAT,
+                self.kind,
+                str(self.source),
+                self.toolchain.canonical(),
+                self.unsaved,
+                selection,
+            ]
+        )
         return hashlib.sha256(text.encode()).hexdigest()
 
 
@@ -141,6 +156,7 @@ class FactCache:
         """
         entry = self.entry_path(key)
         entry.parent.mkdir(parents=True, exist_ok=True)
+        source = str(key.source)
         asked = time.perf_counter()
         with _locked(entry.with_suffix(LOCK_SUFFIX)):
             wait_s = time.perf_counter() - asked
@@ -148,7 +164,9 @@ class FactCache:
                 deps_then, stored = self._read(entry)
                 if self._current(deps_then):
                     os.utime(entry)  # used by this run: `prune` keeps it
-                    self.events.fetched(key.kind, hit=True, compute_s=0.0, wait_s=wait_s)
+                    self.events.fetched(
+                        key.kind, source=source, hit=True, compute_s=0.0, wait_s=wait_s
+                    )
                     return stored
             started = time.perf_counter()
             value, deps = compute()
@@ -156,7 +174,9 @@ class FactCache:
             record = {"deps": self._hash_all(deps), "value": value}
             text = json.dumps(record, sort_keys=True)
             self._write(entry, text)
-            self.events.fetched(key.kind, hit=False, compute_s=compute_s, wait_s=wait_s)
+            self.events.fetched(
+                key.kind, source=source, hit=False, compute_s=compute_s, wait_s=wait_s
+            )
             return json.loads(text)["value"]
 
     def prune(self, unused_since_ns: int) -> list[Path]:

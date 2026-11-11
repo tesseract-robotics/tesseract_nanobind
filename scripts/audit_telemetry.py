@@ -9,13 +9,14 @@ restored into later runs (`audit_cache.EventsInCacheError`).
 Two events:
 
 ```json
-{"event": "fetch", "kind": "bound", "hit": false, "compute_s": 41.2, "wait_s": 0.0, "pid": 7}
+{"event": "fetch", "kind": "bound", "source": "/repo/src/a/a_bindings.cpp", "hit": false,
+ "compute_s": 41.2, "wait_s": 0.0, "pid": 7}
 {"event": "phase", "name": "cpp-api", "seconds": 12.8, "pid": 7}
 ```
 
 `wait_s` is the time a fetch waited for the entry lock (another worker computing the same
-fact), `compute_s` the extraction alone (0 on a hit). `render` sums them per fact kind and
-per phase; `scripts/audit_telemetry_report.py` prints that per step.
+fact), `compute_s` the extraction alone (0 on a hit), `source` the TU's main file. `render`
+sums them per fact kind and per phase and lists each miss's source; `scripts/audit_telemetry_report.py` prints that per step.
 
 Needs no libclang and imports no audit script.
 """
@@ -43,6 +44,7 @@ EVENT_FIELDS: Mapping[str, Mapping[str, tuple[type, ...]]] = {
     FETCH: {
         "event": (str,),
         "kind": (str,),
+        "source": (str,),
         "hit": (bool,),
         "compute_s": (int, float),
         "wait_s": (int, float),
@@ -76,17 +78,27 @@ class EventLog:
         value = os.environ.get(EVENTS_ENV)
         return cls(Path(value) if value else None)
 
-    def fetched(self, kind: str, *, hit: bool, compute_s: float, wait_s: float) -> None:
+    def fetched(
+        self, kind: str, *, source: str, hit: bool, compute_s: float, wait_s: float
+    ) -> None:
         """Record one answered fetch of a `kind` fact.
 
         Args:
             kind: The fact (`FactKey.kind`).
+            source: The TU's main file (`FactKey.source`): which TU a miss parsed.
             hit: The stored entry answered.
             compute_s: Seconds in `compute`; 0 on a hit.
             wait_s: Seconds until the entry lock was held.
         """
         self._append(
-            {"event": FETCH, "kind": kind, "hit": hit, "compute_s": compute_s, "wait_s": wait_s}
+            {
+                "event": FETCH,
+                "kind": kind,
+                "source": source,
+                "hit": hit,
+                "compute_s": compute_s,
+                "wait_s": wait_s,
+            }
         )
 
     @contextmanager
@@ -150,11 +162,13 @@ class Totals:
         fetches: Per fact kind.
         phases: Per phase name.
         processes: Distinct processes that wrote an event.
+        miss_sources: Misses per fact kind and TU main file.
     """
 
     fetches: dict[str, FetchTotal]
     phases: dict[str, PhaseTotal]
     processes: int
+    miss_sources: dict[tuple[str, str], int]
 
 
 def _is(value: object, types: tuple[type, ...]) -> bool:
@@ -203,6 +217,7 @@ def totals(events: Iterable[Mapping[str, object]]) -> Totals:
     """
     fetches: dict[str, FetchTotal] = {}
     phases: dict[str, PhaseTotal] = {}
+    miss_sources: dict[tuple[str, str], int] = {}
     pids = set()
     for index, raw in enumerate(events):
         event = checked_event(raw, f"event {index}")
@@ -216,6 +231,9 @@ def totals(events: Iterable[Mapping[str, object]]) -> Totals:
                 compute_s=old.compute_s + cast(float, event["compute_s"]),
                 wait_s=old.wait_s + cast(float, event["wait_s"]),
             )
+            if not hit:
+                where = (kind, cast(str, event["source"]))
+                miss_sources[where] = miss_sources.get(where, 0) + 1
         else:
             name = cast(str, event["name"])
             old_phase = phases.get(name, PhaseTotal(0, 0.0))
@@ -223,7 +241,7 @@ def totals(events: Iterable[Mapping[str, object]]) -> Totals:
                 calls=old_phase.calls + 1,
                 seconds=old_phase.seconds + cast(float, event["seconds"]),
             )
-    return Totals(fetches=fetches, phases=phases, processes=len(pids))
+    return Totals(fetches=fetches, phases=phases, processes=len(pids), miss_sources=miss_sources)
 
 
 def _aligned(rows: Sequence[Sequence[str]]) -> list[str]:
@@ -239,7 +257,8 @@ def _aligned(rows: Sequence[Sequence[str]]) -> list[str]:
 
 
 def render(step: str, events: Sequence[Mapping[str, object]]) -> str:
-    """The totals of one step's events as two text tables, seconds to one decimal.
+    """The totals of one step's events as text tables, seconds to one decimal: fetches per
+    kind, phases, and the misses per kind and source.
 
     Args:
         step: The step's name (the log's file stem).
@@ -264,6 +283,12 @@ def render(step: str, events: Sequence[Mapping[str, object]]) -> str:
             (name, str(t.calls), f"{t.seconds:.1f}") for name, t in sorted(summed.phases.items())
         ]
         lines += _aligned(phase_rows)
+    if summed.miss_sources:
+        miss_rows = [("miss", "count", "source")]
+        miss_rows += [
+            (kind, str(n), source) for (kind, source), n in sorted(summed.miss_sources.items())
+        ]
+        lines += _aligned(miss_rows)
     return "\n".join(lines)
 
 
