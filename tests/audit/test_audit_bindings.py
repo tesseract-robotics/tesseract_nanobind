@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from tests.audit._load import audit, native_stack
+from tests.audit._prov import PROV
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -905,13 +906,6 @@ def test_bytes_resource_byte_buffer_ctor_accepted(real_reports):
     assert "BytesResource.__init__" not in {g.symbol for g in real_reports["common"].gaps}
 
 
-PROV = {
-    "tesseract": "4cf644d7",
-    "tesseract_planning": "4e27d94b",
-    "trajopt": "98b85d55",
-    "libclang": "clang version 23",
-    "stubs": "abc1234",
-}
 COVERAGE = audit.Coverage(audited=("fixture",), unaudited={"other": "Not yet audited."}, total=2)
 NO_LEDGER: dict = {}  # these report tests check rendering, not outcomes
 
@@ -982,7 +976,8 @@ def test_render_is_deterministic_and_sorted(fixture_report):
     a = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     b = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert a == b
-    assert "abc1234" in a and "==0.35.0" in a
+    # The header names each audited upstream commit, libclang and the stubs' SHA (`provenance`).
+    assert all(f"`{value}`" in a for value in PROV.values())
     gaps = a[a.index("### Gaps") : a.index("### Deviations")]
     gap_rows = [line for line in gaps.splitlines() if line.startswith("| `")]
     assert len(gap_rows) == len(fixture_report.gaps)

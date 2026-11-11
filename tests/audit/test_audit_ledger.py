@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 
 from tests.audit._load import audit
+from tests.audit._prov import PROV
 
-PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
 # Open-row tables of a module in `to_json`, with the field that is the row's ledger key.
 OPEN_TABLES = (("gaps", "symbol"), ("deviations", "name"), ("quoted", "annotation"))
 # Path of the findings `audit-bindings --json` wrote (.github/workflows/audit.yml).

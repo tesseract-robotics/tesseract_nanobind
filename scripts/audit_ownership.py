@@ -343,6 +343,10 @@ PLUGIN_ANCHOR_INCLUDES = {
 # #include, but another binding does, is audited with `header_auditor` of those modules.
 INCLUDE_DIRECTIVE = re.compile(r"^\s*#\s*include\s*<([^>]+)>", re.MULTILINE)
 HEADER_SUFFIXES = frozenset({".h", ".hpp"})
+# A `"…"` include that names a header beside the including file (`binding_local_headers`):
+# declarations a module's TUs share (`trajopt_ifopt_bindings.h`), so its `<…>` includes are the
+# binding's own. A quoted header found elsewhere (`-I src`: `tesseract_nb.h`) is every module's.
+QUOTED_INCLUDE_DIRECTIVE = re.compile(r'^\s*#\s*include\s*"([^"]+)"', re.MULTILINE)
 
 
 class UnknownModuleError(LookupError):
@@ -503,10 +507,27 @@ def primary_source(module: str) -> Path:
     return binding_sources(module)[0]
 
 
+def binding_local_headers(source: Path) -> tuple[Path, ...]:
+    """The headers beside `source` that it reaches through `"…"` includes, transitively, in
+    first-reached order: `trajopt_ifopt.cpp` → `(trajopt_ifopt_bindings.h,)`."""
+    found: dict[Path, None] = {}
+    pending = [source]
+    while pending:
+        text = pending.pop().read_text(encoding="utf-8")
+        for spelling in QUOTED_INCLUDE_DIRECTIVE.findall(text):
+            header = source.parent / spelling
+            if header.suffix in HEADER_SUFFIXES and header.is_file() and header not in found:
+                found[header] = None
+                pending.append(header)
+    return tuple(found)
+
+
 def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
-    """`<…>` spellings the files #include, read as text (other bindings are not parsed)."""
+    """`<…>` spellings the files and their `binding_local_headers` #include, read as text
+    (other bindings are not parsed)."""
+    files = [f for s in sources for f in (s, *binding_local_headers(s))]
     return frozenset(
-        m for s in sources for m in INCLUDE_DIRECTIVE.findall(s.read_text(encoding="utf-8"))
+        m for f in files for m in INCLUDE_DIRECTIVE.findall(f.read_text(encoding="utf-8"))
     )
 
 

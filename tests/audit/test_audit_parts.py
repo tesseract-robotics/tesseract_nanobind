@@ -138,3 +138,41 @@ def test_parts_and_helpers_are_the_sources_cmake_links_into_their_module():
         m: s - own.NON_MODULE_SOURCES for m, s in linked.items() if s - own.NON_MODULE_SOURCES
     } == declared
     assert own.NON_MODULE_SOURCES <= set().union(*linked.values())
+
+
+# A module's shared declarations sit in a header beside its TUs (`trajopt_ifopt_bindings.h`,
+# #included by `trajopt_ifopt.cpp` and `trajopt_ifopt_collision.cpp`): the upstream headers
+# that header #includes are the binding's own direct includes, exactly as if each TU held them.
+
+
+def test_a_binding_local_header_holds_the_tus_direct_includes(tmp_path):
+    (tmp_path / "alpha.cpp").write_text('#include "alpha_bindings.h"\n#include <alpha/own.h>\n')
+    (tmp_path / "alpha_bindings.h").write_text('#include "alpha_more.h"\n#include <alpha/core.h>\n')
+    # A local header reached through another one is the binding's too; a cycle ends.
+    (tmp_path / "alpha_more.h").write_text('#include "alpha_bindings.h"\n#include <alpha/var.h>\n')
+    assert own.direct_include_spellings((tmp_path / "alpha.cpp",)) == {
+        "alpha/own.h",
+        "alpha/core.h",
+        "alpha/var.h",
+    }
+
+
+def test_a_quoted_header_elsewhere_is_no_part_of_the_binding(tmp_path):
+    """`"tesseract_nb.h"` resolves through `-I src`, not beside the TU: shared by every module,
+    its includes are no module's own."""
+    bindings = tmp_path / "bindings"
+    bindings.mkdir()
+    (tmp_path / "shared.h").write_text("#include <alpha/core.h>\n")
+    (bindings / "alpha.cpp").write_text('#include "shared.h"\n#include <alpha/own.h>\n')
+    assert own.direct_include_spellings((bindings / "alpha.cpp",)) == {"alpha/own.h"}
+
+
+def test_the_trajopt_ifopt_tus_include_its_core_headers_through_their_shared_header():
+    includes = own.direct_include_spellings(own.binding_sources("trajopt_ifopt"))
+    assert {
+        "trajopt_ifopt/core/component.h",
+        "trajopt_ifopt/core/constraint_set.h",
+        "trajopt_ifopt/variable_sets/node.h",
+        "trajopt_ifopt/variable_sets/var.h",
+        "trajopt_common/collision_types.h",
+    } <= includes

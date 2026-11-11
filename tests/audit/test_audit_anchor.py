@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from tests.audit._load import audit
+from tests.audit._prov import PROV
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -95,7 +96,6 @@ def test_every_entry_is_an_audited_modules_header_its_binding_includes():
 def test_anchor_includes_rendered_with_reasons():
     report = audit.ModuleReport("fixture", 0, [], [], [], [])
     coverage = audit.Coverage(audited=("fixture",), unaudited={}, total=1)
-    prov = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
-    text = audit.render_markdown([report], prov, coverage, {})
+    text = audit.render_markdown([report], PROV, coverage, {})
     for spelling, reason in audit.PLUGIN_ANCHOR_INCLUDES.items():
         assert f"`{spelling}`: {reason}" in text
