@@ -27,7 +27,7 @@ runs:
       if [ -d "$VENV/Scripts" ]; then BIN="$VENV/Scripts"; else BIN="$VENV/bin"; fi
       echo "TEST_PYTHON=$BIN/python" >> $GITHUB_ENV
       "$BIN/python" -m pip install --upgrade pip
-      "$BIN/python" -m pip install "${{ inputs.wheel_dir }}"/*.whl pytest pytest-xdist pytest-timeout matplotlib
+      "$BIN/python" -m pip install "${{ inputs.wheel_dir }}"/*.whl pytest pytest-xdist pytest-timeout matplotlib ty==0.0.101
   - name: wheel bundles no libstdc++ (Python ${{ inputs.python_version }})
     # gh-119: two libstdc++ copies in one process corrupt the heap; auditwheel never bundles it
     if: runner.os == 'Linux'
