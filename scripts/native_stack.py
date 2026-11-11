@@ -144,7 +144,7 @@ class Stack:
         if self.host.name == "osx":
             return {"DYLD_LIBRARY_PATH": prepend(libs, os.environ.get("DYLD_LIBRARY_PATH"))}
         bins = os.pathsep.join([str(self.vcpkg_prefix / "bin"), str(self.install / "bin")])
-        return {"PATH": prepend(bins, os.environ.get("PATH"))}
+        return {"PATH": os.environ["PATH"] + os.pathsep + bins}
 
     def binding_env(self) -> dict[str, str]:
         """Environment `pip install .` needs to build the bindings against this stack."""
@@ -423,7 +423,7 @@ def main(argv: list[str]) -> None:
         "command", choices=("sources", "vcpkg", "colcon", "all", "github-env", "exec")
     )
     parser.add_argument("--triplet", help="vcpkg triplet (default: this machine's)")
-    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--root", type=Path, help="the build root (all but github-env)")
     parser.add_argument(
         "--binary-cache", type=Path, help="vcpkg binary cache (default: <root>/vcpkg_cache)"
     )
@@ -435,8 +435,12 @@ def main(argv: list[str]) -> None:
     parser.add_argument("rest", nargs="*", help="exec: the command, after --")
     args = parser.parse_args(argv)
     if args.command == "github-env":
-        print(f"VCPKG_REVISION={declarations()['vcpkg']['revision']}")
+        # Newline-terminated with LF on every OS: a CR would end up in the variable's value.
+        with Path(os.environ["GITHUB_ENV"]).open("a", newline="\n") as env_file:
+            env_file.write(f"VCPKG_REVISION={declarations()['vcpkg']['revision']}\n")
         return
+    if args.root is None:
+        parser.error(f"{args.command} needs --root")
     stack = build_stack(args)
     if args.command == "exec":
         run(args.rest, env=stack.binding_env())
