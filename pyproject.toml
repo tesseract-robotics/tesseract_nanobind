@@ -316,6 +316,14 @@ FEEDSTOCK_CONFIG = "osx_arm64_"
 FEEDSTOCK_CONFIG = "linux_64_"
 
 
+# The native stack `pixi run native-build` writes: the default, py312 and py315 envs run the
+# bindings built against it (the upstream and packaged envs use their conda prefix instead).
+[tool.pixi.feature.native.target.osx-arm64.activation.env]
+TESSERACT_CPP_PREFIX = "$PIXI_PROJECT_ROOT/.native/arm64-osx-dynamic-release/ws/install"
+
+[tool.pixi.feature.native.target.linux-64.activation.env]
+TESSERACT_CPP_PREFIX = "$PIXI_PROJECT_ROOT/.native/x64-linux-dynamic-release/ws/install"
+
 # Python 3.12 development env (the PyPI wheels are built without conda, see wheels.yml).
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
@@ -530,11 +538,11 @@ test-packaged = { cmd = "python -m pytest tests --ignore=tests/benchmarks -q -n 
 ], description = "Run the test suite against the packaged 0.36 dev stack" }
 
 [tool.pixi.environments]
-default = { features = ["profile", "viewer"], solve-group = "default" }
+default = { features = ["profile", "viewer", "native"], solve-group = "default" }
 upstream = { features = ["bindings-dev", "upstream", "viewer"], no-default-feature = true, solve-group = "upstream" }
 packaged = { features = ["bindings-dev", "packaged", "viewer"], no-default-feature = true, solve-group = "packaged" }
-py312 = { features = ["py312", "viewer"], solve-group = "py312" }
-py315 = { features = ["py315"], solve-group = "py315" }
+py312 = { features = ["py312", "viewer", "native"], solve-group = "py312" }
+py315 = { features = ["py315", "native"], solve-group = "py315" }
 wheel-312 = { features = ["wheel-test", "wheel-py312"], no-default-feature = true, solve-group = "wheel-312" }
 wheel-313 = { features = ["wheel-test", "wheel-py313"], no-default-feature = true, solve-group = "wheel-313" }
 wheel-314 = { features = ["wheel-test", "wheel-py314"], no-default-feature = true, solve-group = "wheel-314" }
