@@ -26,13 +26,16 @@ def defined_names(module: str) -> set[str]:
 
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
-# audit_types, audit_ownership, audit_parse, audit_bound, audit_stub, audit_lookup, audit_rules,
-# audit_match, audit_report, audit_bindings.
+# audit_types, audit_ownership, audit_cache, audit_parse, audit_bound, gil_entry_points,
+# audit_facts, audit_stub, audit_lookup, audit_rules, audit_match, audit_report, audit_bindings.
 EXPECTED_SCRIPTS = (
     "audit_types",
     "audit_ownership",
+    "audit_cache",
     "audit_parse",
     "audit_bound",
+    "gil_entry_points",
+    "audit_facts",
     "audit_stub",
     "audit_lookup",
     "audit_rules",

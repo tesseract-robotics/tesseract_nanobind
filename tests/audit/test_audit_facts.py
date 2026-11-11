@@ -66,9 +66,10 @@ def test_an_edit_to_an_included_header_reparses(cache, tmp_path):
     shutil.copytree(FIXTURES, work)
     cpp, include = work / IDENTITY.name, work / "include"
     audit.bound_facts(cpp, (include,), audit.parse_tu)
+    tu = audit.parse_tu(cpp, (include,), bodies=True)  # held: includes point into it
     headers = [
         Path(i.include.name)
-        for i in audit.parse_tu(cpp, (include,), bodies=True).get_includes()
+        for i in tu.get_includes()
         if Path(i.include.name).resolve().is_relative_to(include.resolve())
     ]
     assert headers, "the fixture includes a header under its include dir"
