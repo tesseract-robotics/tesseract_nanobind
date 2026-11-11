@@ -393,6 +393,7 @@ audit-gil = { cmd = "python scripts/audit_gil.py", description = "Check every GI
 # which imports the (uninstalled) extension modules.
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
 audit-typecheck = { cmd = "ty check scripts/audit_*.py tests/audit", description = "Type-check the binding API audit scripts and tests" }
+audit-telemetry = { cmd = "python scripts/audit_telemetry_report.py", description = "Print each audit step's fact-cache hits and misses and its timed phases (CI, from BINDING_AUDIT_EVENTS logs)" }
 audit-cache-prune = { cmd = "python scripts/audit_cache_prune.py", description = "Drop the libclang fact-cache entries a run did not use (CI, before saving the cache)" }
 
 # Tooling to build and test the bindings against a 0.36 C++ stack, shared by the
