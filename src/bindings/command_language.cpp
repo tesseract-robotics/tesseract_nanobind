@@ -6,6 +6,8 @@
 #include "tesseract_nb.h"
 #include <algorithm>
 #include <limits>
+#include <typeindex>
+#include <boost/core/demangle.hpp>
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/set.h>
@@ -59,14 +61,124 @@ static std::size_t insert_index(Py_ssize_t i, std::size_t size) {
     return static_cast<std::size_t>(std::clamp<Py_ssize_t>(j, 0, n));
 }
 
+// A Poly's as*() asked for an alternative it does not hold. Upstream's as<T>() throws a bare
+// std::runtime_error (with a stack trace in its message); the bindings check first.
+struct PolyTypeError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// "tesseract::command_language::WaitInstruction" -> "WaitInstruction".
+static std::string short_type_name(const std::type_index& type) {
+    const std::string name = boost::core::demangle(type.name());
+    const auto colon = name.rfind("::");
+    return colon == std::string::npos ? name : name.substr(colon + 2);
+}
+
+// poly.as<T>() by reference, or PolyTypeError naming what the poly does hold.
+template <typename T, typename Poly>
+T& checked_as(Poly& poly, const char* caller) {
+    if (poly.isNull())
+        throw PolyTypeError(std::string(caller) + ": the poly is null, not a " + short_type_name(typeid(T)));
+    if (poly.getType() != typeid(T))
+        throw PolyTypeError(std::string(caller) + ": the poly holds a " + short_type_name(poly.getType()) +
+                            ", not a " + short_type_name(typeid(T)));
+    return poly.template as<T>();
+}
+
+// CompositeInstruction hands Python references into its std::vector<InstructionPoly>: `c[i]`,
+// front/back/at, iteration, flatten, getFirst/Last*. A call that relocates or destroys an element
+// while Python holds such a reference would leave it pointing at moved or freed memory, so it
+// raises this instead, as bytearray raises BufferError when it would resize under an exported
+// buffer (ContactResultVector does the same, collision.cpp).
+struct InstructionHeldError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+template <typename T>
+static bool held(const T& object) {
+    return nb::find(object).is_valid();
+}
+
+// Python holds the element itself, or (for a destroyed element) anything inside it. An
+// InstructionPoly keeps its instruction on the heap (a unique_ptr), so relocating the element
+// moves only that pointer: a view of the instruction (as*Instruction, getFirstMoveInstruction)
+// or of a child composite's elements survives relocation and dies only with the element. Every
+// reference into an instruction (getWaypoint, asCartesianWaypoint, ...) keeps the wrapper of
+// the object it came from alive (reference_internal), so finding the instruction-level wrappers
+// covers the whole chain.
+static bool instruction_held(const tp::InstructionPoly& instruction, bool deep) {
+    if (held(instruction)) return true;
+    if (!deep || instruction.isNull()) return false;
+    if (instruction.isMoveInstruction()) return held(instruction.as<tp::MoveInstructionPoly>());
+    if (instruction.isCompositeInstruction()) {
+        const auto& composite = instruction.as<tp::CompositeInstruction>();
+        if (held(composite)) return true;
+        return std::any_of(composite.begin(), composite.end(),
+                           [](const tp::InstructionPoly& child) { return instruction_held(child, true); });
+    }
+    if (tp::isWaitInstruction(instruction)) return held(instruction.as<tp::WaitInstruction>());
+    if (tp::isTimerInstruction(instruction)) return held(instruction.as<tp::TimerInstruction>());
+    if (tp::isSetAnalogInstruction(instruction)) return held(instruction.as<tp::SetAnalogInstruction>());
+    if (tp::isSetDigitalInstruction(instruction)) return held(instruction.as<tp::SetDigitalInstruction>());
+    if (tp::isSetToolInstruction(instruction)) return held(instruction.as<tp::SetToolInstruction>());
+    return false;
+}
+
+// Raise InstructionHeldError if Python holds a reference that a change to elements
+// [first, last) invalidates: the elements themselves when they only move (`deep` false), or
+// anything inside them when they are destroyed (`deep` true). O(elements checked).
+static void check_not_held(const tp::CompositeInstruction& self, std::size_t first, std::size_t last, bool deep,
+                           const char* caller) {
+    for (std::size_t i = first; i < last; ++i)
+        if (instruction_held(self[i], deep))
+            throw InstructionHeldError(std::string("CompositeInstruction.") + caller + ": element " +
+                                       std::to_string(i) + (deep ? ", or a reference into it," : "") +
+                                       " is still held by Python and would be " + (deep ? "destroyed" : "moved") +
+                                       "; delete the reference first, or hold a copy (copy.copy)");
+}
+
+// One more element at `index`: a reallocation moves every element, otherwise the ones from
+// `index` on shift by one. Python list.insert semantics for the index.
+static void insert_checked(tp::CompositeInstruction& self, Py_ssize_t index, tp::InstructionPoly instruction,
+                           const char* caller) {
+    const std::size_t at = insert_index(index, self.size());
+    check_not_held(self, self.size() == self.capacity() ? 0 : at, self.size(), false, caller);
+    self.insert(self.begin() + static_cast<std::ptrdiff_t>(at), std::move(instruction));
+}
+
+static void push_back_checked(tp::CompositeInstruction& self, tp::InstructionPoly instruction) {
+    insert_checked(self, static_cast<Py_ssize_t>(self.size()), std::move(instruction), "push_back");
+}
+
+// Erase elements [first, last): they are destroyed, the ones after them shift down.
+static void erase_checked(tp::CompositeInstruction& self, std::size_t first, std::size_t last, const char* caller) {
+    check_not_held(self, first, last, true, caller);
+    check_not_held(self, last, self.size(), false, caller);
+    self.erase(self.begin() + static_cast<std::ptrdiff_t>(first), self.begin() + static_cast<std::ptrdiff_t>(last));
+}
+
 // CompositeInstruction.insert for one alternative of InstructionPoly (rule poly-alternative-overloads).
 template <typename T>
 auto composite_insert() {
     return [](tp::CompositeInstruction& self, Py_ssize_t index, const T& instruction) {
-        self.insert(self.begin() + static_cast<std::ptrdiff_t>(insert_index(index, self.size())),
-                    tp::InstructionPoly(instruction));
+        insert_checked(self, index, tp::InstructionPoly(instruction), "insert");
     };
 }
+
+// CompositeInstruction.push_back for one alternative of InstructionPoly.
+template <typename T>
+auto composite_push_back() {
+    return [](tp::CompositeInstruction& self, const T& instruction) {
+        push_back_checked(self, tp::InstructionPoly(instruction));
+    };
+}
+
+// Iterates a CompositeInstruction by index, re-reading its size at each step as a list
+// iterator does, so a push_back in the loop body is seen and never leaves it on freed memory.
+struct CompositeInstructionIterator {
+    nb::object composite;
+    std::size_t index = 0;
+};
 
 // UserDataVariant -> Python. AnyPoly is bound in tesseract_task_composer, which this module does not import.
 static nb::object user_data_to_python(const std::string& key, const tp::CompositeInstruction::UserDataVariant& value) {
@@ -233,21 +345,22 @@ NB_MODULE(command_language, m) {
         .def("isJointWaypoint", &tp::WaypointPoly::isJointWaypoint)
         .def("isStateWaypoint", &tp::WaypointPoly::isStateWaypoint)
         .def("isNull", &tp::WaypointPoly::isNull)
-        // C++ as<T>() returns T& and raises std::runtime_error on a type mismatch.
+        // By reference; a poly holding another alternative raises PolyTypeError.
         .def("asCartesianWaypoint", [](tp::WaypointPoly& self) -> tp::CartesianWaypointPoly& {
-            return self.as<tp::CartesianWaypointPoly>();
+            return checked_as<tp::CartesianWaypointPoly>(self, "WaypointPoly.asCartesianWaypoint");
         }, nb::rv_policy::reference_internal, "The stored CartesianWaypointPoly, by reference.")
         .def("asJointWaypoint", [](tp::WaypointPoly& self) -> tp::JointWaypointPoly& {
-            return self.as<tp::JointWaypointPoly>();
+            return checked_as<tp::JointWaypointPoly>(self, "WaypointPoly.asJointWaypoint");
         }, nb::rv_policy::reference_internal, "The stored JointWaypointPoly, by reference.")
         .def("asStateWaypoint", [](tp::WaypointPoly& self) -> tp::StateWaypointPoly& {
-            return self.as<tp::StateWaypointPoly>();
+            return checked_as<tp::StateWaypointPoly>(self, "WaypointPoly.asStateWaypoint");
         }, nb::rv_policy::reference_internal, "The stored StateWaypointPoly, by reference.");
     bind_value_equality(waypoint_poly);
     bind_copy(waypoint_poly);
 
     // ========== CartesianWaypointPoly ==========
-    // Note: Not binding as subclass of WaypointPoly due to nanobind limitations
+    // Not a subclass of WaypointPoly: upstream's typed Polys are their own type-erased classes
+    // (WaypointPoly holds one); the shared members are bound on each.
     cartesian_waypoint_poly
         .def(nb::init<>())
         .def(nb::init<tp::CartesianWaypoint>(), "waypoint"_a)
@@ -269,7 +382,7 @@ NB_MODULE(command_language, m) {
         })
         .def("isToleranced", &tp::CartesianWaypointPoly::isToleranced)
         .def("asCartesianWaypoint", [](tp::CartesianWaypointPoly& self) -> tp::CartesianWaypoint& {
-            return self.as<tp::CartesianWaypoint>();
+            return checked_as<tp::CartesianWaypoint>(self, "CartesianWaypointPoly.asCartesianWaypoint");
         }, nb::rv_policy::reference_internal, "The stored CartesianWaypoint, by reference.")
         // Re-expose WaypointPoly methods
         .def("setName", &tp::CartesianWaypointPoly::setName, "name"_a)
@@ -301,7 +414,7 @@ NB_MODULE(command_language, m) {
         })
         .def("isToleranced", &tp::JointWaypointPoly::isToleranced)
         .def("asJointWaypoint", [](tp::JointWaypointPoly& self) -> tp::JointWaypoint& {
-            return self.as<tp::JointWaypoint>();
+            return checked_as<tp::JointWaypoint>(self, "JointWaypointPoly.asJointWaypoint");
         }, nb::rv_policy::reference_internal, "The stored JointWaypoint, by reference.")
         // Re-expose WaypointPoly methods
         .def("setName", &tp::JointWaypointPoly::setName, "name"_a)
@@ -341,7 +454,7 @@ NB_MODULE(command_language, m) {
         .def("print", &tp::StateWaypointPoly::print, "prefix"_a = "")
         .def("isNull", &tp::StateWaypointPoly::isNull)
         .def("asStateWaypoint", [](tp::StateWaypointPoly& self) -> tp::StateWaypoint& {
-            return self.as<tp::StateWaypoint>();
+            return checked_as<tp::StateWaypoint>(self, "StateWaypointPoly.asStateWaypoint");
         }, nb::rv_policy::reference_internal, "The stored StateWaypoint, by reference.");
     bind_value_equality(state_waypoint_poly);
     bind_copy(state_waypoint_poly);
@@ -368,48 +481,37 @@ NB_MODULE(command_language, m) {
         .def("isSetDigitalInstruction", &tp::isSetDigitalInstruction)
         .def("isSetToolInstruction", &tp::isSetToolInstruction)
         .def("isNull", &tp::InstructionPoly::isNull)
-        // Note: In 0.33, use .as<T>() for type casting
-        .def("asMoveInstruction", [](tp::InstructionPoly& self) -> tp::MoveInstructionPoly {
-            if (!self.isMoveInstruction())
-                throw std::runtime_error("InstructionPoly is not a MoveInstruction");
-            return self.as<tp::MoveInstructionPoly>();
-        }, "Cast to MoveInstructionPoly. Raises RuntimeError if not a move instruction.")
-        .def("asCompositeInstruction", [](tp::InstructionPoly& self) -> tp::CompositeInstruction {
-            if (!self.isCompositeInstruction())
-                throw std::runtime_error("InstructionPoly is not a CompositeInstruction");
-            return self.as<tp::CompositeInstruction>();
-        }, "Cast to CompositeInstruction. Raises RuntimeError if not a composite instruction.")
-        .def("asWaitInstruction", [](tp::InstructionPoly& self) -> tp::WaitInstruction {
-            if (!tp::isWaitInstruction(self))
-                throw std::runtime_error("InstructionPoly is not a WaitInstruction");
-            return self.as<tp::WaitInstruction>();
-        }, "Cast to WaitInstruction. Raises RuntimeError if not a wait instruction.")
-        .def("asTimerInstruction", [](tp::InstructionPoly& self) -> tp::TimerInstruction {
-            if (!tp::isTimerInstruction(self))
-                throw std::runtime_error("InstructionPoly is not a TimerInstruction");
-            return self.as<tp::TimerInstruction>();
-        }, "Cast to TimerInstruction. Raises RuntimeError if not a timer instruction.")
-        .def("asSetAnalogInstruction", [](tp::InstructionPoly& self) -> tp::SetAnalogInstruction {
-            if (!tp::isSetAnalogInstruction(self))
-                throw std::runtime_error("InstructionPoly is not a SetAnalogInstruction");
-            return self.as<tp::SetAnalogInstruction>();
-        }, "Cast to SetAnalogInstruction. Raises RuntimeError if not a set analog instruction.")
-        .def("asSetDigitalInstruction", [](tp::InstructionPoly& self) -> tp::SetDigitalInstruction {
-            if (!tp::isSetDigitalInstruction(self))
-                throw std::runtime_error("InstructionPoly is not a SetDigitalInstruction");
-            return self.as<tp::SetDigitalInstruction>();
-        }, "Cast to SetDigitalInstruction. Raises RuntimeError if not a set digital instruction.")
-        .def("asSetToolInstruction", [](tp::InstructionPoly& self) -> tp::SetToolInstruction {
-            if (!tp::isSetToolInstruction(self))
-                throw std::runtime_error("InstructionPoly is not a SetToolInstruction");
-            return self.as<tp::SetToolInstruction>();
-        }, "Cast to SetToolInstruction. Raises RuntimeError if not a set tool instruction.");
+        // Views: each returns the instruction this poly holds, by reference, so
+        // `prog[0].asMoveInstruction().setWaypoint(wp)` edits the program. A poly holding another
+        // alternative raises PolyTypeError.
+        .def("asMoveInstruction", [](tp::InstructionPoly& self) -> tp::MoveInstructionPoly& {
+            return checked_as<tp::MoveInstructionPoly>(self, "InstructionPoly.asMoveInstruction");
+        }, nb::rv_policy::reference_internal, "The stored MoveInstructionPoly, by reference.")
+        .def("asCompositeInstruction", [](tp::InstructionPoly& self) -> tp::CompositeInstruction& {
+            return checked_as<tp::CompositeInstruction>(self, "InstructionPoly.asCompositeInstruction");
+        }, nb::rv_policy::reference_internal, "The stored CompositeInstruction, by reference.")
+        .def("asWaitInstruction", [](tp::InstructionPoly& self) -> tp::WaitInstruction& {
+            return checked_as<tp::WaitInstruction>(self, "InstructionPoly.asWaitInstruction");
+        }, nb::rv_policy::reference_internal, "The stored WaitInstruction, by reference.")
+        .def("asTimerInstruction", [](tp::InstructionPoly& self) -> tp::TimerInstruction& {
+            return checked_as<tp::TimerInstruction>(self, "InstructionPoly.asTimerInstruction");
+        }, nb::rv_policy::reference_internal, "The stored TimerInstruction, by reference.")
+        .def("asSetAnalogInstruction", [](tp::InstructionPoly& self) -> tp::SetAnalogInstruction& {
+            return checked_as<tp::SetAnalogInstruction>(self, "InstructionPoly.asSetAnalogInstruction");
+        }, nb::rv_policy::reference_internal, "The stored SetAnalogInstruction, by reference.")
+        .def("asSetDigitalInstruction", [](tp::InstructionPoly& self) -> tp::SetDigitalInstruction& {
+            return checked_as<tp::SetDigitalInstruction>(self, "InstructionPoly.asSetDigitalInstruction");
+        }, nb::rv_policy::reference_internal, "The stored SetDigitalInstruction, by reference.")
+        .def("asSetToolInstruction", [](tp::InstructionPoly& self) -> tp::SetToolInstruction& {
+            return checked_as<tp::SetToolInstruction>(self, "InstructionPoly.asSetToolInstruction");
+        }, nb::rv_policy::reference_internal, "The stored SetToolInstruction, by reference.");
     bind_value_equality(instruction_poly);
     bind_copy(instruction_poly);
     bind_uuid(instruction_poly);
 
     // ========== MoveInstructionPoly ==========
-    // Note: Not binding as subclass due to nanobind cross-module limitations
+    // Not a subclass of InstructionPoly: upstream's MoveInstructionPoly is its own type-erased class
+    // (InstructionPoly holds one); the shared members are bound on each.
     auto move_instruction_poly = nb::class_<tp::MoveInstructionPoly>(m, "MoveInstructionPoly")
         .def(nb::init<>())
         .def(nb::init<const tp::MoveInstruction&>(), "instruction"_a)
@@ -458,7 +560,7 @@ NB_MODULE(command_language, m) {
         .def("print", &tp::MoveInstructionPoly::print, "prefix"_a = "")
         .def("isNull", &tp::MoveInstructionPoly::isNull)
         .def("asMoveInstruction", [](tp::MoveInstructionPoly& self) -> tp::MoveInstruction& {
-            return self.as<tp::MoveInstruction>();
+            return checked_as<tp::MoveInstruction>(self, "MoveInstructionPoly.asMoveInstruction");
         }, nb::rv_policy::reference_internal, "The stored MoveInstruction, by reference.");
     bind_value_equality(move_instruction_poly);
     bind_copy(move_instruction_poly);
@@ -619,10 +721,25 @@ NB_MODULE(command_language, m) {
     bind_copy(set_tool_instruction);
     bind_uuid(set_tool_instruction);
 
+    // ========== CompositeInstruction iterator ==========
+    nb::class_<CompositeInstructionIterator>(m, "CompositeInstructionIterator")
+        .def("__iter__", [](nb::handle self) { return nb::borrow(self); })
+        .def("__next__", [](CompositeInstructionIterator& it) {
+            auto& composite = nb::cast<tp::CompositeInstruction&>(it.composite);
+            if (it.index >= composite.size()) throw nb::stop_iteration();
+            return nb::cast(&composite[it.index++], nb::rv_policy::reference_internal, it.composite);
+        }, nb::sig("def __next__(self) -> InstructionPoly"));
+
+    nb::exception<PolyTypeError>(m, "PolyTypeError", PyExc_TypeError)
+        .attr("__doc__") = "A Poly's as*() asked for an alternative it does not hold (or the Poly is null).";
+    nb::exception<InstructionHeldError>(m, "InstructionHeldError", PyExc_BufferError)
+        .attr("__doc__") = "A CompositeInstruction call would move or destroy an element while Python holds a "
+                           "reference to it, or into it (`x = c[i]`, `c.getFirstMoveInstruction()`).";
+
     // ========== CompositeInstruction ==========
     auto composite_instruction = nb::class_<tp::CompositeInstruction>(m, "CompositeInstruction")
         .def(nb::init<>())
-        .def(nb::init<std::string>(), "profile"_a)  // SWIG-compatible constructor
+        .def(nb::init<std::string>(), "profile"_a)
         // Full C++ ctor — e.g. raster transition composites need order=UNORDERED
         .def(nb::init<std::string, tesseract::common::ManipulatorInfo, tp::CompositeInstructionOrder>(),
              "profile"_a, "manipulator_info"_a = tesseract::common::ManipulatorInfo(),
@@ -664,44 +781,32 @@ NB_MODULE(command_language, m) {
             return self.getManipulatorInfo();
         })
         .def("setManipulatorInfo", &tp::CompositeInstruction::setManipulatorInfo, "info"_a)
-        .def("getInstructions", [](tp::CompositeInstruction& self) -> std::vector<tp::InstructionPoly>& {
-            return self.getInstructions();
-        }, nb::rv_policy::reference_internal)
-        .def("setInstructions", &tp::CompositeInstruction::setInstructions, "instructions"_a)
+        .def("getInstructions", [](const tp::CompositeInstruction& self) { return self.getInstructions(); },
+             "A copy of the instructions, as a list; index the composite (`c[i]`) for a reference.")
+        .def("setInstructions", [](tp::CompositeInstruction& self, std::vector<tp::InstructionPoly> instructions) {
+            check_not_held(self, 0, self.size(), true, "setInstructions");
+            self.setInstructions(std::move(instructions));
+        }, "instructions"_a, "Replace every instruction; raises InstructionHeldError while one is held.")
         // Per-type push_back overloads exist primarily for static type-checkers:
         // nb::implicitly_convertible<T, InstructionPoly> handles dispatch at runtime,
         // but stub generators emit each .def with its declared signature, so without
         // explicit overloads, a callsite like `composite.push_back(MoveInstructionPoly(...))`
         // would type-check as an error even though it works at runtime.
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::InstructionPoly& ip) {
-            self.push_back(ip);
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::MoveInstructionPoly& mi) {
-            self.push_back(tp::InstructionPoly(mi));
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::MoveInstruction& mi) {
-            self.push_back(tp::InstructionPoly(mi));
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::CompositeInstruction& ci) {
-            self.push_back(tp::InstructionPoly(ci));
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::WaitInstruction& wi) {
-            self.push_back(tp::InstructionPoly(wi));
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::TimerInstruction& ti) {
-            self.push_back(tp::InstructionPoly(ti));
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::SetAnalogInstruction& si) {
-            self.push_back(tp::InstructionPoly(si));
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::SetDigitalInstruction& si) {
-            self.push_back(tp::InstructionPoly(si));
-        }, "instruction"_a)
-        .def("push_back", [](tp::CompositeInstruction& self, const tp::SetToolInstruction& si) {
-            self.push_back(tp::InstructionPoly(si));
-        }, "instruction"_a)
+        .def("push_back", composite_push_back<tp::InstructionPoly>(), "instruction"_a,
+             "Append a copy; raises InstructionHeldError, before appending, when the append would "
+             "reallocate while an element is held.")
+        .def("push_back", composite_push_back<tp::MoveInstructionPoly>(), "instruction"_a)
+        .def("push_back", composite_push_back<tp::MoveInstruction>(), "instruction"_a)
+        .def("push_back", composite_push_back<tp::CompositeInstruction>(), "instruction"_a)
+        .def("push_back", composite_push_back<tp::WaitInstruction>(), "instruction"_a)
+        .def("push_back", composite_push_back<tp::TimerInstruction>(), "instruction"_a)
+        .def("push_back", composite_push_back<tp::SetAnalogInstruction>(), "instruction"_a)
+        .def("push_back", composite_push_back<tp::SetDigitalInstruction>(), "instruction"_a)
+        .def("push_back", composite_push_back<tp::SetToolInstruction>(), "instruction"_a)
         // list.insert form: the index becomes an iterator. One overload per alternative, as push_back.
-        .def("insert", composite_insert<tp::InstructionPoly>(), "index"_a, "instruction"_a)
+        .def("insert", composite_insert<tp::InstructionPoly>(), "index"_a, "instruction"_a,
+             "Insert a copy before `index` (list.insert semantics); raises InstructionHeldError while "
+             "an element it would move is held.")
         .def("insert", composite_insert<tp::MoveInstructionPoly>(), "index"_a, "instruction"_a)
         .def("insert", composite_insert<tp::MoveInstruction>(), "index"_a, "instruction"_a)
         .def("insert", composite_insert<tp::CompositeInstruction>(), "index"_a, "instruction"_a)
@@ -712,44 +817,63 @@ NB_MODULE(command_language, m) {
         .def("insert", composite_insert<tp::SetToolInstruction>(), "index"_a, "instruction"_a)
         // erase, in its Python form.
         .def("__delitem__", [](tp::CompositeInstruction& self, Py_ssize_t i) {
-            self.erase(self.begin() + static_cast<std::ptrdiff_t>(normalize_index(i, self.size())));
-        }, "index"_a)
+            const std::size_t j = normalize_index(i, self.size());
+            erase_checked(self, j, j + 1, "__delitem__");
+        }, "index"_a,
+           "Erase one element; raises InstructionHeldError while it, a reference into it, or an "
+           "element after it is held.")
         .def("__delitem__", [](tp::CompositeInstruction& self, const nb::slice& slice) {
             const auto [start, stop, step, length] = slice.compute(self.size());
+            if (length == 0) return;
             if (step == 1) {
-                self.erase(self.begin() + start, self.begin() + start + static_cast<Py_ssize_t>(length));
+                const auto first = static_cast<std::size_t>(start);
+                erase_checked(self, first, first + length, "__delitem__");
                 return;
             }
-            // Erase from the back, so the indices still to erase stay valid.
-            std::vector<Py_ssize_t> indices;
+            // Check every erased element (deep) and every element that shifts, before erasing
+            // anything; then erase from the back, so the indices still to erase stay valid.
+            std::vector<std::size_t> indices;
             for (std::size_t k = 0; k < length; ++k)
-                indices.push_back(start + static_cast<Py_ssize_t>(k) * step);
-            std::sort(indices.rbegin(), indices.rend());
-            for (const Py_ssize_t j : indices)
-                self.erase(self.begin() + j);
+                indices.push_back(static_cast<std::size_t>(start + static_cast<Py_ssize_t>(k) * step));
+            std::sort(indices.begin(), indices.end());
+            for (const std::size_t j : indices) check_not_held(self, j, j + 1, true, "__delitem__");
+            check_not_held(self, indices.front(), self.size(), false, "__delitem__");
+            for (auto it = indices.rbegin(); it != indices.rend(); ++it)
+                self.erase(self.begin() + static_cast<std::ptrdiff_t>(*it));
         }, "slice"_a)
         .def("size", &tp::CompositeInstruction::size)
         .def("empty", &tp::CompositeInstruction::empty)
-        .def("clear", &tp::CompositeInstruction::clear)
+        .def("clear", [](tp::CompositeInstruction& self) {
+            check_not_held(self, 0, self.size(), true, "clear");
+            self.clear();
+        }, "Remove every element; raises InstructionHeldError while one, or a reference into one, is held.")
         .def("max_size", &tp::CompositeInstruction::max_size)
-        .def("reserve", &tp::CompositeInstruction::reserve, "n"_a)
+        .def("reserve", [](tp::CompositeInstruction& self, std::size_t n) {
+            if (n > self.capacity()) check_not_held(self, 0, self.size(), false, "reserve");
+            self.reserve(n);
+        }, "n"_a, "Grow the capacity to at least `n`; raises InstructionHeldError when that reallocates "
+                  "while an element is held.")
         .def("capacity", &tp::CompositeInstruction::capacity)
-        .def("shrink_to_fit", &tp::CompositeInstruction::shrink_to_fit)
+        .def("shrink_to_fit", [](tp::CompositeInstruction& self) {
+            if (self.capacity() != self.size()) check_not_held(self, 0, self.size(), false, "shrink_to_fit");
+            self.shrink_to_fit();
+        }, "Release unused capacity; raises InstructionHeldError when that may reallocate while an "
+           "element is held.")
         // front/back/pop_back on an empty std::vector are undefined behaviour: check first.
         .def("front", [](tp::CompositeInstruction& self) -> tp::InstructionPoly& {
             if (self.empty()) throw std::out_of_range("CompositeInstruction.front: empty composite");
             return self.front();
-        }, nb::rv_policy::reference_internal)
+        }, nb::rv_policy::reference_internal, "The first element, by reference.")
         .def("back", [](tp::CompositeInstruction& self) -> tp::InstructionPoly& {
             if (self.empty()) throw std::out_of_range("CompositeInstruction.back: empty composite");
             return self.back();
-        }, nb::rv_policy::reference_internal)
+        }, nb::rv_policy::reference_internal, "The last element, by reference.")
         .def("at", nb::overload_cast<tp::CompositeInstruction::size_type>(&tp::CompositeInstruction::at),
-             "n"_a, nb::rv_policy::reference_internal)
+             "n"_a, nb::rv_policy::reference_internal, "Element `n`, by reference; IndexError when out of range.")
         .def("pop_back", [](tp::CompositeInstruction& self) {
             if (self.empty()) throw std::out_of_range("CompositeInstruction.pop_back: empty composite");
-            self.pop_back();
-        })
+            erase_checked(self, self.size() - 1, self.size(), "pop_back");
+        }, "Remove the last element; raises InstructionHeldError while it, or a reference into it, is held.")
         // Traversal into child composites. Instructions come back by reference into this
         // composite, which they keep alive. A filter is called as filter(instruction, parent).
         .def("flatten", [](tp::CompositeInstruction& self, const tp::flattenFilterFn& filter) {
@@ -780,10 +904,13 @@ NB_MODULE(command_language, m) {
         .def("__len__", &tp::CompositeInstruction::size)
         .def("__getitem__", [](tp::CompositeInstruction& self, Py_ssize_t i) -> tp::InstructionPoly& {
             return self[normalize_index(i, self.size())];
-        }, nb::rv_policy::reference_internal)
-        .def("__iter__", [](tp::CompositeInstruction& self) {
-            return nb::make_iterator(nb::type<tp::CompositeInstruction>(), "iterator", self.begin(), self.end());
-        }, nb::keep_alive<0, 1>());
+        }, nb::rv_policy::reference_internal,
+           "Element `i` (negative counts from the end), by reference: edits write through. While it is "
+           "held, calls that would move or destroy it raise InstructionHeldError.")
+        .def("__iter__", [](nb::handle self) {
+            return CompositeInstructionIterator{ nb::borrow(self), 0 };
+        }, nb::sig("def __iter__(self) -> collections.abc.Iterator[InstructionPoly]"),
+           "Iterate the elements by reference, by index as a list iterator does.");
     bind_value_equality(composite_instruction);
     bind_copy(composite_instruction);
     bind_uuid(composite_instruction);
@@ -792,14 +919,12 @@ NB_MODULE(command_language, m) {
           "Filter for flatten/getFirstInstruction/...: True for a move instruction.");
 
     // ========== Profile (base class) ==========
-    // Note: Profile moved to tesseract_common in 0.33
     nb::class_<tc::Profile>(m, "Profile")
         .def(nb::init<>())
         .def(nb::init<std::size_t>(), "key"_a)
         .def("getKey", &tc::Profile::getKey);
 
     // ========== ProfileDictionary ==========
-    // Note: ProfileDictionary moved to tesseract_common in 0.33
     // Note: key is std::size_t (a type hash); Python gets it from the static X.createKey() (#273)
     nb::class_<tc::ProfileDictionary>(m, "ProfileDictionary")
         .def(nb::init<>())

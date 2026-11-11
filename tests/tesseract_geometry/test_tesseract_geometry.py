@@ -152,7 +152,7 @@ def test_geometry_load_mesh():
 
 
 def test_mesh():
-    vertices = tesseract_common.VectorVector3d()
+    vertices = []
     vertices.append(np.array([1, 1, 0], dtype=np.float64))
     vertices.append(np.array([1, -1, 0], dtype=np.float64))
     vertices.append(np.array([-1, -1, 0], dtype=np.float64))
@@ -174,7 +174,7 @@ def test_mesh():
 
 
 def test_convex_mesh():
-    vertices = tesseract_common.VectorVector3d()
+    vertices = []
     vertices.append(np.array([1, 1, 0], dtype=np.float64))
     vertices.append(np.array([1, -1, 0], dtype=np.float64))
     vertices.append(np.array([-1, -1, 0], dtype=np.float64))

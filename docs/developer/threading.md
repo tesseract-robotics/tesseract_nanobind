@@ -1,6 +1,6 @@
 # Threading and the GIL
 
-64 bindings release the GIL, each one listed with its reason in
+Every binding that releases the GIL is listed with its reason in
 [`scripts/nogil_entry_points.yaml`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/scripts/nogil_entry_points.yaml)
 (#124). Every other binding holds the GIL for the whole call. The list is checked, not trusted:
 `pixi run -e audit audit-gil` parses every binding TU and fails CI when a binding and the list
@@ -8,10 +8,11 @@ disagree, in either direction. Run-time tests check that each release added by #
 the GIL. New candidates come from measurement: `pixi run gil-hotspots` ranks the bindings that hold
 the GIL longest in the benchmarks and the test suite.
 
-Two caveats. First, `Environment` stays mostly GIL-held, because one deadlock is known (see
-[Known limitation](#known-limitation-environment-event-callbacks)) and its fix is a separate change.
-Second, the plugin factories are slow but can't release the GIL until upstream synchronises their
-caches (see [Upstream](#upstream-plugin-factory-caches)).
+Every `Environment` method releases the GIL, `init` and `getKinematicGroup` included: a thread
+never waits for an environment's lock while it holds the GIL, which is what made a Python event
+callback deadlock against a writer on another thread (see
+[Environment event callbacks](#environment-event-callbacks)). The plugin factories stay GIL-held
+until upstream synchronises their caches (see [Upstream](#upstream-plugin-factory-caches)).
 
 !!! success "Confirmed"
     `audit-gil`: 64 releases, all listed (macOS arm64, 2026-11-08). The audit's contract tests (`pixi run -e audit
@@ -19,8 +20,8 @@ caches (see [Upstream](#upstream-plugin-factory-caches)).
     (macOS arm64, Python 3.14, 2026-10-24).
 
 !!! warning "Incomplete"
-    The `Environment` deadlock fix and the plugin-factory releases are remaining work: see
-    [Remaining work](#remaining-work).
+    The plugin-factory releases are remaining work, and `scripts/nogil_entry_points.yaml` must list
+    the `Environment` releases before the next `audit-gil` run: see [Remaining work](#remaining-work).
 
 ## The rule
 
@@ -130,13 +131,13 @@ one sample is 10 ms.
 | `serialization: environment_{to,from}_{xml,binary}` | 12.2 s together | - | tests | released: same reasons (to and from share a test line, so no per-call mean) |
 | `motion_planners_simple: generateInterpolatedProgram` | 106 ms | 37 | tests | released: interpolation and a state solve per step; only reads `env` |
 | `geometry: createMeshFromResource` | 2.5 ms | 69 | tests | released, with the `Path` loaders and the `ConvexMesh` variants: file IO plus assimp, like `parseURDFFile` |
-| `environment: Environment.init` | 0.85 s / 0.93 s | 303 / 438 | bench / tests | GIL-held: `Environment` method, see the deadlock below |
-| `environment: Environment.getKinematicGroup` | 0.83 s / 0.54 s | 35 / 146 | bench / tests | GIL-held: `Environment` method |
+| `environment: Environment.init` | 0.85 s / 0.93 s | 303 / 438 | bench / tests | released, with every `Environment` method (event callbacks below) |
+| `environment: Environment.getKinematicGroup` | 0.83 s / 0.54 s | 35 / 146 | bench / tests | released, with every `Environment` method |
 | `task_composer: TaskComposerPluginFactory.createTaskComposerNode` | 26 ms / 1.6 s | 570 / 338 | bench / tests | GIL-held: unsynchronised factory cache |
 | `task_composer: TaskComposerPluginFactory.createTaskComposerExecutor` | 0.73 s / 0.99 s | 2 / 48 | bench / tests | GIL-held: unsynchronised factory cache |
 | `kinematics: KinematicsPluginFactory.createFwdKin` / `createInvKin` | 0.92 s / 0.46 s | 19 / 12 | tests | GIL-held: unsynchronised factory cache |
 | `collision: ContactManagersPluginFactory.createDiscreteContactManager` / `createContinuousContactManager` | 0.50 s / 0.56 s | 22 / 17 | tests | GIL-held: unsynchronised factory cache |
-| `motion_planners_descartes: DescartesMoveProfileD.createKinematicGroup` | 0.96 s | 3 | tests | GIL-held: its cost is `Environment.getKinematicGroup`; decide with it |
+| `motion_planners_descartes: DescartesMoveProfileD.createKinematicGroup` | 0.96 s | 3 | tests | released: it locks the environment, as every binding that reads one now does without the GIL |
 | `motion_planners_trajopt_ifopt: TrajOptIfoptCompositeProfile.create` | 84 ms | 5 | tests | GIL-held: the binding runs Python-side contract checks around a trampoline |
 | `task_composer: TaskComposerPluginFactory.getAvailableTaskComposerNodePlugins` | 410 ms | 2 | tests | GIL-held: a getter |
 | `geometry: PolygonMesh.getVertices` / `getFaces` | 80 µs | 1257 | tests | GIL-held: getters (the cost is copying to NumPy) |
@@ -189,20 +190,34 @@ re-ranks a recording, for instance after the list changed.
   Python composite profile and a Python cost run on the task composer's worker threads while the
   main thread waits on the future. Without the release in `TaskComposerFuture.wait` this deadlocks.
 
-## Known limitation: Environment event callbacks
+## Environment event callbacks
 
-`Environment` fires its event callbacks under a shared lock on its mutex, after dropping the
-unique lock it applied the change under. `applyCommand` (three overloads) and `applyCommands`
-release the GIL, so a Python callback waits for the GIL while that shared lock is held. If another
-Python thread meanwhile calls an `Environment` method that takes the unique lock without releasing
-the GIL (`setState`, the other `applyCommand` overloads, `setName`, ...), each thread waits for
-the other. On platforms whose shared mutex favours waiting writers, the same holds for a reader
-queued behind a writer.
+`Environment` fires its event callbacks under a shared lock on its mutex, on the thread that
+changed it, after dropping the unique lock it applied the change under. A Python callback then
+waits for the GIL while that shared lock is held. A thread that waited for the environment's lock
+while holding the GIL would deadlock against it: a writer (`setState`, `applyCommand`, ...)
+always, a reader too on platforms whose shared mutex queues readers behind a waiting writer.
 
-This needs a registered Python event callback *and* concurrent mutation from Python. A single
-writer thread is safe. Until every `Environment` binding that takes its mutex releases the GIL,
-`Environment.init` doesn't release it either, so the window doesn't widen. This also keeps
-`Environment.getKinematicGroup`, the second-largest GIL holder measured above, GIL-held.
+So no binding waits for an environment's lock with the GIL held:
+
+- every `Environment` method runs with the GIL released (`NoGil` in `environment.cpp`), its
+  validation included: validation reads the environment, and its errors are plain C++ exceptions,
+  translated once the GIL is back;
+- every binding in another module that reads an environment does the same:
+  `assignCurrentStateAsSeed`, `formatProgram`, `toToolpath`, the Descartes profile `create*`
+  methods, the TrajOpt-Ifopt profile `create` methods, `createCollisionConstraints`, the
+  collision evaluators' constructors, the simple planner's instruction infos, and the
+  `serialization` Environment functions;
+- `PyEventCallbackFn` and `PyFindTCPOffsetFn` hold their callable through `gil_safe_object`
+  (`tesseract_nb.h`), so `addEventCallback` and `Environment::clone` copy them without the GIL,
+  and each call takes the GIL itself.
+
+A callback receives the event over its own copy of the history or state, so it may keep it.
+A callback must not change its environment: upstream holds the shared lock while it runs.
+
+Test: `tests/tesseract_environment/test_environment_lifetimes.py`
+(`test_event_callback_with_concurrent_writer_does_not_deadlock`, a child interpreter with a
+timeout).
 
 ## C++ threads that call Python at interpreter exit
 
@@ -254,6 +269,10 @@ A reload still holds the GIL throughout, except in the Python callbacks it makes
 thread that needs the GIL gets it at the next of those or between reloads, so each record logged
 during a reload can cost up to one reload.
 
+The gate lives in the server (`GatedServer`, `task_composer.cpp`) and dies with it; a call keeps
+its server alive while it waits on the gate. The gate compensates for upstream's
+`TaskComposerServer` having no lock of its own (`task_composer_server.h` at 0.35.0).
+
 Tests: `tests/tesseract_task_composer/test_output_handler_deadlocks.py`
 (`TestServerReloadAgainstLogHandlers`).
 
@@ -287,12 +306,24 @@ fill without a mutex (`task_composer_plugin_factory.cpp`, `kinematics_plugin_fac
 it would let two threads that share a factory race on the map, which breaks rule 3. Their
 `create*` calls cost 0.03–1.6 s each, mostly plugin loading.
 
+## Upstream: task composer
+
+- `TaskComposerServer` has no lock: loadConfig / addTask / addExecutor race any other call on
+  another thread. The binding's server gate serialises them (above).
+- `TaskComposerExecutor` has no wait-for-idle: Taskflow sets a run's future before it counts the
+  run off its executor (`tf::Executor::_tear_down_topology`), and `tf::Executor::wait_for_all` is
+  private to `TaskflowTaskComposerExecutor`. The exit drain (`wait_for_in_flight_runs`) therefore
+  polls `getTaskCount()` every millisecond (`EXIT_DRAIN_IDLE_POLL`), only at interpreter exit and
+  only for runs whose future is already set. A public `waitForIdle()` upstream would replace the
+  poll with a wait.
+
 ## Remaining work
 
 | Item | Status | Blocked on |
 |---|---|---|
-| Release the GIL in every `Environment` binding that takes its mutex, then in `Environment.init` and `getKinematicGroup`, with a GIL-safe `PyEventCallbackFn` and a deadlock regression test | incomplete | a separate PR |
+| List the `Environment` and environment-reading releases in `scripts/nogil_entry_points.yaml` | incomplete | the release-polish merge (the list lives outside the bindings) |
 | Release the GIL in the plugin factories' `create*` methods | incomplete | a mutex around the factory caches upstream |
+| Replace the exit drain's poll with a wait | incomplete | a public wait-for-idle on `TaskComposerExecutor` upstream |
 
 ## Free-threaded builds
 

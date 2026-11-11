@@ -11,6 +11,8 @@ timeout: the failures are hangs.
 import subprocess
 import sys
 
+import pytest
+
 # A load is a few seconds; a deadlock never ends. Generous for a loaded machine.
 TIMEOUT_S = 60
 # s: how long a script waits for callers to reach the reload gate (`_reload_gate_waiters`)
@@ -80,6 +82,15 @@ def make_storage(node):
     storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
     return storage
 """
+
+
+# [s] Per-test bound: ten times the slowest test measured in this file (2.13 s, test_reload_while_workers_log_into_python),
+# rounded up to a multiple of 5 s, and never under 60 s: the bound includes fixture setup, and a
+# cold CI worker (Windows above all) spends seconds loading plugins before the first test runs.
+# A deadlock or hang never ends; this fails it instead of
+# waiting for the session-wide timeout.
+TEST_TIMEOUT_S = 60
+pytestmark = pytest.mark.timeout(TEST_TIMEOUT_S)
 
 
 def _run(script: str, *, planning: bool = True) -> str:

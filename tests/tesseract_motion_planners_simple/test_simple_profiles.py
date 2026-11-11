@@ -28,7 +28,6 @@ from tesseract_robotics.common import (
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
-    VectorIsometry3d,
 )
 from tesseract_robotics.environment import Environment
 from tesseract_robotics.motion_planners import PlannerRequest
@@ -243,7 +242,7 @@ def test_interpolate_poses():
     a = Isometry3d([0.0, 0.0, 0.0], q_a)
     b = Isometry3d([1.0, 2.0, 3.0], q_b)
     poses = interpolate(a, b, STEPS)
-    assert isinstance(poses, VectorIsometry3d)
+    assert isinstance(poses, list)
     assert len(poses) == STEPS + 1
     np.testing.assert_allclose(poses[0].matrix, a.matrix, atol=1e-12)
     np.testing.assert_allclose(poses[STEPS].matrix, b.matrix, atol=1e-12)

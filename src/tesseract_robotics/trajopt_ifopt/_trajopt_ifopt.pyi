@@ -11,10 +11,13 @@ from numpy.typing import NDArray
 import scipy.sparse
 
 import tesseract_robotics.collision
-import tesseract_robotics.common._common
+import tesseract_robotics.common
 import tesseract_robotics.environment
 import tesseract_robotics.kinematics
 
+
+class DegenerateAxisError(ValueError):
+    """A CartAxis axis argument is zero or not finite."""
 
 class ConstraintNotLinkedError(RuntimeError):
     """getJacobian() on a constraint set that is not linked to variables yet."""
@@ -297,18 +300,18 @@ def calcForwardNumJac(f: Callable[[Annotated[NDArray[numpy.float64], dict(shape=
 def toTrajArray(joint_positions: Sequence[Var]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')]:
     """The Vars' values as a waypoints x joints matrix, one row per Var"""
 
-def toJointTrajectory(joint_positions: Sequence[Var]) -> tesseract_robotics.common._common.JointTrajectory:
+def toJointTrajectory(joint_positions: Sequence[Var]) -> tesseract_robotics.common.JointTrajectory:
     """
     A JointTrajectory with one JointState (the Var's names and values) per Var
     """
 
 class CartPosConstraint(ConstraintSet):
     @overload
-    def __init__(self, position_var: Var, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, target_frame: tesseract_robotics.common._common.LinkId | str, source_frame_offset: tesseract_robotics.common._common.Isometry3d, target_frame_offset: tesseract_robotics.common._common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+    def __init__(self, position_var: Var, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, target_frame: tesseract_robotics.common.LinkId | str, source_frame_offset: tesseract_robotics.common.Isometry3d, target_frame_offset: tesseract_robotics.common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """Create Cartesian position constraint"""
 
     @overload
-    def __init__(self, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], bounds: Sequence[Bounds], manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, target_frame: tesseract_robotics.common._common.LinkId | str, source_frame_offset: tesseract_robotics.common._common.Isometry3d, target_frame_offset: tesseract_robotics.common._common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+    def __init__(self, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], bounds: Sequence[Bounds], manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, target_frame: tesseract_robotics.common.LinkId | str, source_frame_offset: tesseract_robotics.common.Isometry3d, target_frame_offset: tesseract_robotics.common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """
         Create Cartesian position constraint with per-axis coefficients and bounds. coeffs and bounds are both length 6, ordered [x, y, z, rx, ry, rz]; a zero coefficient frees that axis.
         """
@@ -324,13 +327,13 @@ class CartPosConstraint(ConstraintSet):
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
 
-    def setTargetPose(self, target_frame_offset: tesseract_robotics.common._common.Isometry3d) -> None:
+    def setTargetPose(self, target_frame_offset: tesseract_robotics.common.Isometry3d) -> None:
         """Set the target pose - critical for online planning!"""
 
-    def getTargetPose(self) -> tesseract_robotics.common._common.Isometry3d:
+    def getTargetPose(self) -> tesseract_robotics.common.Isometry3d:
         """Get the target pose for the constraint"""
 
-    def getCurrentPose(self) -> tesseract_robotics.common._common.Isometry3d:
+    def getCurrentPose(self) -> tesseract_robotics.common.Isometry3d:
         """Get current TCP pose in world frame"""
 
     @property
@@ -400,22 +403,22 @@ class CollisionCoeffData:
     def getDefaultCollisionCoeff(self) -> float: ...
 
     @overload
-    def setCollisionCoeff(self, obj1: tesseract_robotics.common._common.LinkId | str, obj2: tesseract_robotics.common._common.LinkId | str, collision_coeff: float) -> None: ...
+    def setCollisionCoeff(self, obj1: tesseract_robotics.common.LinkId | str, obj2: tesseract_robotics.common.LinkId | str, collision_coeff: float) -> None: ...
 
     @overload
-    def setCollisionCoeff(self, pair: tesseract_robotics.common._common.LinkIdPair | tuple[str, str], collision_coeff: float) -> None: ...
+    def setCollisionCoeff(self, pair: tesseract_robotics.common.LinkIdPair | tuple[str, str], collision_coeff: float) -> None: ...
 
-    def getCollisionCoeff(self, pair: tesseract_robotics.common._common.LinkIdPair | tuple[str, str]) -> float: ...
+    def getCollisionCoeff(self, pair: tesseract_robotics.common.LinkIdPair | tuple[str, str]) -> float: ...
 
-    def getCollisionCoeffPairData(self) -> dict[tesseract_robotics.common._common.LinkIdPair, float]:
+    def getCollisionCoeffPairData(self) -> dict[tesseract_robotics.common.LinkIdPair, float]:
         """Every pair with a coefficient: {LinkIdPair: coeff}"""
 
-    def hasZeroCoeff(self, pair: tesseract_robotics.common._common.LinkIdPair | tuple[str, str]) -> bool:
+    def hasZeroCoeff(self, pair: tesseract_robotics.common.LinkIdPair | tuple[str, str]) -> bool:
         """
         Whether the pair's coefficient is 0 (collision checking switched off for it)
         """
 
-    def getPairsWithZeroCoeff(self) -> set[tesseract_robotics.common._common.LinkIdPair]:
+    def getPairsWithZeroCoeff(self) -> set[tesseract_robotics.common.LinkIdPair]:
         """The pairs whose coefficient is 0 (collision checking switched off)"""
 
 class TrajOptCollisionConfig:
@@ -570,10 +573,10 @@ class GradientResultsSet:
     def __init__(self, reserve: int) -> None: ...
 
     @property
-    def key(self) -> tesseract_robotics.common._common.LinkIdPair: ...
+    def key(self) -> tesseract_robotics.common.LinkIdPair: ...
 
     @key.setter
-    def key(self, arg: tesseract_robotics.common._common.LinkIdPair | tuple[str, str], /) -> None: ...
+    def key(self, arg: tesseract_robotics.common.LinkIdPair | tuple[str, str], /) -> None: ...
 
     @property
     def shape_key(self) -> tuple[tuple[int, int], tuple[int, int]]: ...
@@ -654,7 +657,7 @@ class DiscreteCollisionEvaluator:
 
     def getCollisionMarginBuffer(self) -> float: ...
 
-    def getCollisionMarginData(self) -> tesseract_robotics.common._common.CollisionMarginData: ...
+    def getCollisionMarginData(self) -> tesseract_robotics.common.CollisionMarginData: ...
 
     def getCollisionCoeffData(self) -> CollisionCoeffData: ...
 
@@ -681,7 +684,7 @@ class ContinuousCollisionEvaluator:
 
     def getCollisionMarginBuffer(self) -> float: ...
 
-    def getCollisionMarginData(self) -> tesseract_robotics.common._common.CollisionMarginData: ...
+    def getCollisionMarginData(self) -> tesseract_robotics.common.CollisionMarginData: ...
 
     def getCollisionCoeffData(self) -> CollisionCoeffData: ...
 
@@ -738,6 +741,24 @@ class ContinuousCollisionNumericalConstraint(ConstraintSet):
 
     def getCollisionEvaluator(self) -> ContinuousCollisionEvaluator: ...
 
+class DiscreteCollisionNumericalConstraint(ConstraintSet):
+    def __init__(self, collision_evaluator: DiscreteCollisionEvaluator, position_var: Var, max_num_cnt: int = 1, fixed_sparsity: bool = False, name: str = 'DiscreteCollisionNumerical') -> None:
+        """Create discrete collision constraint with numerical jacobians"""
+
+    def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+        """
+        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables and an update() since the last variable change
+        """
+
+    def getCollisionEvaluator(self) -> DiscreteCollisionEvaluator: ...
+
 class JointJerkConstraint(ConstraintSet):
     @overload
     def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointJerk') -> None:
@@ -757,17 +778,17 @@ class CartLineInfo:
     def __init__(self) -> None: ...
 
     @overload
-    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, target_frame: tesseract_robotics.common._common.LinkId | str, target_frame_offset1: tesseract_robotics.common._common.Isometry3d, target_frame_offset2: tesseract_robotics.common._common.Isometry3d, source_frame_offset: tesseract_robotics.common._common.Isometry3d, indices: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int]) -> None:
+    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, target_frame: tesseract_robotics.common.LinkId | str, target_frame_offset1: tesseract_robotics.common.Isometry3d, target_frame_offset2: tesseract_robotics.common.Isometry3d, source_frame_offset: tesseract_robotics.common.Isometry3d, indices: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int]) -> None:
         """
         Create the info of a line from target_frame_offset1 to target_frame_offset2
         """
 
     @overload
-    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, target_frame: tesseract_robotics.common._common.LinkId | str, target_frame_offset1: tesseract_robotics.common._common.Isometry3d, target_frame_offset2: tesseract_robotics.common._common.Isometry3d, source_frame_offset: tesseract_robotics.common._common.Isometry3d) -> None:
+    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, target_frame: tesseract_robotics.common.LinkId | str, target_frame_offset1: tesseract_robotics.common.Isometry3d, target_frame_offset2: tesseract_robotics.common.Isometry3d, source_frame_offset: tesseract_robotics.common.Isometry3d) -> None:
         """Create the info of a line, constraining all 6 indices"""
 
     @overload
-    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, target_frame: tesseract_robotics.common._common.LinkId | str, target_frame_offset1: tesseract_robotics.common._common.Isometry3d, target_frame_offset2: tesseract_robotics.common._common.Isometry3d) -> None:
+    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, target_frame: tesseract_robotics.common.LinkId | str, target_frame_offset1: tesseract_robotics.common.Isometry3d, target_frame_offset2: tesseract_robotics.common.Isometry3d) -> None:
         """
         Create the info of a line, with an identity source_frame_offset and all 6 indices
         """
@@ -780,39 +801,39 @@ class CartLineInfo:
     def manip(self, arg: tesseract_robotics.kinematics.JointGroup, /) -> None: ...
 
     @property
-    def source_frame(self) -> tesseract_robotics.common._common.LinkId:
+    def source_frame(self) -> tesseract_robotics.common.LinkId:
         """TCP frame"""
 
     @source_frame.setter
-    def source_frame(self, arg: tesseract_robotics.common._common.LinkId | str, /) -> None: ...
+    def source_frame(self, arg: tesseract_robotics.common.LinkId | str, /) -> None: ...
 
     @property
-    def target_frame(self) -> tesseract_robotics.common._common.LinkId:
+    def target_frame(self) -> tesseract_robotics.common.LinkId:
         """Reference frame"""
 
     @target_frame.setter
-    def target_frame(self, arg: tesseract_robotics.common._common.LinkId | str, /) -> None: ...
+    def target_frame(self, arg: tesseract_robotics.common.LinkId | str, /) -> None: ...
 
     @property
-    def source_frame_offset(self) -> tesseract_robotics.common._common.Isometry3d:
+    def source_frame_offset(self) -> tesseract_robotics.common.Isometry3d:
         """TCP offset"""
 
     @source_frame_offset.setter
-    def source_frame_offset(self, arg: tesseract_robotics.common._common.Isometry3d, /) -> None: ...
+    def source_frame_offset(self, arg: tesseract_robotics.common.Isometry3d, /) -> None: ...
 
     @property
-    def target_frame_offset1(self) -> tesseract_robotics.common._common.Isometry3d:
+    def target_frame_offset1(self) -> tesseract_robotics.common.Isometry3d:
         """Line start pose"""
 
     @target_frame_offset1.setter
-    def target_frame_offset1(self, arg: tesseract_robotics.common._common.Isometry3d, /) -> None: ...
+    def target_frame_offset1(self, arg: tesseract_robotics.common.Isometry3d, /) -> None: ...
 
     @property
-    def target_frame_offset2(self) -> tesseract_robotics.common._common.Isometry3d:
+    def target_frame_offset2(self) -> tesseract_robotics.common.Isometry3d:
         """Line end pose"""
 
     @target_frame_offset2.setter
-    def target_frame_offset2(self, arg: tesseract_robotics.common._common.Isometry3d, /) -> None: ...
+    def target_frame_offset2(self, arg: tesseract_robotics.common.Isometry3d, /) -> None: ...
 
     @property
     def indices(self) -> Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')]:
@@ -831,7 +852,7 @@ class CartLineConstraint(ConstraintSet):
     def setBounds(self, bounds: Sequence[Bounds]) -> None:
         """Set the bounds, one per row; raises BoundsSizeError otherwise"""
 
-    def getLine(self) -> tuple[tesseract_robotics.common._common.Isometry3d, tesseract_robotics.common._common.Isometry3d]:
+    def getLine(self) -> tuple[tesseract_robotics.common.Isometry3d, tesseract_robotics.common.Isometry3d]:
         """The line's two end poses (target_frame_offset1, target_frame_offset2)"""
 
     def getInfo(self) -> CartLineInfo:
@@ -849,7 +870,7 @@ class CartLineConstraint(ConstraintSet):
         """Calculate error values for given joint values"""
 
     @staticmethod
-    def getLinePoint(source_tf: tesseract_robotics.common._common.Isometry3d, target_tf1: tesseract_robotics.common._common.Isometry3d, target_tf2: tesseract_robotics.common._common.Isometry3d) -> tesseract_robotics.common._common.Isometry3d:
+    def getLinePoint(source_tf: tesseract_robotics.common.Isometry3d, target_tf1: tesseract_robotics.common.Isometry3d, target_tf2: tesseract_robotics.common.Isometry3d) -> tesseract_robotics.common.Isometry3d:
         """Find nearest point on line (uses SLERP for orientation)"""
 
     @property
@@ -865,7 +886,7 @@ class CartAxisKinematics:
     and its 3 x n Jacobian.
     """
 
-    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.common._common.LinkId | str) -> None:
+    def __init__(self, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.common.LinkId | str) -> None:
         """
         source_axis is in source link coordinates and normalized. Raises on a link that is not in
         manip or an invalid axis.
@@ -891,11 +912,10 @@ class CartAxisKinematics:
     @staticmethod
     def toUnitAxis(axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], what: str) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
         """
-        axis normalized; raises RuntimeError naming `what` if it is zero or not finite
+        axis normalized; raises DegenerateAxisError (a ValueError) naming `what` if it is zero or not finite
         """
 
-    SIN_ANGLE_FLOOR: float = ...
-    """(arg: object, /) -> float"""
+    SIN_ANGLE_FLOOR: float = 1e-12
 
 class CartAxisConeConstraint(ConstraintSet):
     """
@@ -904,7 +924,7 @@ class CartAxisConeConstraint(ConstraintSet):
     the source axis stays free. For half_angle near 0 use CartAxisAlignConstraint.
     """
 
-    def __init__(self, position_var: Var, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.common._common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], half_angle: float, coeff: float = 1.0, name: str = 'CartAxisCone') -> None:
+    def __init__(self, position_var: Var, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], half_angle: float, coeff: float = 1.0, name: str = 'CartAxisCone') -> None:
         """
         Axes are in their links' coordinates and normalized; 0 < half_angle < pi. Raises on an invalid
         link, axis, half angle or coefficient.
@@ -934,7 +954,7 @@ class CartAxisAlignConstraint(ConstraintSet):
     axes coincide.
     """
 
-    def __init__(self, position_var: Var, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common._common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.common._common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], coeff: float = 1.0, name: str = 'CartAxisAlign') -> None:
+    def __init__(self, position_var: Var, manip: tesseract_robotics.kinematics.JointGroup, source_frame: tesseract_robotics.common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], coeff: float = 1.0, name: str = 'CartAxisAlign') -> None:
         """
         Axes are in their links' coordinates and normalized. Raises on an invalid link, axis or
         coefficient.
@@ -954,34 +974,16 @@ class CartAxisAlignConstraint(ConstraintSet):
     def getTargetAxis(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
         """The axis to align with, normalized"""
 
-class DiscreteCollisionNumericalConstraint(ConstraintSet):
-    def __init__(self, collision_evaluator: DiscreteCollisionEvaluator, position_var: Var, max_num_cnt: int = 1, fixed_sparsity: bool = False, name: str = 'DiscreteCollisionNumerical') -> None:
-        """Create discrete collision constraint with numerical jacobians"""
-
-    def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
-
-    def setBounds(self, bounds: Sequence[Bounds]) -> None:
-        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
-
-    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
-
-    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
-        """
-        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables and an update() since the last variable change
-        """
-
-    def getCollisionEvaluator(self) -> DiscreteCollisionEvaluator: ...
-
 class InverseKinematicsInfo:
     @overload
     def __init__(self) -> None: ...
 
     @overload
-    def __init__(self, manip: tesseract_robotics.kinematics.KinematicGroup, working_frame: tesseract_robotics.common._common.LinkId | str, tcp_frame: tesseract_robotics.common._common.LinkId | str, tcp_offset: tesseract_robotics.common._common.Isometry3d) -> None:
+    def __init__(self, manip: tesseract_robotics.kinematics.KinematicGroup, working_frame: tesseract_robotics.common.LinkId | str, tcp_frame: tesseract_robotics.common.LinkId | str, tcp_offset: tesseract_robotics.common.Isometry3d) -> None:
         """Create IK info; raises if manip has no link tcp_frame"""
 
     @overload
-    def __init__(self, manip: tesseract_robotics.kinematics.KinematicGroup, working_frame: tesseract_robotics.common._common.LinkId | str, tcp_frame: tesseract_robotics.common._common.LinkId | str) -> None:
+    def __init__(self, manip: tesseract_robotics.kinematics.KinematicGroup, working_frame: tesseract_robotics.common.LinkId | str, tcp_frame: tesseract_robotics.common.LinkId | str) -> None:
         """
         Create IK info with an identity tcp_offset; raises if manip has no link tcp_frame
         """
@@ -994,28 +996,28 @@ class InverseKinematicsInfo:
     def manip(self, arg: tesseract_robotics.kinematics.KinematicGroup, /) -> None: ...
 
     @property
-    def working_frame(self) -> tesseract_robotics.common._common.LinkId:
+    def working_frame(self) -> tesseract_robotics.common.LinkId:
         """Working frame (not currently used)"""
 
     @working_frame.setter
-    def working_frame(self, arg: tesseract_robotics.common._common.LinkId | str, /) -> None: ...
+    def working_frame(self, arg: tesseract_robotics.common.LinkId | str, /) -> None: ...
 
     @property
-    def tcp_frame(self) -> tesseract_robotics.common._common.LinkId:
+    def tcp_frame(self) -> tesseract_robotics.common.LinkId:
         """TCP frame (not currently used)"""
 
     @tcp_frame.setter
-    def tcp_frame(self, arg: tesseract_robotics.common._common.LinkId | str, /) -> None: ...
+    def tcp_frame(self, arg: tesseract_robotics.common.LinkId | str, /) -> None: ...
 
     @property
-    def tcp_offset(self) -> tesseract_robotics.common._common.Isometry3d:
+    def tcp_offset(self) -> tesseract_robotics.common.Isometry3d:
         """TCP offset (not currently used)"""
 
     @tcp_offset.setter
-    def tcp_offset(self, arg: tesseract_robotics.common._common.Isometry3d, /) -> None: ...
+    def tcp_offset(self, arg: tesseract_robotics.common.Isometry3d, /) -> None: ...
 
 class InverseKinematicsConstraint(ConstraintSet):
-    def __init__(self, target_pose: tesseract_robotics.common._common.Isometry3d, kinematic_info: InverseKinematicsInfo, constraint_var: Var, seed_var: Var, name: str = 'InverseKinematics') -> None:
+    def __init__(self, target_pose: tesseract_robotics.common.Isometry3d, kinematic_info: InverseKinematicsInfo, constraint_var: Var, seed_var: Var, name: str = 'InverseKinematics') -> None:
         """
         Create IK constraint (constraint_var constrained to IK solution seeded from seed_var)
         """
@@ -1031,7 +1033,7 @@ class InverseKinematicsConstraint(ConstraintSet):
         The constraint Jacobian at joint_vals, the constraint var's values (sparse matrix, sized like getJacobian()); needs linked variables
         """
 
-    def setTargetPose(self, target_pose: tesseract_robotics.common._common.Isometry3d) -> None:
+    def setTargetPose(self, target_pose: tesseract_robotics.common.Isometry3d) -> None:
         """Set the target pose the IK solution is computed for"""
 
     def getKinematicInfo(self) -> InverseKinematicsInfo:

@@ -90,9 +90,7 @@ def get_environment():
         except Exception:
             traceback.print_exc()
 
-    event_cb = tesseract_environment.EventCallbackFn(event_cb_py)
-
-    env.addEventCallback(12345, event_cb)
+    env.addEventCallback(event_cb_py)
 
     env.setState(joint_names, joint_values)
     assert scene_state_changed[0]
@@ -138,10 +136,10 @@ def test_set_state_names_values_length_mismatch_raises():
         env.setState([f"joint_a{i + 1}" for i in range(7)], np.array([1.0, 2.0]))
 
 
-def test_set_state_by_names_and_values_unknown_joint_raises():
+def test_set_state_by_ids_and_values_unknown_joint_raises():
     env = _fresh_env()
     with pytest.raises(ValueError, match="not_a_joint"):
-        env.setStateByNamesAndValues(["not_a_joint"], np.array([1.0]))
+        env.setState(["not_a_joint"], np.array([1.0]))
 
 
 def test_set_state_valid_dict_still_works():
@@ -288,8 +286,7 @@ def test_apply_command_releases_gil_and_still_calls_back():
     assert env.getContinuousContactManager() is not None
 
     events = []
-    cb = tesseract_environment.EventCallbackFn(lambda evt: events.append(evt.type))
-    env.addEventCallback(1, cb)
+    env.addEventCallback(lambda evt: events.append(evt.type))
 
     assert env.applyCommand(tesseract_environment.AddLinkCommand(link, joint))
     assert "gil_link" in env.getLinkIds()
@@ -533,11 +530,9 @@ def test_get_state_native_overloads():
     joints = dict(zip(_IIWA_JOINTS, _IIWA_VALUES))
     by_names = env.getState(_IIWA_JOINTS, _IIWA_VALUES)
     by_map = env.getState(joints)
-    alias_names = env.getStateByNamesAndValues(_IIWA_JOINTS, _IIWA_VALUES)
-    alias_map = env.getStateByMap(joints)
 
     expected_tool0 = env.getLinkTransforms(_IIWA_JOINTS, _IIWA_VALUES)["tool0"].matrix
-    for state in (by_names, by_map, alias_names, alias_map):
+    for state in (by_names, by_map):
         assert state.joints == joints
         np.testing.assert_allclose(
             state.link_transforms["tool0"].matrix, expected_tool0, atol=FK_ATOL
@@ -551,16 +546,14 @@ def test_get_state_unknown_joint_raises():
     # Before #187 these returned a state with the bogus key inserted, and a names/values length
     # mismatch read joint_values out of bounds.
     env = _fresh_env()
-    for get_state in (env.getState, env.getStateByMap):
-        with pytest.raises(ValueError, match="not_a_joint"):
-            get_state({"not_a_joint": 1.0})
-        with pytest.raises(ValueError, match="joint_a7-tool0"):
-            get_state({"joint_a7-tool0": 1.0})  # fixed joint: not in the state solver
-    for get_state in (env.getState, env.getStateByNamesAndValues):
-        with pytest.raises(ValueError, match="not_a_joint"):
-            get_state(["not_a_joint"], np.array([1.0]))
-        with pytest.raises(ValueError, match="length"):
-            get_state(_IIWA_JOINTS, np.array([1.0]))
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.getState({"not_a_joint": 1.0})
+    with pytest.raises(ValueError, match="joint_a7-tool0"):
+        env.getState({"joint_a7-tool0": 1.0})  # fixed joint: not in the state solver
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.getState(["not_a_joint"], np.array([1.0]))
+    with pytest.raises(ValueError, match="joint_ids length"):
+        env.getState(_IIWA_JOINTS, np.array([1.0]))
 
 
 def test_get_state_floating_joints():
@@ -574,8 +567,6 @@ def test_get_state_floating_joints():
     for state in (
         env.getState({"arm_joint": 0.5}, {"float_joint": pose}),
         env.getState(["arm_joint"], np.array([0.5]), {"float_joint": pose}),
-        env.getStateByMap({"arm_joint": 0.5}, {"float_joint": pose}),
-        env.getStateByNamesAndValues(["arm_joint"], np.array([0.5]), {"float_joint": pose}),
     ):
         np.testing.assert_allclose(
             state.link_transforms["arm"].translation, [4.5, 5.0, 6.0], atol=FK_ATOL
@@ -605,12 +596,11 @@ def test_set_state_floating_joints():
         env.getLinkTransform("arm").translation, [7.25, 8.0, 9.0], atol=FK_ATOL
     )
 
-    for set_state in (env.setState, env.setStateByNamesAndValues):
-        set_state(["arm_joint"], np.array([-0.5]), {"float_joint": _translation(0.0, 0.0, 1.0)})
-        np.testing.assert_array_equal(env.getCurrentJointValues(), [-0.5])
-        np.testing.assert_allclose(
-            env.getLinkTransform("arm").translation, [-0.5, 0.0, 1.0], atol=FK_ATOL
-        )
+    env.setState(["arm_joint"], np.array([-0.5]), {"float_joint": _translation(0.0, 0.0, 1.0)})
+    np.testing.assert_array_equal(env.getCurrentJointValues(), [-0.5])
+    np.testing.assert_allclose(
+        env.getLinkTransform("arm").translation, [-0.5, 0.0, 1.0], atol=FK_ATOL
+    )
 
 
 def test_floating_joints_unknown_raises():
@@ -634,18 +624,17 @@ def test_floating_joints_unknown_raises():
     np.testing.assert_array_equal(env.getCurrentJointValues(), [0.0])
 
 
-def test_get_current_joint_values_by_names():
+def test_get_current_joint_values_by_ids():
     env = _fresh_env()
     env.setState(_IIWA_JOINTS, _IIWA_VALUES)
     np.testing.assert_array_equal(
         env.getCurrentJointValues(_IIWA_JOINTS), env.getCurrentJointValues()
     )
-    for get_values in (env.getCurrentJointValues, env.getCurrentJointValuesByNames):
-        np.testing.assert_array_equal(get_values(["joint_a3", "joint_a1"]), [0.3, 0.1])
-        with pytest.raises(KeyError, match="not_a_joint"):
-            get_values(["not_a_joint"])
-        with pytest.raises(KeyError, match="joint_a7-tool0"):
-            get_values(["joint_a7-tool0"])  # fixed joint: no value in the state
+    np.testing.assert_array_equal(env.getCurrentJointValues(["joint_a3", "joint_a1"]), [0.3, 0.1])
+    with pytest.raises(KeyError, match="not_a_joint"):
+        env.getCurrentJointValues(["not_a_joint"])
+    with pytest.raises(KeyError, match="joint_a7-tool0"):
+        env.getCurrentJointValues(["joint_a7-tool0"])  # fixed joint: no value in the state
 
 
 def test_link_names_by_joint_names():
@@ -797,9 +786,7 @@ def test_event_callback_receives_derived_type():
     env = _fresh_env()
     received = []
 
-    env.addEventCallback(
-        1, tesseract_environment.EventCallbackFn(lambda evt: received.append(type(evt)))
-    )
+    env.addEventCallback(lambda evt: received.append(type(evt)))
     env.setState(_IIWA_JOINTS, np.zeros(7))
     assert env.applyCommand(tesseract_environment.RemoveJointCommand("joint_a7-tool0"))
 
@@ -825,7 +812,7 @@ def test_cast_event_matching_type_roundtrips():
                 (type(cast), cast is evt, {name: cast.state.joints[name] for name in _IIWA_JOINTS})
             )
 
-    env.addEventCallback(1, tesseract_environment.EventCallbackFn(on_event))
+    env.addEventCallback(on_event)
     env.setState(_IIWA_JOINTS, values)
     revision = env.getRevision()
     assert env.applyCommand(tesseract_environment.RemoveJointCommand("joint_a7-tool0"))
@@ -872,7 +859,7 @@ def on_event(evt):
         })
     else:
         results.append({"cast": cast.__name__, "raised": None})
-env.addEventCallback(1, te.EventCallbackFn(on_event))
+env.addEventCallback(on_event)
 env.setState([f"joint_a{i + 1}" for i in range(7)], np.zeros(7))
 assert env.applyCommand(te.RemoveJointCommand("joint_a7-tool0"))
 print("RESULTS " + json.dumps(results))

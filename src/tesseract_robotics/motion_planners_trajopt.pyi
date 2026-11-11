@@ -7,8 +7,8 @@ import numpy
 from numpy.typing import NDArray
 
 import tesseract_robotics.command_language
-import tesseract_robotics.motion_planners._motion_planners
-import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
+import tesseract_robotics.motion_planners
+import tesseract_robotics.trajopt_ifopt
 import tesseract_robotics.trajopt_sqp
 
 
@@ -147,16 +147,16 @@ class TrajOptDefaultCompositeProfile(TrajOptCompositeProfile):
     def __init__(self) -> None: ...
 
     @property
-    def collision_cost_config(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig: ...
+    def collision_cost_config(self) -> tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig: ...
 
     @collision_cost_config.setter
-    def collision_cost_config(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
+    def collision_cost_config(self, arg: tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
 
     @property
-    def collision_constraint_config(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig: ...
+    def collision_constraint_config(self) -> tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig: ...
 
     @collision_constraint_config.setter
-    def collision_constraint_config(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
+    def collision_constraint_config(self, arg: tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
 
     @property
     def smooth_velocities(self) -> bool: ...
@@ -635,5 +635,5 @@ class TrajOptPIQPSolverProfile(TrajOptSolverProfile):
         `settings:` (PIQP) and `opt_params:` are merged into the profile's values; settings PIQP's sparse backend rejects raise RuntimeError.
         """
 
-class TrajOptMotionPlanner(tesseract_robotics.motion_planners._motion_planners.MotionPlanner):
+class TrajOptMotionPlanner(tesseract_robotics.motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...

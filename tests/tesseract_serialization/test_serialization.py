@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
 from tesseract_robotics.command_language import (
@@ -80,11 +81,11 @@ class TestCompositeInstructionSerialization:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "program.xml"
 
-            composite_instruction_to_file(original, str(path))
+            assert composite_instruction_to_file(original, path) is None
             assert path.exists()
             assert path.stat().st_size > 0
 
-            restored = composite_instruction_from_file(str(path))
+            restored = composite_instruction_from_file(str(path))  # str and PathLike alike
             assert restored.size() == original.size()
 
     def test_binary_roundtrip(self):
@@ -92,7 +93,7 @@ class TestCompositeInstructionSerialization:
         original = make_test_program()
 
         binary = composite_instruction_to_binary(original)
-        assert isinstance(binary, (bytes, list))
+        assert isinstance(binary, bytes)
         assert len(binary) > 0
 
         restored = composite_instruction_from_binary(binary)
@@ -182,3 +183,26 @@ class TestEnvironmentSerialization:
         restored = environment_from_binary(environment_to_binary(env))
         restored.clearCachedDiscreteContactManager()
         assert restored.getDiscreteContactManager() is not None
+
+
+class TestFileContract:
+    """Every *_to_file writes exactly `path` and raises OSError on failure; *_from_file too."""
+
+    def test_writes_the_path_as_named(self, tmp_path):
+        path = tmp_path / "program"  # no suffix: upstream's writer would have appended one
+        composite_instruction_to_file(make_test_program(), path)
+        assert path.exists()
+        assert composite_instruction_from_file(path).size() == make_test_program().size()
+
+    def test_unwritable_path_raises_os_error(self, tmp_path):
+        with pytest.raises(OSError) as info:
+            composite_instruction_to_file(make_test_program(), tmp_path / "missing" / "program.xml")
+        assert info.value.filename == str(tmp_path / "missing" / "program.xml")
+        with pytest.raises(OSError):
+            environment_to_file(make_test_environment(), tmp_path / "missing" / "env.xml")
+
+    def test_missing_file_raises_os_error(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            composite_instruction_from_file(tmp_path / "nope.xml")
+        with pytest.raises(FileNotFoundError):
+            environment_from_file(tmp_path / "nope.xml")

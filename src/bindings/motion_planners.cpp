@@ -9,8 +9,6 @@
 
 #include <tesseract/common/eigen_types.h>
 
-// Toolpath is AlignedVector<VectorIsometry3d>; the inner vector is opaque, bound in tesseract_common.
-NB_MAKE_OPAQUE(tesseract::common::VectorIsometry3d)
 
 // tesseract_motion_planners core
 #include <tesseract/motion_planners/piqp/settings_utils.h>
@@ -89,7 +87,6 @@ NB_MODULE(_motion_planners, m) {
         .def_prop_rw("env",
             [](const tp::PlannerRequest& self) { return self.env; },
             [](tp::PlannerRequest& self, std::shared_ptr<const te::Environment> env) { self.env = env; })
-        // Note: ProfileDictionary moved to tesseract_common in 0.33
         .def_prop_rw("profiles",
             [](const tp::PlannerRequest& self) { return self.profiles; },
             [](tp::PlannerRequest& self, std::shared_ptr<const tc::ProfileDictionary> profiles) { self.profiles = profiles; })
@@ -129,26 +126,28 @@ NB_MODULE(_motion_planners, m) {
         .def("clone", [](const tp::MotionPlanner& self) { return self.clone(); });
 
     // ========== Utility functions ==========
+    // Each reads the environment, which it locks without the GIL (Environment's rule,
+    // docs/developer/threading.md).
     m.def("assignCurrentStateAsSeed", &tp::assignCurrentStateAsSeed,
-          "composite_instructions"_a, "env"_a,
+          "composite_instructions"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(),
           "Assign the current environment state as seed to all CartesianWaypoints in the program");
 
     m.def("formatProgram", &tp::formatProgram,
-          "composite_instructions"_a, "env"_a,
+          "composite_instructions"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(),
           "Reorder joint and state waypoints in place to the kinematic group's joint order. "
           "Returns True if the program needed formatting.");
 
     // Exact-type overloads first; InstructionPoly last.
     m.def("toToolpath",
           nb::overload_cast<const tcl::CompositeInstruction&, const te::Environment&>(&tp::toToolpath),
-          "ci"_a, "env"_a,
-          "World-frame TCP poses of a program, one VectorIsometry3d per sub-composite.");
+          "ci"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(),
+          "World-frame TCP poses of a program, one list of Isometry3d per sub-composite.");
     m.def("toToolpath",
           nb::overload_cast<const tcl::MoveInstructionPoly&, const te::Environment&>(&tp::toToolpath),
-          "mi"_a, "env"_a, "World-frame TCP pose of a move instruction.");
+          "mi"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(), "World-frame TCP pose of a move instruction.");
     m.def("toToolpath",
           nb::overload_cast<const tcl::InstructionPoly&, const te::Environment&>(&tp::toToolpath),
-          "instruction"_a, "env"_a, "World-frame TCP poses of a composite or move instruction.");
+          "instruction"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(), "World-frame TCP poses of a composite or move instruction.");
 
     m.def("contactCheckProgram", &contact_check_program<tcol::ContinuousContactManager>,
           "manager"_a, "state_solver"_a, "program"_a, "config"_a,

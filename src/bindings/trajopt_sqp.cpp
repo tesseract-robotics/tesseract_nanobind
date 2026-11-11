@@ -7,6 +7,7 @@
  */
 
 #include "tesseract_nb.h"
+#include "osqp_settings_bindings.h"
 
 // OsqpEigen - must be included BEFORE trajopt_sqp headers to complete forward declaration
 #include <OsqpEigen/Solver.hpp>
@@ -429,42 +430,24 @@ NB_MODULE(trajopt_sqp, m) {
         .def_rw("verbosity", &tsqp::QPSolver::verbosity, "Verbosity level (0 = silent)");
 
     // ========== OSQPEigenSolver ==========
-    nb::class_<tsqp::OSQPEigenSolver, tsqp::QPSolver>(
-        m, "OSQPEigenSolver", "OSQP-based QP solver")
+    auto osqp_eigen_solver = nb::class_<tsqp::OSQPEigenSolver, tsqp::QPSolver>(
+        m, "OSQPEigenSolver", "OSQP-based QP solver");
+    osqp_eigen_solver
         .def(nb::init<>())
         .def("init", &tsqp::OSQPEigenSolver::init, "num_vars"_a, "num_cnts"_a)
         .def("clear", &tsqp::OSQPEigenSolver::clear)
         .def("solve", &tsqp::OSQPEigenSolver::solve)
         .def("getSolution", &tsqp::OSQPEigenSolver::getSolution)
         .def("getSolverStatus", &tsqp::OSQPEigenSolver::getSolverStatus)
-        // OSQP settings — forwarded to solver_->settings()
-        // Defaults (set in C++ constructor): polish=true, warmStart=true,
-        // adaptiveRho=true, maxIter=8192, absTol=1e-4, relTol=1e-6
-        .def("setPolish", [](tsqp::OSQPEigenSolver& self, bool v) {
-            self.solver_->settings()->setPolish(v); }, "polish"_a,
-            "Enable solution polishing (default: true)")
-        .def("setWarmStart", [](tsqp::OSQPEigenSolver& self, bool v) {
-            self.solver_->settings()->setWarmStart(v); }, "warm_start"_a,
-            "Enable warm-starting (default: true)")
-        // The bool forwarder above hides QPSolver.setWarmStart(problem); bind it here too
+        // The bool forwarder setWarmStart (osqp_settings_bindings.h) hides QPSolver.setWarmStart(problem);
+        // bind it here too
         .def("setWarmStart", &set_warm_start_checked, "qp_problem"_a,
              "Seed the next solve from the problem's variables (and its slacks); a no-op while "
-             "warm-starting is off")
-        .def("setAdaptiveRho", [](tsqp::OSQPEigenSolver& self, bool v) {
-            self.solver_->settings()->setAdaptiveRho(v); }, "adaptive_rho"_a,
-            "Enable adaptive step size (default: true)")
-        .def("setMaxIteration", [](tsqp::OSQPEigenSolver& self, int v) {
-            self.solver_->settings()->setMaxIteration(v); }, "max_iter"_a,
-            "Max OSQP iterations per QP solve (default: 8192)")
-        .def("setAbsoluteTolerance", [](tsqp::OSQPEigenSolver& self, double v) {
-            self.solver_->settings()->setAbsoluteTolerance(v); }, "abs_tol"_a,
-            "Absolute convergence tolerance (default: 1e-4)")
-        .def("setRelativeTolerance", [](tsqp::OSQPEigenSolver& self, double v) {
-            self.solver_->settings()->setRelativeTolerance(v); }, "rel_tol"_a,
-            "Relative convergence tolerance (default: 1e-6)")
-        .def("setVerbosity", [](tsqp::OSQPEigenSolver& self, bool v) {
-            self.solver_->settings()->setVerbosity(v); }, "verbose"_a,
-            "Enable OSQP console output (default: false)");
+             "warm-starting is off");
+    // OSQP settings, forwarded to solver_->settings() (osqp_settings_bindings.h, shared with
+    // TrajOptIfoptOSQPSolverProfile).
+    bind_osqp_settings(osqp_eigen_solver,
+                       [](tsqp::OSQPEigenSolver& self) -> OsqpEigen::Settings& { return *self.solver_->settings(); });
 
     // ========== QPProblem (abstract base) ==========
 
@@ -695,7 +678,7 @@ NB_MODULE(trajopt_sqp, m) {
     nb::class_<tsqp::TrustRegionSQPSolver>(
         m, "TrustRegionSQPSolver",
         "Trust region SQP solver for trajectory optimization.\n\n"
-        "Key methods for real-time/incremental optimization:\n"
+        "Key methods for incremental optimization:\n"
         "  - init(qp_prob): Initialize solver with problem\n"
         "  - stepSQPSolver(): Run ONE SQP iteration (for real-time control)\n"
         "  - getResults(): Get current optimization results\n"
@@ -708,13 +691,17 @@ NB_MODULE(trajopt_sqp, m) {
              "Run complete SQP optimization", nb::call_guard<nb::gil_scoped_release>())
         .def("stepSQPSolver", &tsqp::TrustRegionSQPSolver::stepSQPSolver,
              "Run a SINGLE SQP convexification step.\n\n"
-             "This is the key method for real-time/online planning.\n"
-             "Returns True if QP solve converged (does not mean SQP converged).\n\n"
-             "Typical usage:\n"
-             "  solver.init(problem)\n"
-             "  while solver.getStatus() == SQPStatus.RUNNING:\n"
-             "      solver.stepSQPSolver()\n"
-             "      # Check constraints, update environment, etc.")
+             "Used for online planning, where the caller updates the problem between steps.\n\n"
+             "Returns True when no further step should follow at the current penalty: the step\n"
+             "converged, the QP failure budget was spent, or a callback stopped the solve;\n"
+             "getStatus() tells which. It does not mean the SQP solver has converged.\n\n"
+             "Example:\n"
+             "```python\n"
+             "solver.init(problem)\n"
+             "while solver.getStatus() == SQPStatus.RUNNING:\n"
+             "    solver.stepSQPSolver()\n"
+             "    # Check constraints, update environment, etc.\n"
+             "```")
         .def("verifySQPSolverConvergence", &tsqp::TrustRegionSQPSolver::verifySQPSolverConvergence,
              "Check if SQP constraints are satisfied")
         .def("adjustPenalty", &tsqp::TrustRegionSQPSolver::adjustPenalty,

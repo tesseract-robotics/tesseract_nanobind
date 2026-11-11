@@ -497,33 +497,56 @@ class OSQPEigenSolver(QPSolver):
 
     def getSolverStatus(self) -> QPSolverStatus: ...
 
-    def setPolish(self, polish: bool) -> None:
-        """Enable solution polishing (default: true)"""
-
-    @overload
-    def setWarmStart(self, warm_start: bool) -> None:
-        """Enable warm-starting (default: true)"""
-
     @overload
     def setWarmStart(self, qp_problem: QPProblem) -> bool:
         """
         Seed the next solve from the problem's variables (and its slacks); a no-op while warm-starting is off
         """
 
+    @overload
+    def setWarmStart(self, warm_start: bool) -> None:
+        """
+        Warm-start each QP solve from the previous solution (OSQP `warm_starting`).
+        """
+
+    def setPolish(self, polish: bool) -> None:
+        """Polish the ADMM solution (OSQP `polishing`)."""
+
+    def getPolish(self) -> bool: ...
+
+    def getWarmStart(self) -> bool: ...
+
     def setAdaptiveRho(self, adaptive_rho: bool) -> None:
-        """Enable adaptive step size (default: true)"""
+        """Adapt the ADMM step size rho (OSQP `adaptive_rho`)."""
+
+    def getAdaptiveRho(self) -> bool: ...
+
+    def setAdaptiveRhoInterval(self, interval: int) -> None:
+        """
+        Adapt rho every `interval` iterations. OSQP's 0 adapts on wall-clock timing, which makes solutions differ run to run; a fixed interval (e.g. 25) makes them reproducible.
+        """
+
+    def getAdaptiveRhoInterval(self) -> int: ...
 
     def setMaxIteration(self, max_iter: int) -> None:
-        """Max OSQP iterations per QP solve (default: 8192)"""
+        """Maximum ADMM iterations per QP solve."""
+
+    def getMaxIteration(self) -> int: ...
 
     def setAbsoluteTolerance(self, abs_tol: float) -> None:
-        """Absolute convergence tolerance (default: 1e-4)"""
+        """Absolute convergence tolerance (OSQP `eps_abs`)."""
+
+    def getAbsoluteTolerance(self) -> float: ...
 
     def setRelativeTolerance(self, rel_tol: float) -> None:
-        """Relative convergence tolerance (default: 1e-6)"""
+        """Relative convergence tolerance (OSQP `eps_rel`)."""
+
+    def getRelativeTolerance(self) -> float: ...
 
     def setVerbosity(self, verbose: bool) -> None:
-        """Enable OSQP console output (default: false)"""
+        """Write OSQP's progress to the console."""
+
+    def getVerbosity(self) -> bool: ...
 
 class QPProblem:
     """Abstract base class for QP problems (convexified NLP)"""
@@ -963,7 +986,7 @@ class TrustRegionSQPSolver:
     """
     Trust region SQP solver for trajectory optimization.
 
-    Key methods for real-time/incremental optimization:
+    Key methods for incremental optimization:
       - init(qp_prob): Initialize solver with problem
       - stepSQPSolver(): Run ONE SQP iteration (for real-time control)
       - getResults(): Get current optimization results
@@ -983,14 +1006,19 @@ class TrustRegionSQPSolver:
         """
         Run a SINGLE SQP convexification step.
 
-        This is the key method for real-time/online planning.
-        Returns True if QP solve converged (does not mean SQP converged).
+        Used for online planning, where the caller updates the problem between steps.
 
-        Typical usage:
-          solver.init(problem)
-          while solver.getStatus() == SQPStatus.RUNNING:
-              solver.stepSQPSolver()
-              # Check constraints, update environment, etc.
+        Returns True when no further step should follow at the current penalty: the step
+        converged, the QP failure budget was spent, or a callback stopped the solve;
+        getStatus() tells which. It does not mean the SQP solver has converged.
+
+        Example:
+        ```python
+        solver.init(problem)
+        while solver.getStatus() == SQPStatus.RUNNING:
+            solver.stepSQPSolver()
+            # Check constraints, update environment, etc.
+        ```
         """
 
     def verifySQPSolverConvergence(self) -> bool:

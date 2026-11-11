@@ -8,11 +8,16 @@ from numpy.typing import NDArray
 
 import tesseract_robotics.collision
 import tesseract_robotics.command_language
-import tesseract_robotics.common._common
+import tesseract_robotics.common
 import tesseract_robotics.environment
 import tesseract_robotics.kinematics
-import tesseract_robotics.motion_planners._motion_planners
+import tesseract_robotics.motion_planners
 
+
+class ProfileReturnTypeError(TypeError):
+    """
+    A Python DescartesMoveProfile's create* returned an object that is not the EdgeEvaluator / WaypointSampler / StateEvaluator the planner calls.
+    """
 
 class DescartesStateD:
     @overload
@@ -113,14 +118,17 @@ class DescartesMoveProfileD(tesseract_robotics.command_language.Profile):
     def createKey() -> int:
         """The key every Descartes move profile carries"""
 
-    def createKinematicGroup(self, manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> tesseract_robotics.kinematics.KinematicGroup:
+    def createKinematicGroup(self, manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> tesseract_robotics.kinematics.KinematicGroup:
         """The kinematic group for `manip_info`'s manipulator and IK solver"""
 
-    def createWaypointSampler(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesWaypointSamplerD: ...
+    def createWaypointSampler(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesWaypointSamplerD:
+        """The waypoint sampler the planner calls for `move_instruction`"""
 
-    def createEdgeEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesEdgeEvaluatorD: ...
+    def createEdgeEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesEdgeEvaluatorD:
+        """The edge evaluator the planner calls into `move_instruction`"""
 
-    def createStateEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesStateEvaluatorD: ...
+    def createStateEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesStateEvaluatorD:
+        """The state evaluator the planner calls at `move_instruction`"""
 
 class DescartesDefaultMoveProfileD(DescartesMoveProfileD):
     def __init__(self) -> None: ...
@@ -224,7 +232,7 @@ class DescartesDefaultMoveProfileD(DescartesMoveProfileD):
     @classmethod
     def __init_subclass__(cls: type, **kwargs: object) -> None: ...
 
-class DescartesMotionPlannerD(tesseract_robotics.motion_planners._motion_planners.MotionPlanner):
+class DescartesMotionPlannerD(tesseract_robotics.motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...
 
 class DescartesStateF:
@@ -326,14 +334,17 @@ class DescartesMoveProfileF(tesseract_robotics.command_language.Profile):
     def createKey() -> int:
         """The key every Descartes move profile carries"""
 
-    def createKinematicGroup(self, manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> tesseract_robotics.kinematics.KinematicGroup:
+    def createKinematicGroup(self, manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> tesseract_robotics.kinematics.KinematicGroup:
         """The kinematic group for `manip_info`'s manipulator and IK solver"""
 
-    def createWaypointSampler(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesWaypointSamplerF: ...
+    def createWaypointSampler(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesWaypointSamplerF:
+        """The waypoint sampler the planner calls for `move_instruction`"""
 
-    def createEdgeEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesEdgeEvaluatorF: ...
+    def createEdgeEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesEdgeEvaluatorF:
+        """The edge evaluator the planner calls into `move_instruction`"""
 
-    def createStateEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesStateEvaluatorF: ...
+    def createStateEvaluator(self, move_instruction: tesseract_robotics.command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.common.ManipulatorInfo, env: tesseract_robotics.environment.Environment) -> DescartesStateEvaluatorF:
+        """The state evaluator the planner calls at `move_instruction`"""
 
 class DescartesDefaultMoveProfileF(DescartesMoveProfileF):
     def __init__(self) -> None: ...
@@ -437,28 +448,28 @@ class DescartesDefaultMoveProfileF(DescartesMoveProfileF):
     @classmethod
     def __init_subclass__(cls: type, **kwargs: object) -> None: ...
 
-class DescartesMotionPlannerF(tesseract_robotics.motion_planners._motion_planners.MotionPlanner):
+class DescartesMotionPlannerF(tesseract_robotics.motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...
 
-def sampleToolAxis(tool_pose: tesseract_robotics.common._common.Isometry3d, axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], resolution: float, minimum: float, maximum: float) -> tesseract_robotics.common._common.VectorIsometry3d:
+def sampleToolAxis(tool_pose: tesseract_robotics.common.Isometry3d, axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], resolution: float, minimum: float, maximum: float) -> list[tesseract_robotics.common.Isometry3d]:
     """
     Given a tool pose create samples from [minimum, maximum] around the provided axis.
     """
 
-def sampleToolXAxis(tool_pose: tesseract_robotics.common._common.Isometry3d, resolution: float, minimum: float, maximum: float) -> tesseract_robotics.common._common.VectorIsometry3d:
+def sampleToolXAxis(tool_pose: tesseract_robotics.common.Isometry3d, resolution: float, minimum: float, maximum: float) -> list[tesseract_robotics.common.Isometry3d]:
     """
     Given a tool pose create samples from [minimum, maximum] around the x axis.
     """
 
-def sampleToolYAxis(tool_pose: tesseract_robotics.common._common.Isometry3d, resolution: float, minimum: float, maximum: float) -> tesseract_robotics.common._common.VectorIsometry3d:
+def sampleToolYAxis(tool_pose: tesseract_robotics.common.Isometry3d, resolution: float, minimum: float, maximum: float) -> list[tesseract_robotics.common.Isometry3d]:
     """
     Given a tool pose create samples from [minimum, maximum] around the y axis.
     """
 
-def sampleToolZAxis(tool_pose: tesseract_robotics.common._common.Isometry3d, resolution: float, minimum: float, maximum: float) -> tesseract_robotics.common._common.VectorIsometry3d:
+def sampleToolZAxis(tool_pose: tesseract_robotics.common.Isometry3d, resolution: float, minimum: float, maximum: float) -> list[tesseract_robotics.common.Isometry3d]:
     """
     Given a tool pose create samples from [minimum, maximum] around the z axis.
     """
 
-def sampleFixed(tool_pose: tesseract_robotics.common._common.Isometry3d) -> tesseract_robotics.common._common.VectorIsometry3d:
+def sampleFixed(tool_pose: tesseract_robotics.common.Isometry3d) -> list[tesseract_robotics.common.Isometry3d]:
     """This will return the tool pose as the only sample."""

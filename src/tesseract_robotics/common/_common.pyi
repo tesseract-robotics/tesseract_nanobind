@@ -203,7 +203,7 @@ class Isometry3d:
 
 class Translation3d:
     @overload
-    def __init__(self, arg0: float, arg1: float, arg2: float, /) -> None: ...
+    def __init__(self, x: float, y: float, z: float) -> None: ...
 
     @overload
     def __init__(self, vector: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> None: ...
@@ -236,16 +236,13 @@ class Translation3d:
 
 class Quaterniond:
     @overload
-    def __init__(self, arg0: float, arg1: float, arg2: float, arg3: float, /) -> None: ...
-
-    @overload
     def __init__(self, rotation_matrix: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')] | Sequence[Sequence[float]]) -> None: ...
 
     @overload
     def __init__(self, angle_axis: AngleAxisd) -> None: ...
 
     @overload
-    def __init__(self, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]) -> None: ...
+    def __init__(self, xyzw: Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]) -> None: ...
 
     @staticmethod
     def Identity() -> Quaterniond: ...
@@ -318,7 +315,8 @@ class Quaterniond:
 
 class AngleAxisd:
     @overload
-    def __init__(self, arg0: float, arg1: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> None: ...
+    def __init__(self, angle: float, axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> None:
+        """Rotation by `angle` [rad] about `axis` (normalized; zero raises)."""
 
     @overload
     def __init__(self, quaternion: Quaterniond) -> None: ...
@@ -341,6 +339,21 @@ class AngleAxisd:
     def __repr__(self) -> str: ...
 
 def apply_directions_each(transforms: Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C', writable=False)], vectors: Annotated[NDArray[numpy.float64], dict(shape=(None, 3), writable=False)] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 3), order='C')]: ...
+
+class NotRotationError(ValueError):
+    """
+    A matrix offered as a rotation (or rigid transform) is not one: max|RᵀR − I| above EIGEN_DEFAULT_PREC, a non-finite entry, or a bottom row other than [0, 0, 0, 1].
+    """
+
+class DegenerateRotationError(ValueError):
+    """
+    A quaternion or rotation axis that is zero or not finite: it names no rotation.
+    """
+
+class DegenerateGeometryError(ValueError):
+    """
+    A Hyperplane3d / ParametrizedLine3d input with no direction: a zero normal or direction, coincident points, or collinear points.
+    """
 
 class NonFiniteMatrixError(ValueError):
     """nearest_rotation got a matrix with a NaN or infinite entry."""
@@ -1117,8 +1130,7 @@ class KinematicsPluginInfo(PluginDiscoveryInfo):
 
     def empty(self) -> bool: ...
 
-    CONFIG_KEY: str = ...
-    """(arg: object, /) -> str"""
+    CONFIG_KEY: str = 'kinematic_plugins'
 
     def __eq__(self, arg: KinematicsPluginInfo, /) -> bool: ...
 
@@ -1159,8 +1171,7 @@ class ContactManagersPluginInfo(PluginDiscoveryInfo):
 
     def empty(self) -> bool: ...
 
-    CONFIG_KEY: str = ...
-    """(arg: object, /) -> str"""
+    CONFIG_KEY: str = 'contact_manager_plugins'
 
     def __eq__(self, arg: ContactManagersPluginInfo, /) -> bool: ...
 
@@ -1186,8 +1197,7 @@ class CalibrationInfo:
 
     def empty(self) -> bool: ...
 
-    CONFIG_KEY: str = ...
-    """(arg: object, /) -> str"""
+    CONFIG_KEY: str = 'calibration'
 
     def __eq__(self, arg: CalibrationInfo, /) -> bool: ...
 
@@ -1228,8 +1238,7 @@ class TaskComposerPluginInfo(PluginDiscoveryInfo):
 
     def empty(self) -> bool: ...
 
-    CONFIG_KEY: str = ...
-    """(arg: object, /) -> str"""
+    CONFIG_KEY: str = 'task_composer_plugins'
 
     def __eq__(self, arg: TaskComposerPluginInfo, /) -> bool: ...
 
@@ -1264,8 +1273,7 @@ class ProfilesPluginInfo(PluginDiscoveryInfo):
 
     def empty(self) -> bool: ...
 
-    CONFIG_KEY: str = ...
-    """(arg: object, /) -> str"""
+    CONFIG_KEY: str = 'profile_plugins'
 
     def __eq__(self, arg: ProfilesPluginInfo, /) -> bool: ...
 
@@ -1393,27 +1401,3 @@ def addLogRecordHandler(handler: Callable) -> int:
 
 def removeLogRecordHandler(handler_id: int) -> bool:
     """Unregister a handler by id; False if the id is not registered"""
-
-class VectorVector3d:
-    def __init__(self) -> None: ...
-
-    def __len__(self) -> int: ...
-
-    def __getitem__(self, arg: int, /) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
-
-    def __setitem__(self, arg0: int, arg1: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> None: ...
-
-    def append(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> None: ...
-
-    def clear(self) -> None: ...
-
-class VectorIsometry3d:
-    def __init__(self) -> None: ...
-
-    def __len__(self) -> int: ...
-
-    def __getitem__(self, arg: int, /) -> Isometry3d: ...
-
-    def append(self, arg: Isometry3d, /) -> None: ...
-
-    def clear(self) -> None: ...

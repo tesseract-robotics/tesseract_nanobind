@@ -124,23 +124,23 @@ NB_MODULE(state_solver, m) {
     nb::class_<tsg::SceneState> scene_state(m, "SceneState");
     scene_state
         .def(nb::init<>())
-        .def_rw("joints", &tsg::SceneState::joints, nb::rv_policy::copy)
-        .def_rw("floating_joints", &tsg::SceneState::floating_joints, nb::rv_policy::copy)
+        .def_rw("joints", &tsg::SceneState::joints, nb::rv_policy::copy, "Joint values: joint id -> value [rad or m].")
+        .def_rw("floating_joints", &tsg::SceneState::floating_joints, nb::rv_policy::copy, "Floating-joint transforms: joint id -> Isometry3d.")
         .def_prop_rw("link_transforms",
             [](const tsg::SceneState& self) {
                 return LinkTransforms(self.link_transforms.begin(), self.link_transforms.end());
             },
             [](tsg::SceneState& self, const LinkTransforms& m) {
                 self.link_transforms = tc::LinkIdTransformMap(m.begin(), m.end());
-            })
+            }, "World transform of every link: link id -> Isometry3d (a copy).")
         .def_prop_rw("joint_transforms",
             [](const tsg::SceneState& self) {
                 return JointTransforms(self.joint_transforms.begin(), self.joint_transforms.end());
             },
             [](tsg::SceneState& self, const JointTransforms& m) {
                 self.joint_transforms = tc::JointIdTransformMap(m.begin(), m.end());
-            })
-        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_ids"_a)
+            }, "World transform of every joint: joint id -> Isometry3d (a copy).")
+        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_ids"_a, "The values of `joint_ids`, in that order; an unknown id raises KeyError.")
         // #232: upstream's floating_joints.at(name) (scene_state.cpp:48) throws std::out_of_range
         // for an unknown name; a missing mapping key is KeyError in Python.
         .def("getFloatingJointValues",
@@ -156,8 +156,7 @@ NB_MODULE(state_solver, m) {
 
     // ========== StateSolver (abstract base) ==========
     // gh-219: every setState / getState / getJacobian / getLinkTransforms overload under its native
-    // name, validated as above. The Python-only aliases setStateByMap / setStateByNamesAndValues are
-    // bound to the same lambdas as their native forms (kept until a separate removal).
+    // name, validated as above.
     // Dispatch: {name: float} matches only the joint-value map, {name: Isometry3d} only the
     // JointIdTransformMap; an empty {} converts to both and reaches the joint-value map first.
     const auto set_state_map = [](tsg::StateSolver& self,
@@ -184,19 +183,16 @@ NB_MODULE(state_solver, m) {
             validate_floating_joints(self, floating_joint_values, "setState");
             self.setState(joint_values, floating_joint_values);
         }, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
-        .def("setState", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
+        .def("setState", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{}, "Set joint values (a vector in getActiveJointIds order, a {joint: value} map, or ids and values) and optional floating-joint transforms. Unknown joints raise ValueError before anything changes.")
         .def("setState", set_state_names_values,
-             "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
+             "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{}, "Set joint values (a vector in getActiveJointIds order, a {joint: value} map, or ids and values) and optional floating-joint transforms. Unknown joints raise ValueError before anything changes.")
         .def("setState", [](tsg::StateSolver& self, const tc::JointIdTransformMap& floating_joint_values) {
             validate_floating_joints(self, floating_joint_values, "setState");
             self.setState(floating_joint_values);
         }, "floating_joint_values"_a)
-        .def("setStateByMap", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
-        .def("setStateByNamesAndValues", set_state_names_values,
-             "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getState", [](const tsg::StateSolver& self) {
             return self.getState();
-        })
+        }, "The state at the given joint values (forms as setState), or the current state with no arguments, without changing the solver.")
         .def("getState", [](const tsg::StateSolver& self,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
                             const tc::JointIdTransformMap& floating_joint_values) {
@@ -228,7 +224,7 @@ NB_MODULE(state_solver, m) {
         // the current floating joint values, which an empty map leaves in place.
         .def("getLinkTransforms", [](const tsg::StateSolver& self) {
             return self.getLinkTransforms();
-        })
+        }, "Every link's world transform, at the current state or at `joint_values` for `joint_ids`.")
         .def("getLinkTransforms", [](const tsg::StateSolver& self,
                                      const std::vector<tc::JointId>& joint_ids,
                                      const Eigen::Ref<const Eigen::VectorXd>& joint_values,
@@ -239,7 +235,7 @@ NB_MODULE(state_solver, m) {
             self.getLinkTransforms(link_transforms, joint_ids, joint_values, floating_joint_values);
             return link_transforms;
         }, "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
-        .def("getRandomState", &tsg::StateSolver::getRandomState)
+        .def("getRandomState", &tsg::StateSolver::getRandomState, "A state at uniformly random joint values within the joint limits.")
         // 0.36 dropped the joint-value-map getJacobian (state_solver.h:170-189): vector and ids + vector only
         .def("getJacobian", [](const tsg::StateSolver& self,
                                const Eigen::Ref<const Eigen::VectorXd>& joint_values,
@@ -261,43 +257,43 @@ NB_MODULE(state_solver, m) {
             return self.getJacobian(joint_ids, joint_values, link_id, floating_joint_values);
         }, "joint_ids"_a, "joint_values"_a, "link_id"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         // Id getters
-        .def("getJointIds", &tsg::StateSolver::getJointIds)
-        .def("getFloatingJointIds", &tsg::StateSolver::getFloatingJointIds)
-        .def("getActiveJointIds", &tsg::StateSolver::getActiveJointIds)
-        .def("getBaseLinkId", &tsg::StateSolver::getBaseLinkId)
-        .def("getLinkIds", &tsg::StateSolver::getLinkIds)
-        .def("getActiveLinkIds", &tsg::StateSolver::getActiveLinkIds)
-        .def("getStaticLinkIds", &tsg::StateSolver::getStaticLinkIds)
+        .def("getJointIds", &tsg::StateSolver::getJointIds, "Every joint id of the scene graph.")
+        .def("getFloatingJointIds", &tsg::StateSolver::getFloatingJointIds, "The floating joint ids.")
+        .def("getActiveJointIds", &tsg::StateSolver::getActiveJointIds, "The active (non-fixed, non-mimic) joint ids, in state-vector order.")
+        .def("getBaseLinkId", &tsg::StateSolver::getBaseLinkId, "The root link id.")
+        .def("getLinkIds", &tsg::StateSolver::getLinkIds, "Every link id.")
+        .def("getActiveLinkIds", &tsg::StateSolver::getActiveLinkIds, "Links moved by an active joint.")
+        .def("getStaticLinkIds", &tsg::StateSolver::getStaticLinkIds, "Links no active joint moves.")
         // Link queries
-        .def("isActiveLinkId", &tsg::StateSolver::isActiveLinkId, "link_id"_a)
-        .def("hasLinkId", &tsg::StateSolver::hasLinkId, "link_id"_a)
+        .def("isActiveLinkId", &tsg::StateSolver::isActiveLinkId, "link_id"_a, "True if an active joint moves `link_id`.")
+        .def("hasLinkId", &tsg::StateSolver::hasLinkId, "link_id"_a, "True if `link_id` is a link of the scene graph.")
         // Transform getters
         .def("getLinkTransform", nb::overload_cast<const tc::LinkId&>(&tsg::StateSolver::getLinkTransform, nb::const_),
-             "link_id"_a)
+             "link_id"_a, "The current world transform of `link_id`.")
         .def("getRelativeLinkTransform", &tsg::StateSolver::getRelativeLinkTransform,
-             "from_link_id"_a, "to_link_id"_a)
-        .def("getLimits", &tsg::StateSolver::getLimits)
-        .def("clone", [](const tsg::StateSolver& self) { return self.clone(); });
+             "from_link_id"_a, "to_link_id"_a, "The transform of `to_link_id` in the frame of `from_link_id`, at the current state.")
+        .def("getLimits", &tsg::StateSolver::getLimits, "The active joints' position, velocity, acceleration and jerk limits, in getActiveJointIds order.")
+        .def("clone", [](const tsg::StateSolver& self) { return self.clone(); }, "An independent copy at the same state.");
 
     // ========== MutableStateSolver (abstract, inherits StateSolver) ==========
     nb::class_<tsg::MutableStateSolver, tsg::StateSolver>(m, "MutableStateSolver")
-        .def("setRevision", &tsg::MutableStateSolver::setRevision, "revision"_a)
-        .def("getRevision", &tsg::MutableStateSolver::getRevision)
-        .def("addLink", &tsg::MutableStateSolver::addLink, "link"_a, "joint"_a)
-        .def("moveLink", &tsg::MutableStateSolver::moveLink, "joint"_a)
-        .def("removeLink", &tsg::MutableStateSolver::removeLink, "name"_a)
-        .def("replaceJoint", &tsg::MutableStateSolver::replaceJoint, "joint"_a)
-        .def("removeJoint", &tsg::MutableStateSolver::removeJoint, "name"_a)
-        .def("moveJoint", &tsg::MutableStateSolver::moveJoint, "name"_a, "parent_link"_a)
-        .def("changeJointOrigin", &tsg::MutableStateSolver::changeJointOrigin, "name"_a, "new_origin"_a)
+        .def("setRevision", &tsg::MutableStateSolver::setRevision, "revision"_a, "Set the revision this solver tracks (the environment's command count).")
+        .def("getRevision", &tsg::MutableStateSolver::getRevision, "The revision this solver tracks.")
+        .def("addLink", &tsg::MutableStateSolver::addLink, "link"_a, "joint"_a, "Add `link` attached by `joint`; False if the link or joint exists.")
+        .def("moveLink", &tsg::MutableStateSolver::moveLink, "joint"_a, "Re-attach a link by replacing its parent joint with `joint`; False on failure.")
+        .def("removeLink", &tsg::MutableStateSolver::removeLink, "name"_a, "Remove the link `name` and its subtree; False if unknown.")
+        .def("replaceJoint", &tsg::MutableStateSolver::replaceJoint, "joint"_a, "Replace the joint of the same name (same child link); False on failure.")
+        .def("removeJoint", &tsg::MutableStateSolver::removeJoint, "name"_a, "Remove the joint `name` and its child subtree; False if unknown.")
+        .def("moveJoint", &tsg::MutableStateSolver::moveJoint, "name"_a, "parent_link"_a, "Re-parent the joint `name` onto `parent_link`; False on failure.")
+        .def("changeJointOrigin", &tsg::MutableStateSolver::changeJointOrigin, "name"_a, "new_origin"_a, "Set the origin of the joint `name`; False if unknown.")
         .def("changeJointPositionLimits", &tsg::MutableStateSolver::changeJointPositionLimits,
-             "name"_a, "lower"_a, "upper"_a)
+             "name"_a, "lower"_a, "upper"_a, "Set the position limits of the joint `name`; False if unknown.")
         .def("changeJointVelocityLimits", &tsg::MutableStateSolver::changeJointVelocityLimits,
-             "name"_a, "limit"_a)
+             "name"_a, "limit"_a, "Set the velocity limit of the joint `name`; False if unknown.")
         .def("changeJointAccelerationLimits", &tsg::MutableStateSolver::changeJointAccelerationLimits,
-             "name"_a, "limit"_a)
+             "name"_a, "limit"_a, "Set the acceleration limit of the joint `name`; False if unknown.")
         .def("changeJointJerkLimits", &tsg::MutableStateSolver::changeJointJerkLimits,
-             "name"_a, "limit"_a)
+             "name"_a, "limit"_a, "Set the jerk limit of the joint `name`; False if unknown.")
         // False (and a tesseract error) when the joint's parent link is not in the solver, its
         // child is not in scene_graph, or the joint name exists (ofkt_state_solver.cpp:861-886).
         .def("insertSceneGraph", &tsg::MutableStateSolver::insertSceneGraph,
@@ -314,7 +310,7 @@ NB_MODULE(state_solver, m) {
         .def(nb::init<const tsg::SceneGraph&>(), "scene_graph"_a)
         .def("clone", [](const tsg::KDLStateSolver& self) {
             return self.clone();
-        });
+        }, "An independent copy at the same state.");
 
     // ========== OFKTStateSolver (concrete, mutable) ==========
     nb::class_<tsg::OFKTStateSolver, tsg::MutableStateSolver>(m, "OFKTStateSolver")
@@ -325,5 +321,5 @@ NB_MODULE(state_solver, m) {
         .def(nb::init<const tc::LinkId&>(), "root_link_id"_a)
         .def("clone", [](const tsg::OFKTStateSolver& self) {
             return self.clone();
-        });
+        }, "An independent copy at the same state.");
 }

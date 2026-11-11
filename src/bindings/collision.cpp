@@ -4,6 +4,7 @@
  */
 
 #include "tesseract_nb.h"
+#include "collision_defaults.h"
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/unordered_map.h>
@@ -23,6 +24,7 @@
 #include <tesseract/common/collision_margin_data.h>
 #include <tesseract/common/resource_locator.h>
 #include <cerrno>
+#include <limits>
 #include <filesystem>
 #include <fstream>
 #include <tesseract/common/types.h>
@@ -178,21 +180,33 @@ void check_no_held_element(const tc::ContactResultVector& v, const char* caller)
                                          "delete the reference first, or hold copy.copy(v[i])");
 }
 
+// Upstream's index parameters are `long`, 32 bits on Windows: a larger Python int would be
+// truncated silently. std::overflow_error reaches Python as OverflowError.
+long to_long(Py_ssize_t value, const char* name) {
+    if (value < std::numeric_limits<long>::min() || value > std::numeric_limits<long>::max())
+        throw std::overflow_error(std::string(name) + " = " + std::to_string(value) + " does not fit a C long");
+    return static_cast<long>(value);
+}
+
 void check_nonempty(const CRM::MappedType& results) {
     if (results.empty())
         throw EmptyContactResultsError("ContactResultMap: results must hold at least one ContactResult");
 }
 
-// Wrap a Python callable as FilterFn. The vector is passed by reference so the callback can
-// clear or append; it is valid only for the duration of the call (same contract as
-// PySQPCallback's problem argument, src/bindings/trajopt_sqp.cpp).
+// Wrap a Python callable as FilterFn. The callback gets a copy of the pair's vector, which is
+// copied back into the map when it returns: clearing or appending to it edits the map, and a
+// callback that keeps the vector keeps its own copy, never a reference into the map (which a
+// later insert or shrinkToFit would free). Upstream calls the filter on the calling thread,
+// which holds the GIL (neither binding that takes a filter releases it).
 using PyFilterFn = nb::typed<nb::callable, void(CRM::KeyType, tc::ContactResultVector)>;
 
 CRM::FilterFn to_filter_fn(const std::optional<PyFilterFn>& maybe_fn) {
     if (!maybe_fn) return nullptr;
     nb::callable fn = *maybe_fn;
     return [fn](CRM::PairType& pair) {
-        fn(nb::cast(pair.first), nb::cast(pair.second, nb::rv_policy::reference));
+        nb::object results = nb::cast(pair.second, nb::rv_policy::copy);
+        fn(nb::cast(pair.first), results);
+        pair.second = nb::cast<const tc::ContactResultVector&>(results);
     };
 }
 
@@ -300,10 +314,14 @@ NB_MODULE(collision, m) {
         "delete the reference, or hold a copy (`copy.copy(v[i])`), first.")
         .def(nb::init<>())
         .def("__len__", [](const tc::ContactResultVector& v) { return v.size(); })
-        .def("__getitem__", [](tc::ContactResultVector& v, size_t i) -> tc::ContactResult& {
-            if (i >= v.size()) throw nb::index_error();
-            return v[i];
-        }, nb::rv_policy::reference_internal,
+        .def("__getitem__", [](tc::ContactResultVector& v, Py_ssize_t i) -> tc::ContactResult& {
+            const auto n = static_cast<Py_ssize_t>(v.size());
+            const Py_ssize_t j = i < 0 ? i + n : i;
+            if (j < 0 || j >= n)
+                throw nb::index_error(("index " + std::to_string(i) + " out of range for size " +
+                                       std::to_string(v.size())).c_str());
+            return v[static_cast<std::size_t>(j)];
+        }, "index"_a, nb::rv_policy::reference_internal,
            "Reference to the element at the index (write-through), kept valid by refusing reallocation while it is held.")
         .def("append", [](tc::ContactResultVector& v, const tc::ContactResult& item) {
             check_no_held_element(v, "append");
@@ -318,8 +336,8 @@ NB_MODULE(collision, m) {
     nb::exception<EmptyContactResultsError>(m, "EmptyContactResultsError", PyExc_ValueError)
         .attr("__doc__") = "A ContactResultMap vector overload got an empty ContactResultVector.";
 
-    // Every value handed to Python is a copy (the filter callback's vector excepted), so Python
-    // never holds a reference into the map that a later insert or shrinkToFit invalidates.
+    // Every value handed to Python is a copy (the filter callback's vector is copied back), so
+    // Python never holds a reference into the map that a later insert or shrinkToFit invalidates.
     auto contact_result_map = nb::class_<CRM>(m, "ContactResultMap")
         .def(nb::init<>())
         .def("count", &CRM::count)
@@ -375,13 +393,16 @@ NB_MODULE(collision, m) {
         }, "key"_a, "results"_a)
         .def("shrinkToFit", &CRM::shrinkToFit)
         .def("filter", [](CRM& self, const PyFilterFn& fn) { self.filter(to_filter_fn(fn)); }, "fn"_a,
-             "Call `fn(key, results)` for every pair; clearing or appending to `results` edits the map. "
-             "`results` is valid only during the call.")
+             "Call `fn(key, results)` for every pair; what `results` holds when `fn` returns replaces the "
+             "pair's results (clear it to drop them). `results` is a copy: one kept past the call no "
+             "longer edits the map.")
         .def("addInterpolatedCollisionResults",
-             [](CRM& self, CRM& sub_segment_results, long sub_segment_index, long sub_segment_last_index,
+             [](CRM& self, CRM& sub_segment_results, Py_ssize_t sub_segment_index, Py_ssize_t sub_segment_last_index,
                 const std::unordered_set<tcommon::LinkId>& active_link_ids, double segment_dt, bool discrete,
                 const std::optional<PyFilterFn>& filter) {
-                 self.addInterpolatedCollisionResults(sub_segment_results, sub_segment_index, sub_segment_last_index,
+                 self.addInterpolatedCollisionResults(sub_segment_results,
+                                                      to_long(sub_segment_index, "sub_segment_index"),
+                                                      to_long(sub_segment_last_index, "sub_segment_last_index"),
                                                       active_link_ids, segment_dt, discrete, to_filter_fn(filter));
              },
              "sub_segment_results"_a, "sub_segment_index"_a, "sub_segment_last_index"_a, "active_link_ids"_a,
@@ -503,7 +524,7 @@ NB_MODULE(collision, m) {
                       tc::CollisionCheckExitType>(),
              "contact_request"_a = tc::ContactRequest(),
              "type"_a = tc::CollisionEvaluatorType::DISCRETE,
-             "longest_valid_segment_length"_a = 0.005,
+             "longest_valid_segment_length"_a = LONGEST_VALID_SEGMENT_LENGTH_DEFAULT,
              "check_program_mode"_a = tc::CollisionCheckProgramType::ALL,
              "exit_condition"_a = tc::CollisionCheckExitType::FIRST)
         .def_rw("contact_request", &tc::CollisionCheckConfig::contact_request)
@@ -591,7 +612,10 @@ NB_MODULE(collision, m) {
         // background worker thread can sweep a whole trajectory without blocking
         // the Python UI thread — mirrors the motion planners' solve() guards.
         .def("contactTest", &tc::DiscreteContactManager::contactTest, "collisions"_a, "request"_a, nb::call_guard<nb::gil_scoped_release>())
-        .def("clone", [](const tc::DiscreteContactManager& self) { return self.clone(); });
+        .def("clone", [](const tc::DiscreteContactManager& self) { return self.clone(); },
+             // gh-72: a clone runs the plugin library's code (its vtable lives there), so it keeps
+             // the original, and through it whatever owns that library, alive.
+             nb::keep_alive<0, 1>(), "An independent copy; it keeps this object alive (gh-72).");
     // After the single-object overloads: nanobind tries overloads in order, and a dict converts to
     // the batch (ids, state) overload's id set.
     bind_batch_collision_objects(discrete_contact_manager);
@@ -689,7 +713,10 @@ NB_MODULE(collision, m) {
         .def("getContactAllowedValidator", &tc::ContinuousContactManager::getContactAllowedValidator)
         .def("applyContactManagerConfig", &tc::ContinuousContactManager::applyContactManagerConfig, "config"_a)
         .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a, nb::call_guard<nb::gil_scoped_release>())  // GIL released (see discrete contactTest above)
-        .def("clone", [](const tc::ContinuousContactManager& self) { return self.clone(); });
+        .def("clone", [](const tc::ContinuousContactManager& self) { return self.clone(); },
+             // gh-72: a clone runs the plugin library's code (its vtable lives there), so it keeps
+             // the original, and through it whatever owns that library, alive.
+             nb::keep_alive<0, 1>(), "An independent copy; it keeps this object alive (gh-72).");
     // After the cast (pose1, pose2) overloads: a (dict, dict) call is the cast map overload.
     bind_batch_collision_objects(continuous_contact_manager);
 
@@ -774,7 +801,8 @@ NB_MODULE(collision, m) {
         ContactManagersPluginFactoryWrapper() : ptr(std::make_shared<tc::ContactManagersPluginFactory>()) {}
         // StrictPath (tesseract_nb.h): a `str` is always YAML content, never a path
         ContactManagersPluginFactoryWrapper(const tesseract_nb::StrictPath& config_path, const tcommon::ResourceLocator& locator)
-            : ptr(std::make_shared<tc::ContactManagersPluginFactory>(config_path.value, locator)) {}
+            : ptr((require_located_file(config_path.value, locator),
+                   std::make_shared<tc::ContactManagersPluginFactory>(config_path.value, locator))) {}
         ContactManagersPluginFactoryWrapper(const std::string& config, const tcommon::ResourceLocator& locator)
             : ptr(std::make_shared<tc::ContactManagersPluginFactory>(config, locator)) {}
 

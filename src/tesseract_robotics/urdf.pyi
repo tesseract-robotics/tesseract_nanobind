@@ -1,18 +1,27 @@
 """tesseract_urdf Python bindings"""
 
-import tesseract_robotics.common._common
+import pathlib
+
+import tesseract_robotics.common
 import tesseract_robotics.geometry
-import tesseract_robotics.scene_graph._scene_graph
+import tesseract_robotics.scene_graph
 
 
-def parseURDFString(urdf_xml_string: str, locator: tesseract_robotics.common._common.ResourceLocator) -> tesseract_robotics.scene_graph._scene_graph.SceneGraph:
+def parseURDFString(urdf_xml_string: str, locator: tesseract_robotics.common.ResourceLocator) -> tesseract_robotics.scene_graph.SceneGraph:
     """Parse a URDF string into a SceneGraph"""
 
-def parseURDFFile(path: str, locator: tesseract_robotics.common._common.ResourceLocator) -> tesseract_robotics.scene_graph._scene_graph.SceneGraph:
+def parseURDFFile(path: str, locator: tesseract_robotics.common.ResourceLocator) -> tesseract_robotics.scene_graph.SceneGraph:
     """Parse a URDF file into a SceneGraph"""
 
-def writeURDFFile(scene_graph: tesseract_robotics.scene_graph._scene_graph.SceneGraph, package_path: str, urdf_name: str = '') -> None:
-    """Write a SceneGraph to a URDF file"""
+class URDFWriteError(RuntimeError):
+    """
+    writeURDFFile could not write the scene graph; the message names the cause.
+    """
+
+def writeURDFFile(scene_graph: tesseract_robotics.scene_graph.SceneGraph, package_path: str, urdf_name: str = '') -> pathlib.Path:
+    """
+    Write `scene_graph` to `package_path`/urdf/`urdf_name`.urdf (`urdf_name` is a stem; default: the graph's name), its meshes as PLY files under `package_path`/visual and /collision. Returns the URDF's path. Raises URDFWriteError naming the cause.
+    """
 
 def writeMeshToFile(mesh: tesseract_robotics.geometry.PolygonMesh, filepath: str) -> None:
     """

@@ -145,7 +145,7 @@ from tesseract_robotics.collision import (
     ContactTestType,
 )
 from tesseract_robotics.common import (
-    CollisionMarginData, GeneralResourceLocator, Isometry3d, VectorIsometry3d,
+    CollisionMarginData, GeneralResourceLocator, Isometry3d,
 )
 from tesseract_robotics.geometry import Box, GeometriesConst
 
@@ -161,7 +161,7 @@ checker = factory.createDiscreteContactManager("BulletDiscreteBVHManager")
 for name in ("box_a", "box_b"):
     shapes = GeometriesConst()
     shapes.append(Box(1.0, 1.0, 1.0))
-    poses = VectorIsometry3d()
+    poses = []
     poses.append(Isometry3d(np.eye(4)))
     checker.addCollisionObject(name, 0, shapes, poses)
 checker.setActiveCollisionObjects(["box_a", "box_b"])

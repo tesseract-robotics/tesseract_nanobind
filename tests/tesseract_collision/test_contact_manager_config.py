@@ -36,7 +36,6 @@ from tesseract_robotics.common import (
     CombinedContactAllowedValidator,
     CombinedContactAllowedValidatorType,
     Isometry3d,
-    VectorIsometry3d,
 )
 from tesseract_robotics.geometry import Box, GeometriesConst
 
@@ -118,7 +117,7 @@ def _box(size=1.0):
     box = Box(size, size, size)
     shapes = GeometriesConst()
     shapes.append(box)
-    poses = VectorIsometry3d()
+    poses = []
     poses.append(Isometry3d(np.eye(4)))
     return shapes, poses
 

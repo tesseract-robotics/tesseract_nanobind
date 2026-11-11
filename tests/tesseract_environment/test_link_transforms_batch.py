@@ -45,5 +45,5 @@ def test_refuses_unknown_joint_and_link_names_and_a_column_mismatch():
         env.link_transforms_batch([*_IIWA_JOINTS[:-1], "not_a_joint"], values, _LINKS)
     with pytest.raises(ValueError, match="not_a_link"):
         env.link_transforms_batch(_IIWA_JOINTS, values, ["tool0", "not_a_link"])
-    with pytest.raises(ValueError, match="joint_names length"):
+    with pytest.raises(ValueError, match="joint_ids length"):
         env.link_transforms_batch(_IIWA_JOINTS, values[:, :-1], _LINKS)

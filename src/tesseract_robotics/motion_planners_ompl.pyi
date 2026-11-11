@@ -5,7 +5,7 @@ import enum
 
 import tesseract_robotics.collision
 import tesseract_robotics.command_language
-import tesseract_robotics.motion_planners._motion_planners
+import tesseract_robotics.motion_planners
 
 
 class OMPLObjectiveReturnTypeError(TypeError):
@@ -496,7 +496,7 @@ class OMPLRealVectorMoveProfile(OMPLMoveProfile):
         Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `solver_config:` starts with no planners (OMPLSolverConfig() holds none).
         """
 
-class OMPLMotionPlanner(tesseract_robotics.motion_planners._motion_planners.MotionPlanner):
+class OMPLMotionPlanner(tesseract_robotics.motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...
 
 def RNG_setSeed(seed: int) -> None:

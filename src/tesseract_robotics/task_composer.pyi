@@ -8,7 +8,7 @@ from typing import overload
 
 import tesseract_robotics.collision
 import tesseract_robotics.command_language
-import tesseract_robotics.common._common
+import tesseract_robotics.common
 import tesseract_robotics.environment
 
 
@@ -171,10 +171,10 @@ class TaskComposerNodePorts:
     def outputs(self) -> dict[str, TaskComposerNodePorts.PortDefinition]:
         """Output port name -> PortDefinition."""
 
-    def inputSchema(self) -> tesseract_robotics.common._common.PropertyTree:
+    def inputSchema(self) -> tesseract_robotics.common.PropertyTree:
         """The schema of an `inputs:` port-mapping config."""
 
-    def outputSchema(self) -> tesseract_robotics.common._common.PropertyTree:
+    def outputSchema(self) -> tesseract_robotics.common.PropertyTree:
         """The schema of an `outputs:` port-mapping config."""
 
     def validate(self, inputs: TaskComposerPortMap, outputs: TaskComposerPortMap) -> list[TaskComposerNodePorts.ValidationError]:
@@ -537,7 +537,7 @@ class TaskComposerTask(TaskComposerNode):
     def setTriggerAbort(self, enable: bool) -> None: ...
 
     @staticmethod
-    def schema(ports: TaskComposerNodePorts) -> tesseract_robotics.common._common.PropertyTree:
+    def schema(ports: TaskComposerNodePorts) -> tesseract_robotics.common.PropertyTree:
         """The config schema of a task with the port contract `ports`."""
 
 class TaskComposerGraph(TaskComposerNode):
@@ -579,7 +579,7 @@ class TaskComposerGraph(TaskComposerNode):
         """(True, message) if valid, else (False, the reason)."""
 
     @staticmethod
-    def schema() -> tesseract_robotics.common._common.PropertyTree:
+    def schema() -> tesseract_robotics.common.PropertyTree:
         """The config schema of a TaskComposerGraph."""
 
 class TaskComposerPipeline(TaskComposerGraph):
@@ -590,7 +590,7 @@ class TaskComposerPipeline(TaskComposerGraph):
     def __init__(self, name: str, conditional: bool) -> None: ...
 
     @staticmethod
-    def schema() -> tesseract_robotics.common._common.PropertyTree:
+    def schema() -> tesseract_robotics.common.PropertyTree:
         """The config schema of a TaskComposerPipeline."""
 
 class TaskflowTaskComposerExecutor(TaskComposerExecutor):
@@ -613,17 +613,17 @@ class TaskflowTaskComposerExecutor(TaskComposerExecutor):
     def getTaskCount(self) -> int: ...
 
     @staticmethod
-    def schema() -> tesseract_robotics.common._common.PropertyTree:
+    def schema() -> tesseract_robotics.common.PropertyTree:
         """The config schema of a TaskflowTaskComposerExecutor."""
-
-class TaskComposerPluginError(RuntimeError):
-    """
-    createTaskComposerNode / createTaskComposerExecutor could not create the named plugin: the name is not configured, or its plugin failed to load or build.
-    """
 
 class TaskComposerConfigError(ValueError):
     """
     A `str` config passed to TaskComposerPluginFactory or TaskComposerServer is not a loadable task composer config (a `str` is YAML text; pass a pathlib.Path to load a file).
+    """
+
+class TaskComposerPluginError(RuntimeError):
+    """
+    createTaskComposerNode / createTaskComposerExecutor could not create the named plugin: the name is not configured, or its plugin failed to load or build.
     """
 
 class TaskComposerPluginFactory:
@@ -631,22 +631,22 @@ class TaskComposerPluginFactory:
     def __init__(self) -> None: ...
 
     @overload
-    def __init__(self, config: tesseract_robotics.common._common.TaskComposerPluginInfo) -> None: ...
+    def __init__(self, config: tesseract_robotics.common.TaskComposerPluginInfo) -> None: ...
 
     @overload
-    def __init__(self, config_path: os.PathLike, locator: tesseract_robotics.common._common.ResourceLocator) -> None: ...
+    def __init__(self, config_path: os.PathLike, locator: tesseract_robotics.common.ResourceLocator) -> None: ...
 
     @overload
-    def __init__(self, config: str, locator: tesseract_robotics.common._common.ResourceLocator) -> None: ...
+    def __init__(self, config: str, locator: tesseract_robotics.common.ResourceLocator) -> None: ...
 
     @overload
-    def loadConfig(self, config: tesseract_robotics.common._common.TaskComposerPluginInfo) -> None: ...
+    def loadConfig(self, config: tesseract_robotics.common.TaskComposerPluginInfo) -> None: ...
 
     @overload
-    def loadConfig(self, config_path: os.PathLike, locator: tesseract_robotics.common._common.ResourceLocator) -> None: ...
+    def loadConfig(self, config_path: os.PathLike, locator: tesseract_robotics.common.ResourceLocator) -> None: ...
 
     @overload
-    def loadConfig(self, config: str, locator: tesseract_robotics.common._common.ResourceLocator) -> None: ...
+    def loadConfig(self, config: str, locator: tesseract_robotics.common.ResourceLocator) -> None: ...
 
     def addSearchPath(self, path: str) -> None: ...
 
@@ -660,9 +660,9 @@ class TaskComposerPluginFactory:
 
     def clearSearchLibraries(self) -> None: ...
 
-    def addTaskComposerExecutorPlugin(self, name: str, plugin_info: tesseract_robotics.common._common.PluginInfo) -> None: ...
+    def addTaskComposerExecutorPlugin(self, name: str, plugin_info: tesseract_robotics.common.PluginInfo) -> None: ...
 
-    def getTaskComposerExecutorPlugins(self) -> dict[str, tesseract_robotics.common._common.PluginInfo]:
+    def getTaskComposerExecutorPlugins(self) -> dict[str, tesseract_robotics.common.PluginInfo]:
         """Configured executor plugins, name -> PluginInfo (a copy)."""
 
     def removeTaskComposerExecutorPlugin(self, name: str) -> None: ...
@@ -673,9 +673,9 @@ class TaskComposerPluginFactory:
 
     def getDefaultTaskComposerExecutorPlugin(self) -> str: ...
 
-    def addTaskComposerNodePlugin(self, name: str, plugin_info: tesseract_robotics.common._common.PluginInfo) -> None: ...
+    def addTaskComposerNodePlugin(self, name: str, plugin_info: tesseract_robotics.common.PluginInfo) -> None: ...
 
-    def getTaskComposerNodePlugins(self) -> dict[str, tesseract_robotics.common._common.PluginInfo]:
+    def getTaskComposerNodePlugins(self) -> dict[str, tesseract_robotics.common.PluginInfo]:
         """
         Configured task composer node plugins, name -> PluginInfo (a copy). The keys are the names createTaskComposerNode accepts.
         """
@@ -695,7 +695,7 @@ class TaskComposerPluginFactory:
         """
 
     @overload
-    def createTaskComposerExecutor(self, name: str, plugin_info: tesseract_robotics.common._common.PluginInfo) -> TaskComposerExecutor:
+    def createTaskComposerExecutor(self, name: str, plugin_info: tesseract_robotics.common.PluginInfo) -> TaskComposerExecutor:
         """
         Create an executor named `name` from an explicit PluginInfo. Raises TaskComposerPluginError if it cannot be created.
         """
@@ -707,7 +707,7 @@ class TaskComposerPluginFactory:
         """
 
     @overload
-    def createTaskComposerNode(self, name: str, plugin_info: tesseract_robotics.common._common.PluginInfo) -> TaskComposerNode:
+    def createTaskComposerNode(self, name: str, plugin_info: tesseract_robotics.common.PluginInfo) -> TaskComposerNode:
         """
         Create a node named `name` from an explicit PluginInfo. Raises TaskComposerPluginError if it cannot be created.
         """
@@ -731,10 +731,10 @@ class TaskComposerServer:
     def __init__(self) -> None: ...
 
     @overload
-    def loadConfig(self, config_path: os.PathLike, locator: tesseract_robotics.common._common.ResourceLocator) -> None: ...
+    def loadConfig(self, config_path: os.PathLike, locator: tesseract_robotics.common.ResourceLocator) -> None: ...
 
     @overload
-    def loadConfig(self, config: str, locator: tesseract_robotics.common._common.ResourceLocator) -> None: ...
+    def loadConfig(self, config: str, locator: tesseract_robotics.common.ResourceLocator) -> None: ...
 
     def addExecutor(self, executor: TaskComposerExecutor) -> None: ...
 

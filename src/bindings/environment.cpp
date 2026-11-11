@@ -4,6 +4,7 @@
  */
 
 #include "tesseract_nb.h"
+#include "environment_bindings.h"
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/unique_ptr.h>
@@ -22,28 +23,6 @@
 #include <tesseract/environment/events.h>
 #include <tesseract/environment/utils.h>
 #include <tesseract/environment/command.h>
-#include <tesseract/environment/commands/add_contact_managers_plugin_info_command.h>
-#include <tesseract/environment/commands/add_link_command.h>
-#include <tesseract/environment/commands/add_kinematics_information_command.h>
-#include <tesseract/environment/commands/add_scene_graph_command.h>
-#include <tesseract/environment/commands/add_trajectory_link_command.h>
-#include <tesseract/environment/commands/change_collision_margins_command.h>
-#include <tesseract/environment/commands/change_joint_acceleration_limits_command.h>
-#include <tesseract/environment/commands/change_joint_origin_command.h>
-#include <tesseract/environment/commands/change_joint_position_limits_command.h>
-#include <tesseract/environment/commands/change_joint_velocity_limits_command.h>
-#include <tesseract/environment/commands/change_link_collision_enabled_command.h>
-#include <tesseract/environment/commands/change_link_origin_command.h>
-#include <tesseract/environment/commands/change_link_visibility_command.h>
-#include <tesseract/environment/commands/modify_allowed_collisions_command.h>
-#include <tesseract/environment/commands/move_joint_command.h>
-#include <tesseract/environment/commands/move_link_command.h>
-#include <tesseract/environment/commands/remove_allowed_collision_link_command.h>
-#include <tesseract/environment/commands/remove_joint_command.h>
-#include <tesseract/environment/commands/remove_link_command.h>
-#include <tesseract/environment/commands/replace_joint_command.h>
-#include <tesseract/environment/commands/set_active_continuous_contact_manager_command.h>
-#include <tesseract/environment/commands/set_active_discrete_contact_manager_command.h>
 
 // tesseract_scene_graph
 #include <tesseract/scene_graph/graph.h>
@@ -180,7 +159,7 @@ void validate_set_state_joint_ids(const te::Environment& env,
         }
     }
     if (!unknown.empty())
-        throw std::invalid_argument(caller + ": unknown or non-active joint names: " + unknown);
+        throw std::invalid_argument(caller + ": unknown or non-active joint ids: " + unknown);
 }
 
 void validate_set_state(const te::Environment& env,
@@ -189,7 +168,7 @@ void validate_set_state(const te::Environment& env,
                         const std::string& caller = "setState")
 {
     if (static_cast<Eigen::Index>(names.size()) != values.size())
-        throw std::invalid_argument(caller + ": joint_names length (" + std::to_string(names.size()) +
+        throw std::invalid_argument(caller + ": joint_ids length (" + std::to_string(names.size()) +
                                     ") != joint_values length (" + std::to_string(values.size()) + ")");
     validate_set_state_joint_ids(env, names, caller);
 }
@@ -274,6 +253,28 @@ void require_link(const te::Environment& env, const tc::LinkId& id)
         throw nb::key_error(("Link not found: " + id.name()).c_str());
 }
 
+// An SRDF group name, the key of every group getter: a miss is a KeyError (gh-188).
+void require_group(const te::Environment& env, const std::string& group_name)
+{
+    const auto groups = env.getGroupNames();
+    if (groups.find(group_name) == groups.end())
+        throw nb::key_error(("Group not found: " + group_name).c_str());
+}
+
+// getKinematicGroup's (group, solver) key. Upstream throws a bare runtime_error for a group with
+// no IK configuration and returns nullptr for an unknown solver name.
+void require_ik_solver(const te::Environment& env, const std::string& group_name, const std::string& ik_solver_name)
+{
+    require_group(env, group_name);
+    const auto info = env.getKinematicsInformation().kinematics_plugin_info.inv_plugin_infos;
+    const auto group = info.find(group_name);
+    if (group == info.end() || group->second.plugins.empty())
+        throw nb::key_error(("Group '" + group_name + "' has no inverse kinematics solver").c_str());
+    if (!ik_solver_name.empty() && group->second.plugins.find(ik_solver_name) == group->second.plugins.end())
+        throw nb::key_error(("Inverse kinematics solver '" + ik_solver_name + "' not found for group '" +
+                             group_name + "'").c_str());
+}
+
 // gh-186: nanobind's None check covers a direct shared_ptr argument but not the elements of a
 // list, so `[cmd, None]` arrives with a null element, which upstream dereferences (SIGSEGV).
 using CommandList = std::vector<std::shared_ptr<const te::Command>>;
@@ -345,41 +346,65 @@ const Derived& checked_event_cast(const te::Event& evt, const char* name) {
                              ", expected Events." + event_type_name(Expected));
     return static_cast<const Derived&>(evt);
 }
-}  // namespace
 
-// Wrapper for Python event callbacks
+// The events hand callbacks references into the environment (CommandAppliedEvent::commands,
+// SceneStateChangedEvent::state) that die when the callback returns. Python gets an event over
+// a copy instead, owned with it, so a callback may keep the event. Members are constructed in
+// declaration order: the copy exists before the event binds a reference to it.
+struct CommandAppliedEventCopy {
+    explicit CommandAppliedEventCopy(const te::CommandAppliedEvent& event)
+        : commands(event.commands), event(commands, event.revision) {}
+    const std::vector<std::shared_ptr<const te::Command>> commands;
+    const te::CommandAppliedEvent event;
+};
+
+struct SceneStateChangedEventCopy {
+    explicit SceneStateChangedEventCopy(const te::SceneStateChangedEvent& event) : state(event.state), event(state) {}
+    const tsg::SceneState state;
+    const te::SceneStateChangedEvent event;
+};
+
+// The Python object of an owned copy of `event`: the event refers into a copy that a capsule
+// owns, and the event's wrapper keeps the capsule alive. Called with the GIL held.
+template <typename Copy, typename Event>
+nb::object owned_event(const te::Event& event) {
+    auto* copy = new Copy(static_cast<const Event&>(event));
+    nb::capsule owner(copy, [](void* p) noexcept { delete static_cast<Copy*>(p); });
+    return nb::cast(&copy->event, nb::rv_policy::reference_internal, owner);
+}
+
+using PyEventCallable = nb::typed<nb::callable, void(te::Event)>;
+
+// gh-183-style Python-backed EventCallbackFn. Upstream fires the callbacks from the thread that
+// changed the environment, under its shared lock; every Environment binding runs that change
+// without the GIL, and C++ threads (a ROS 2 monitor) change it too, so the call takes the GIL
+// itself.
 struct PyEventCallbackFn {
-    nb::callable callback;
-    void operator()(const te::Event& evt) const {
-        // Events fire from applyCommand, which now runs with the GIL released (and from C++
-        // threads such as the ROS 2 monitor), so re-enter the interpreter explicitly.
-        nb::gil_scoped_acquire gil;
-        callback(nb::cast(evt, nb::rv_policy::reference));
+    std::shared_ptr<nb::object> fn;
+
+    void operator()(const te::Event& event) const {
+        if (!nb::is_alive()) return;  // a C++ thread changing the environment after interpreter exit
+        nb::gil_scoped_acquire gil;  // declared first, so it is released after every Python object below
+        nb::object py_event;
+        switch (event.type) {
+            case te::Events::COMMAND_APPLIED:
+                py_event = owned_event<CommandAppliedEventCopy, te::CommandAppliedEvent>(event);
+                break;
+            case te::Events::SCENE_STATE_CHANGED:
+                py_event = owned_event<SceneStateChangedEventCopy, te::SceneStateChangedEvent>(event);
+                break;
+        }
+        (*fn)(py_event);
     }
 };
 
 // gh-183: Python-backed FindTCPOffsetCallbackFn. Environment::clone copies every find-TCP callback
 // with the GIL released (gh-134), and planners call findTCPOffset from task-composer worker threads,
-// so neither a copy nor a call may assume the GIL. A copy only bumps the shared_ptr's atomic count;
-// the call and the last release take the GIL themselves.
+// so neither a copy nor a call may assume the GIL (gil_safe_object, tesseract_nb.h).
 using PyFindTCPOffsetCallable = nb::typed<nb::callable, Eigen::Isometry3d(tc::ManipulatorInfo)>;
 
 struct PyFindTCPOffsetFn {
     std::shared_ptr<nb::object> fn;
-
-    explicit PyFindTCPOffsetFn(nb::callable f)
-        : fn(new nb::object(std::move(f)), [](nb::object* p) {
-              // The last owner may be a C++ thread or static that outlives the interpreter; skip the
-              // decref then, as nanobind's own shared_ptr deleter does (nanobind/stl/shared_ptr.h).
-              // Module globals are cleared before nanobind marks itself dead, so they still decref.
-              if (!nb::is_alive()) {
-                  (void)p->release();
-                  delete p;
-                  return;
-              }
-              nb::gil_scoped_acquire gil;
-              delete p;
-          }) {}
 
     // Every throw below counts as "not located": upstream's findTCPOffset wraps each callback in
     // catch (...) and tries the next one (environment.cpp, Implementation::findTCPOffset).
@@ -402,6 +427,7 @@ struct PyFindTCPOffsetFn {
         return tcp;
     }
 };
+}  // namespace
 
 NB_MODULE(environment, m) {
     // Import collision module for DiscreteContactManager/ContinuousContactManager types
@@ -423,29 +449,32 @@ NB_MODULE(environment, m) {
         .value("SCENE_STATE_CHANGED", te::Events::SCENE_STATE_CHANGED);
 
     // ========== Event base class ==========
-    nb::class_<te::Event>(m, "Event")
-        .def_ro("type", &te::Event::type);
+    // A callback receives the most-derived event, over its own copy of the environment data it
+    // names (the history, the state): it stays valid after the callback returns.
+    nb::class_<te::Event>(m, "Event", "An environment event; `type` names its derived class.")
+        .def_ro("type", &te::Event::type, "Which event this is.");
 
     // ========== CommandAppliedEvent ==========
-    // `commands` is the environment's whole history at the event. The C++ member is a reference
-    // that dies with the event, so the property copies the list (polymorphic, see getCommandHistory).
-    nb::class_<te::CommandAppliedEvent, te::Event>(m, "CommandAppliedEvent")
+    // `commands` is the environment's whole history at the event; the property copies the list
+    // (polymorphic, see getCommandHistory).
+    nb::class_<te::CommandAppliedEvent, te::Event>(m, "CommandAppliedEvent",
+        "Fired after commands were applied (applyCommand(s), init, reset).")
         .def_prop_ro("commands", [](const te::CommandAppliedEvent& self) {
             return CommandList(self.commands);
-        })
-        .def_ro("revision", &te::CommandAppliedEvent::revision);
+        }, "The environment's command history at the event (a copy).")
+        .def_ro("revision", &te::CommandAppliedEvent::revision, "The environment's revision after the commands.");
 
     // ========== SceneStateChangedEvent ==========
-    nb::class_<te::SceneStateChangedEvent, te::Event>(m, "SceneStateChangedEvent")
+    nb::class_<te::SceneStateChangedEvent, te::Event>(m, "SceneStateChangedEvent",
+        "Fired after the current state changed (setState, and every applied command).")
         .def_prop_ro("state", [](const te::SceneStateChangedEvent& self) -> const tsg::SceneState& {
             return self.state;
-        });
+        }, "The new current state.");
 
     // ========== Event cast functions (for Python to downcast Event to specific type) ==========
     // Callbacks already receive the most-derived class (Event is polymorphic), so these only
     // check the type. The result is the argument's own Python object (nanobind finds the
-    // registered wrapper for the same pointer), so rv_policy::reference adds no lifetime of
-    // its own; like the argument, it is valid only inside the callback.
+    // registered wrapper for the same pointer).
     nb::exception<EventTypeError>(m, "EventTypeError", PyExc_TypeError)
         .attr("__doc__") = "cast_CommandAppliedEvent / cast_SceneStateChangedEvent got an event of the other type.";
     m.def("cast_CommandAppliedEvent", [](const te::Event& evt) -> const te::CommandAppliedEvent& {
@@ -500,238 +529,11 @@ NB_MODULE(environment, m) {
             return check_trajectory_state(manager, state, contact_request);
         }, "manager"_a, "state"_a, "contact_request"_a);
 
-    // EventCallbackFn wrapper for Python callbacks
-    nb::class_<PyEventCallbackFn>(m, "EventCallbackFn")
-        .def(nb::init<nb::callable>(), "callback"_a);
-
-    // ========== CommandType enum ==========
-    nb::enum_<te::CommandType>(m, "CommandType")
-        .value("UNINITIALIZED", te::CommandType::UNINITIALIZED)
-        .value("ADD_LINK", te::CommandType::ADD_LINK)
-        .value("MOVE_LINK", te::CommandType::MOVE_LINK)
-        .value("MOVE_JOINT", te::CommandType::MOVE_JOINT)
-        .value("REMOVE_LINK", te::CommandType::REMOVE_LINK)
-        .value("REMOVE_JOINT", te::CommandType::REMOVE_JOINT)
-        .value("CHANGE_LINK_ORIGIN", te::CommandType::CHANGE_LINK_ORIGIN)
-        .value("CHANGE_JOINT_ORIGIN", te::CommandType::CHANGE_JOINT_ORIGIN)
-        .value("CHANGE_LINK_COLLISION_ENABLED", te::CommandType::CHANGE_LINK_COLLISION_ENABLED)
-        .value("CHANGE_LINK_VISIBILITY", te::CommandType::CHANGE_LINK_VISIBILITY)
-        .value("MODIFY_ALLOWED_COLLISIONS", te::CommandType::MODIFY_ALLOWED_COLLISIONS)
-        .value("REMOVE_ALLOWED_COLLISION_LINK", te::CommandType::REMOVE_ALLOWED_COLLISION_LINK)
-        .value("ADD_SCENE_GRAPH", te::CommandType::ADD_SCENE_GRAPH)
-        .value("CHANGE_JOINT_POSITION_LIMITS", te::CommandType::CHANGE_JOINT_POSITION_LIMITS)
-        .value("CHANGE_JOINT_VELOCITY_LIMITS", te::CommandType::CHANGE_JOINT_VELOCITY_LIMITS)
-        .value("CHANGE_JOINT_ACCELERATION_LIMITS", te::CommandType::CHANGE_JOINT_ACCELERATION_LIMITS)
-        .value("ADD_KINEMATICS_INFORMATION", te::CommandType::ADD_KINEMATICS_INFORMATION)
-        .value("REPLACE_JOINT", te::CommandType::REPLACE_JOINT)
-        .value("CHANGE_COLLISION_MARGINS", te::CommandType::CHANGE_COLLISION_MARGINS)
-        .value("ADD_CONTACT_MANAGERS_PLUGIN_INFO", te::CommandType::ADD_CONTACT_MANAGERS_PLUGIN_INFO)
-        .value("SET_ACTIVE_DISCRETE_CONTACT_MANAGER", te::CommandType::SET_ACTIVE_DISCRETE_CONTACT_MANAGER)
-        .value("SET_ACTIVE_CONTINUOUS_CONTACT_MANAGER", te::CommandType::SET_ACTIVE_CONTINUOUS_CONTACT_MANAGER)
-        .value("ADD_TRAJECTORY_LINK", te::CommandType::ADD_TRAJECTORY_LINK);
-
-    // ========== Command base class ==========
-    // Command has a virtual destructor, so a shared_ptr<const Command> returned to Python (command
-    // history, CommandAppliedEvent.commands) arrives as its most-derived bound class.
-    // operator== compares only the command type. Every derived command binds its own __eq__,
-    // and Python dispatches on the most-derived class, so derived commands compare their state.
-    auto command = nb::class_<te::Command>(m, "Command")
-        .def("getType", &te::Command::getType);
-    bind_value_equality(command);
-
-    // ========== RemoveJointCommand ==========
-    auto remove_joint_command = nb::class_<te::RemoveJointCommand, te::Command>(m, "RemoveJointCommand")
-        .def(nb::init<tc::JointId>(), "joint_id"_a)
-        .def("getJointId", &te::RemoveJointCommand::getJointId);
-    bind_value_equality(remove_joint_command);
-
-    // ========== AddLinkCommand ==========
-    auto add_link_command = nb::class_<te::AddLinkCommand, te::Command>(m, "AddLinkCommand")
-        .def(nb::init<const tsg::Link&, bool>(), "link"_a, "replace_allowed"_a = false)
-        .def(nb::init<const tsg::Link&, const tsg::Joint&, bool>(),
-             "link"_a, "joint"_a, "replace_allowed"_a = false)
-        .def("getLink", &te::AddLinkCommand::getLink)
-        .def("getJoint", &te::AddLinkCommand::getJoint)
-        .def("replaceAllowed", &te::AddLinkCommand::replaceAllowed);
-    bind_value_equality(add_link_command);
-
-    // ========== RemoveLinkCommand ==========
-    auto remove_link_command = nb::class_<te::RemoveLinkCommand, te::Command>(m, "RemoveLinkCommand")
-        .def(nb::init<tc::LinkId>(), "link_id"_a)
-        .def("getLinkId", &te::RemoveLinkCommand::getLinkId);
-    bind_value_equality(remove_link_command);
-
-    // ========== AddSceneGraphCommand ==========
-    auto add_scene_graph_command = nb::class_<te::AddSceneGraphCommand, te::Command>(m, "AddSceneGraphCommand")
-        .def(nb::init<const tsg::SceneGraph&, std::string>(), "scene_graph"_a, "prefix"_a = "")
-        .def(nb::init<const tsg::SceneGraph&, const tsg::Joint&, std::string>(),
-             "scene_graph"_a, "joint"_a, "prefix"_a = "")
-        .def("getSceneGraph", &te::AddSceneGraphCommand::getSceneGraph)
-        .def("getJoint", &te::AddSceneGraphCommand::getJoint)
-        .def("getPrefix", &te::AddSceneGraphCommand::getPrefix);
-    bind_value_equality(add_scene_graph_command);
-
-    // ========== AddTrajectoryLinkCommand ==========
-    // Adds a link whose collision geometry sweeps the given trajectory. `Method` is nested
-    // (AddTrajectoryLinkCommand.Method.PER_STATE_OBJECTS), without SWIG-style Method_* module
-    // constants. It is registered before the ctor so the `method` default renders in the stub.
-    // The arity-0 ctor is a serialization ctor and stays unbound. getTrajectory returns a copy:
-    // a Python edit must not reach a command already in an environment's history.
-    using TrajectoryLinkMethod = te::AddTrajectoryLinkCommand::Method;
-    auto add_trajectory_link_command = nb::class_<te::AddTrajectoryLinkCommand, te::Command>(m, "AddTrajectoryLinkCommand");
-    nb::enum_<TrajectoryLinkMethod>(add_trajectory_link_command, "Method")
-        .value("PER_STATE_OBJECTS", TrajectoryLinkMethod::PER_STATE_OBJECTS)
-        .value("PER_STATE_CONVEX_HULL", TrajectoryLinkMethod::PER_STATE_CONVEX_HULL)
-        .value("GLOBAL_PER_LINK_CONVEX_HULL", TrajectoryLinkMethod::GLOBAL_PER_LINK_CONVEX_HULL)
-        .value("GLOBAL_CONVEX_HULL", TrajectoryLinkMethod::GLOBAL_CONVEX_HULL);
-    add_trajectory_link_command
-        .def(nb::init<tc::LinkId, tc::LinkId, tc::JointTrajectory, bool, TrajectoryLinkMethod>(),
-             "link_id"_a, "parent_link_id"_a, "trajectory"_a, "replace_allowed"_a = false,
-             "method"_a = TrajectoryLinkMethod::PER_STATE_OBJECTS)
-        .def("getLinkId", &te::AddTrajectoryLinkCommand::getLinkId)
-        .def("getParentLinkId", &te::AddTrajectoryLinkCommand::getParentLinkId)
-        .def("getTrajectory", &te::AddTrajectoryLinkCommand::getTrajectory, nb::rv_policy::copy)
-        .def("replaceAllowed", &te::AddTrajectoryLinkCommand::replaceAllowed)
-        .def("getMethod", &te::AddTrajectoryLinkCommand::getMethod);
-    bind_value_equality(add_trajectory_link_command);
-
-    // ========== AddKinematicsInformationCommand ==========
-    // Registers a KinematicsInformation (group defs + IK plugin config) into a live env.
-    // insert-merges with existing kinematics info, so pre-existing groups keep resolving.
-    auto add_kinematics_information_command = nb::class_<te::AddKinematicsInformationCommand, te::Command>(m, "AddKinematicsInformationCommand")
-        .def(nb::init<>())
-        .def(nb::init<tesseract::srdf::KinematicsInformation>(), "kinematics_information"_a)
-        .def("getKinematicsInformation", &te::AddKinematicsInformationCommand::getKinematicsInformation);
-    bind_value_equality(add_kinematics_information_command);
-
-    // ========== AddContactManagersPluginInfoCommand ==========
-    // The arity-0 ctor is a serialization ctor and stays unbound. The getter returns a copy:
-    // the C++ getter is a const& into the command, and a Python edit must not mutate a
-    // command already in an environment's history.
-    auto add_contact_managers_plugin_info_command = nb::class_<te::AddContactManagersPluginInfoCommand, te::Command>(m, "AddContactManagersPluginInfoCommand")
-        .def(nb::init<tesseract::common::ContactManagersPluginInfo>(), "contact_managers_plugin_info"_a)
-        .def("getContactManagersPluginInfo", &te::AddContactManagersPluginInfoCommand::getContactManagersPluginInfo,
-             nb::rv_policy::copy);
-    bind_value_equality(add_contact_managers_plugin_info_command);
-
-    // ========== ModifyAllowedCollisionsType enum ==========
-    nb::enum_<te::ModifyAllowedCollisionsType>(m, "ModifyAllowedCollisionsType")
-        .value("ADD", te::ModifyAllowedCollisionsType::ADD)
-        .value("REMOVE", te::ModifyAllowedCollisionsType::REMOVE)
-        .value("REPLACE", te::ModifyAllowedCollisionsType::REPLACE);
-
-    // ========== ModifyAllowedCollisionsCommand ==========
-    auto modify_allowed_collisions_command = nb::class_<te::ModifyAllowedCollisionsCommand, te::Command>(m, "ModifyAllowedCollisionsCommand")
-        .def(nb::init<tc::AllowedCollisionMatrix, te::ModifyAllowedCollisionsType>(),
-             "acm"_a, "type"_a)
-        .def("getModifyType", &te::ModifyAllowedCollisionsCommand::getModifyType)
-        .def("getAllowedCollisionMatrix", &te::ModifyAllowedCollisionsCommand::getAllowedCollisionMatrix);
-    bind_value_equality(modify_allowed_collisions_command);
-
-    // ========== RemoveAllowedCollisionLinkCommand ==========
-    auto remove_allowed_collision_link_command = nb::class_<te::RemoveAllowedCollisionLinkCommand, te::Command>(m, "RemoveAllowedCollisionLinkCommand")
-        .def(nb::init<tc::LinkId>(), "link_id"_a)
-        .def("getLinkId", &te::RemoveAllowedCollisionLinkCommand::getLinkId);
-    bind_value_equality(remove_allowed_collision_link_command);
-
-    // ========== ChangeJointPositionLimitsCommand ==========
-    auto change_joint_position_limits_command = nb::class_<te::ChangeJointPositionLimitsCommand, te::Command>(m, "ChangeJointPositionLimitsCommand")
-        .def(nb::init<tc::JointId, double, double>(), "joint_id"_a, "lower"_a, "upper"_a)
-        .def(nb::init<std::unordered_map<tc::JointId, std::pair<double, double>>>(), "limits"_a)
-        .def("getLimits", &te::ChangeJointPositionLimitsCommand::getLimits);
-    bind_value_equality(change_joint_position_limits_command);
-
-    // ========== ChangeJointVelocityLimitsCommand ==========
-    auto change_joint_velocity_limits_command = nb::class_<te::ChangeJointVelocityLimitsCommand, te::Command>(m, "ChangeJointVelocityLimitsCommand")
-        .def(nb::init<tc::JointId, double>(), "joint_id"_a, "limit"_a)
-        .def(nb::init<std::unordered_map<tc::JointId, double>>(), "limits"_a)
-        .def("getLimits", &te::ChangeJointVelocityLimitsCommand::getLimits);
-    bind_value_equality(change_joint_velocity_limits_command);
-
-    // ========== ChangeJointAccelerationLimitsCommand ==========
-    auto change_joint_acceleration_limits_command = nb::class_<te::ChangeJointAccelerationLimitsCommand, te::Command>(m, "ChangeJointAccelerationLimitsCommand")
-        .def(nb::init<tc::JointId, double>(), "joint_id"_a, "limit"_a)
-        .def(nb::init<std::unordered_map<tc::JointId, double>>(), "limits"_a)
-        .def("getLimits", &te::ChangeJointAccelerationLimitsCommand::getLimits);
-    bind_value_equality(change_joint_acceleration_limits_command);
-
-    // ========== ChangeCollisionMarginsCommand ==========
-    // Note: 0.33 API change - uses CollisionMarginPairData and CollisionMarginPairOverrideType
-    auto change_collision_margins_command = nb::class_<te::ChangeCollisionMarginsCommand, te::Command>(m, "ChangeCollisionMarginsCommand")
-        .def(nb::init<double>(), "default_margin"_a)
-        .def(nb::init<tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
-             "pair_margin_data"_a, "override_type"_a = tc::CollisionMarginPairOverrideType::MODIFY)
-        // #247: override_type defaults to MODIFY in both overloads, as upstream
-        .def(nb::init<double, tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
-             "default_margin"_a, "pair_margin_data"_a,
-             "override_type"_a = tc::CollisionMarginPairOverrideType::MODIFY)
-        .def("getDefaultCollisionMargin", &te::ChangeCollisionMarginsCommand::getDefaultCollisionMargin)
-        .def("getCollisionMarginPairData", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairData)
-        .def("getCollisionMarginPairOverrideType", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairOverrideType);
-    bind_value_equality(change_collision_margins_command);
-
-    // ========== ChangeLinkCollisionEnabledCommand ==========
-    auto change_link_collision_enabled_command = nb::class_<te::ChangeLinkCollisionEnabledCommand, te::Command>(m, "ChangeLinkCollisionEnabledCommand")
-        .def(nb::init<tc::LinkId, bool>(), "link_id"_a, "enabled"_a)
-        .def("getLinkId", &te::ChangeLinkCollisionEnabledCommand::getLinkId)
-        .def("getEnabled", &te::ChangeLinkCollisionEnabledCommand::getEnabled);
-    bind_value_equality(change_link_collision_enabled_command);
-
-    // ========== ChangeLinkVisibilityCommand ==========
-    auto change_link_visibility_command = nb::class_<te::ChangeLinkVisibilityCommand, te::Command>(m, "ChangeLinkVisibilityCommand")
-        .def(nb::init<tc::LinkId, bool>(), "link_id"_a, "visible"_a)
-        .def("getLinkId", &te::ChangeLinkVisibilityCommand::getLinkId)
-        .def("getEnabled", &te::ChangeLinkVisibilityCommand::getEnabled);
-    bind_value_equality(change_link_visibility_command);
-
-    // ========== ChangeJointOriginCommand ==========
-    auto change_joint_origin_command = nb::class_<te::ChangeJointOriginCommand, te::Command>(m, "ChangeJointOriginCommand")
-        .def(nb::init<tc::JointId, const Eigen::Isometry3d&>(), "joint_id"_a, "origin"_a)
-        .def("getJointId", &te::ChangeJointOriginCommand::getJointId)
-        .def("getOrigin", &te::ChangeJointOriginCommand::getOrigin);
-    bind_value_equality(change_joint_origin_command);
-
-    // ========== ChangeLinkOriginCommand ==========
-    auto change_link_origin_command = nb::class_<te::ChangeLinkOriginCommand, te::Command>(m, "ChangeLinkOriginCommand")
-        .def(nb::init<tc::LinkId, const Eigen::Isometry3d&>(), "link_id"_a, "origin"_a)
-        .def("getLinkId", &te::ChangeLinkOriginCommand::getLinkId)
-        .def("getOrigin", &te::ChangeLinkOriginCommand::getOrigin);
-    bind_value_equality(change_link_origin_command);
-
-    // ========== MoveJointCommand ==========
-    auto move_joint_command = nb::class_<te::MoveJointCommand, te::Command>(m, "MoveJointCommand")
-        .def(nb::init<tc::JointId, tc::LinkId>(), "joint_id"_a, "parent_link"_a)
-        .def("getJointId", &te::MoveJointCommand::getJointId)
-        .def("getParentLink", &te::MoveJointCommand::getParentLink);
-    bind_value_equality(move_joint_command);
-
-    // ========== MoveLinkCommand ==========
-    auto move_link_command = nb::class_<te::MoveLinkCommand, te::Command>(m, "MoveLinkCommand")
-        .def(nb::init<const tsg::Joint&>(), "joint"_a)
-        .def("getJoint", &te::MoveLinkCommand::getJoint);
-    bind_value_equality(move_link_command);
-
-    // ========== ReplaceJointCommand ==========
-    auto replace_joint_command = nb::class_<te::ReplaceJointCommand, te::Command>(m, "ReplaceJointCommand")
-        .def(nb::init<const tsg::Joint&>(), "joint"_a)
-        .def("getJoint", &te::ReplaceJointCommand::getJoint);
-    bind_value_equality(replace_joint_command);
-
-    // ========== SetActive{Discrete,Continuous}ContactManagerCommand ==========
-    // The arity-0 ctors are serialization ctors and stay unbound.
-    auto set_active_discrete_contact_manager_command = nb::class_<te::SetActiveDiscreteContactManagerCommand, te::Command>(m, "SetActiveDiscreteContactManagerCommand")
-        .def(nb::init<std::string>(), "active_contact_manager"_a)
-        .def("getName", &te::SetActiveDiscreteContactManagerCommand::getName);
-    bind_value_equality(set_active_discrete_contact_manager_command);
-
-    auto set_active_continuous_contact_manager_command = nb::class_<te::SetActiveContinuousContactManagerCommand, te::Command>(m, "SetActiveContinuousContactManagerCommand")
-        .def(nb::init<std::string>(), "active_contact_manager"_a)
-        .def("getName", &te::SetActiveContinuousContactManagerCommand::getName);
-    bind_value_equality(set_active_continuous_contact_manager_command);
+    bind_commands(m);  // environment_commands.cpp
 
     // gh-187: getState validates like setState (GH #43). Unvalidated, the state solver inserts
     // unknown or fixed joint names into the returned state without complaint and, on a
-    // names/values length mismatch, reads joint_values out of bounds.
+    // ids/values length mismatch, reads joint_values out of bounds.
     const auto get_state_map = [](const te::Environment& self,
                                   const tsg::SceneState::JointValues& joints,
                                   const tc::JointIdTransformMap& floating_joints) {
@@ -739,21 +541,13 @@ NB_MODULE(environment, m) {
         validate_floating_joints(self, floating_joints, "getState");
         return self.getState(joints, floating_joints);
     };
-    const auto get_state_names_values = [](const te::Environment& self,
-                                           const std::vector<tc::JointId>& joint_ids,
-                                           const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                           const tc::JointIdTransformMap& floating_joints) {
+    const auto get_state_ids_values = [](const te::Environment& self,
+                                         const std::vector<tc::JointId>& joint_ids,
+                                         const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                         const tc::JointIdTransformMap& floating_joints) {
         validate_set_state(self, joint_ids, joint_values, "getState");
         validate_floating_joints(self, floating_joints, "getState");
         return self.getState(joint_ids, joint_values, floating_joints);
-    };
-    const auto set_state_names_values = [](te::Environment& self,
-                                           const std::vector<tc::JointId>& joint_ids,
-                                           const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                           const tc::JointIdTransformMap& floating_joints) {
-        validate_set_state(self, joint_ids, joint_values);  // GH #43
-        validate_floating_joints(self, floating_joints, "setState");
-        self.setState(joint_ids, joint_values, floating_joints);
     };
     // current_state.joints is keyed by exactly the active joints; a miss is std::out_of_range
     // (IndexError) upstream. Raise KeyError like getCurrentFloatingJointValues(joint_ids).
@@ -779,339 +573,235 @@ NB_MODULE(environment, m) {
     // exists for cereal and leaves scene_graph_ null, which operator() dereferences. __call__ is
     // inherited from the tesseract_common base binding and dispatches virtually.
     nb::class_<te::EnvironmentContactAllowedValidator, tc::ContactAllowedValidator>(
-        m, "EnvironmentContactAllowedValidator")
-        .def(nb::init<std::shared_ptr<const tsg::SceneGraph>>(), "scene_graph"_a);
+        m, "EnvironmentContactAllowedValidator",
+        "The contact validator an Environment installs on its contact managers: a link pair may collide "
+        "unless the scene graph's allowed collision matrix allows it.")
+        .def(nb::init<std::shared_ptr<const tsg::SceneGraph>>(), "scene_graph"_a,
+             "Validate against `scene_graph`'s ACM, kept alive and read at each call.");
 
     // ========== Environment ==========
-    // operator== (environment.cpp) holds a shared lock on the left operand's mutex, so the GIL is
-    // released as for clone(). It compares initialized, the revisions, the command types (through
-    // the non-virtual Command::operator==), the current state and both timestamps: two
-    // environments built separately differ by their timestamps; a clone() compares equal.
-    auto environment = nb::class_<te::Environment>(m, "Environment")
-        .def(nb::init<>())
-        // Init methods
+    // Every method that reaches the environment runs with the GIL released (NoGil). Upstream
+    // fires event callbacks under the environment's shared lock, from the changing thread; a
+    // Python callback then waits for the GIL while holding that lock. A thread that waited for
+    // the environment's lock while holding the GIL would deadlock against it, writers (unique
+    // lock) always and readers too on platforms whose shared mutex queues them behind a waiting
+    // writer (docs/developer/threading.md). Validation runs inside the release: it reads the
+    // environment, and its errors are plain C++ exceptions, translated after the GIL is back.
+    // Arguments are converted before the release and results after it.
+    using NoGil = nb::call_guard<nb::gil_scoped_release>;
+    auto environment = nb::class_<te::Environment>(m, "Environment",
+        "A scene graph with its current state, kinematic groups, contact managers and command history.\n\n"
+        "Thread-safe: every method takes the environment's lock without holding the GIL, so Python "
+        "threads may share one environment. Event and find-TCP callbacks run on the thread that changed "
+        "or queried the environment, under its lock: they must not change it.")
+        .def(nb::init<>(), "An empty, uninitialized environment; call `init`.")
+        // Init methods. A `str` is always *content* (the std::string overloads), never a path: the
+        // path overloads take StrictPath, which rejects `str`, so a path must be a pathlib.Path /
+        // os.PathLike and a mixed (content, path) call matches nothing and raises TypeError.
         .def("init", [](te::Environment& self, const tsg::SceneGraph& scene_graph) {
             return self.init(scene_graph);
-        }, "scene_graph"_a)
-        // Init with scene_graph + srdf (makes a copy of srdf into shared_ptr)
+        }, "scene_graph"_a, NoGil(),
+           "Initialize from a copy of `scene_graph`, with no SRDF; False on failure.")
         .def("init", [](te::Environment& self, const tsg::SceneGraph& scene_graph,
                         const tesseract::srdf::SRDFModel& srdf) {
-            auto srdf_ptr = std::make_shared<const tesseract::srdf::SRDFModel>(srdf);
-            return self.init(scene_graph, srdf_ptr);
-        }, "scene_graph"_a, "srdf"_a)
-        // Native URDF/SRDF overloads. A `str` is always *content* (the std::string
-        // overloads), never a path: the path overloads take StrictPath, which
-        // rejects `str`, so a path must be a pathlib.Path / os.PathLike and a mixed
-        // (content, path) call matches nothing and raises TypeError.
+            return self.init(scene_graph, std::make_shared<const tesseract::srdf::SRDFModel>(srdf));
+        }, "scene_graph"_a, "srdf"_a, NoGil(),
+           "Initialize from copies of `scene_graph` and `srdf`; False on failure.")
         .def("init", nb::overload_cast<const std::string&, const LocatorPtr&>(&te::Environment::init),
-             "urdf_string"_a, "locator"_a)
+             "urdf_string"_a, "locator"_a, NoGil(),
+             "Initialize from URDF text, resolving package:// and file:// URLs with `locator`; False on failure.")
         .def("init", [](te::Environment& self, const tesseract_nb::StrictPath& urdf_path,
                         const LocatorPtr& locator) {
             return self.init(urdf_path.value, locator);
-        }, "urdf_path"_a, "locator"_a)
+        }, "urdf_path"_a, "locator"_a, NoGil(),
+           "Initialize from a URDF file; False on failure.")
         .def("init", nb::overload_cast<const std::string&, const std::string&, const LocatorPtr&>(
                          &te::Environment::init),
-             "urdf_string"_a, "srdf_string"_a, "locator"_a)
+             "urdf_string"_a, "srdf_string"_a, "locator"_a, NoGil(),
+             "Initialize from URDF and SRDF text; False on failure.")
         .def("init", [](te::Environment& self, const tesseract_nb::StrictPath& urdf_path,
                         const tesseract_nb::StrictPath& srdf_path, const LocatorPtr& locator) {
             return self.init(urdf_path.value, srdf_path.value, locator);
-        }, "urdf_path"_a, "srdf_path"_a, "locator"_a)
-        // The inverse of getCommandHistory: the list must start with an AddSceneGraphCommand.
+        }, "urdf_path"_a, "srdf_path"_a, "locator"_a, NoGil(),
+           "Initialize from URDF and SRDF files; False on failure.")
         .def("init", [](te::Environment& self, const CommandList& commands) {
             return self.init(require_commands(commands, "init"));
-        }, "commands"_a)
+        }, "commands"_a, NoGil(),
+           "Initialize by replaying `commands`, the inverse of getCommandHistory: the list must start "
+           "with an AddSceneGraphCommand. False on failure.")
         // State methods
-        .def("isInitialized", &te::Environment::isInitialized)
-        .def("reset", &te::Environment::reset)
-        .def("clear", &te::Environment::clear)
-        .def("getRevision", &te::Environment::getRevision)
-        .def("getInitRevision", &te::Environment::getInitRevision)
+        .def("isInitialized", &te::Environment::isInitialized, NoGil(), "True once an init call succeeded.")
+        .def("reset", &te::Environment::reset, NoGil(),
+             "Re-initialize from the init commands, dropping every later command; False on failure.")
+        .def("clear", &te::Environment::clear, NoGil(), "Drop everything: the environment is uninitialized.")
+        .def("getRevision", &te::Environment::getRevision, NoGil(),
+             "The number of commands applied, init's own included.")
+        .def("getInitRevision", &te::Environment::getInitRevision, NoGil(),
+             "The revision right after init: what reset() returns to.")
         // system_clock::time_point -> naive datetime.datetime in local time (nanobind stl/chrono.h)
-        .def("getTimestamp", &te::Environment::getTimestamp,
+        .def("getTimestamp", &te::Environment::getTimestamp, NoGil(),
              "Last update time (any change to the environment), as a naive local `datetime.datetime`.")
-        .def("getCurrentStateTimestamp", &te::Environment::getCurrentStateTimestamp,
+        .def("getCurrentStateTimestamp", &te::Environment::getCurrentStateTimestamp, NoGil(),
              "Last update time of the current state, as a naive local `datetime.datetime`.")
-        .def("getName", &te::Environment::getName)
-        .def("setName", &te::Environment::setName, "name"_a)
+        .def("getName", &te::Environment::getName, NoGil(), "The environment's name (the URDF robot name).")
+        .def("setName", &te::Environment::setName, "name"_a, NoGil(), "Rename the environment.")
         // Scene graph
-        .def("getSceneGraph", &te::Environment::getSceneGraph)
+        .def("getSceneGraph", &te::Environment::getSceneGraph, NoGil(),
+             "The scene graph, shared with the environment: read-only, changed only through commands.")
         // State
-        .def("getState", [](const te::Environment& self) {
-            return self.getState();
-        })
-        .def("getState", get_state_map, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{},
-             nb::call_guard<nb::gil_scoped_release>())
-        .def("getState", get_state_names_values,
-             "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{},
-             nb::call_guard<nb::gil_scoped_release>())
+        .def("getState", [](const te::Environment& self) { return self.getState(); }, NoGil(),
+             "The current state: joint values and every link's world transform.")
+        .def("getState", get_state_map, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
+             "The state at the active-joint values `joints` (the rest current), without changing the "
+             "environment. Unknown or non-active joints raise ValueError.")
+        .def("getState", get_state_ids_values,
+             "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
+             "The state at `joint_values` for `joint_ids` (the rest current), without changing the environment.")
         .def("getState", [](const te::Environment& self, const tc::JointIdTransformMap& floating_joints) {
             validate_floating_joints(self, floating_joints, "getState");
             return self.getState(floating_joints);
-        }, "floating_joints"_a, nb::call_guard<nb::gil_scoped_release>())
-        // Python-only aliases of the native overloads above (kept until a separate removal).
-        .def("getStateByMap", get_state_map, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{},
-             nb::call_guard<nb::gil_scoped_release>())
-        .def("getStateByNamesAndValues", get_state_names_values,
-             "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{},
-             nb::call_guard<nb::gil_scoped_release>())
+        }, "floating_joints"_a, NoGil(),
+           "The state at the floating-joint transforms `floating_joints` (the rest current).")
         // M joint states in one call: (M, N) values of `joint_ids` -> (M, L, 4, 4) world
         // transforms of `link_ids`, row-major. Row m is bitwise
         // `getState(joint_ids, joint_values[m]).link_transforms[link].matrix`; the
-        // environment's own state is not moved.
+        // environment's own state is not moved. The capsule is a Python object: built with the GIL.
         .def("link_transforms_batch", [](const te::Environment& self,
                                          const std::vector<tc::JointId>& joint_ids,
                                          const Eigen::Ref<const RowMajorXd>& joint_values,
                                          const std::vector<tc::LinkId>& link_ids) {
-            if (static_cast<Eigen::Index>(joint_ids.size()) != joint_values.cols())
-                throw std::invalid_argument("link_transforms_batch: joint_names length (" +
-                                            std::to_string(joint_ids.size()) + ") != joint_values columns (" +
-                                            std::to_string(joint_values.cols()) + ")");
-            validate_set_state_joint_ids(self, joint_ids, "link_transforms_batch");
-            std::string unknown;
-            for (const auto& id : link_ids) {
-                if (!self.getLink(id)) {
-                    if (!unknown.empty()) unknown += ", ";
-                    unknown += id.name();
-                }
-            }
-            if (!unknown.empty())
-                throw std::invalid_argument("link_transforms_batch: unknown link names: " + unknown);
             const std::size_t m = static_cast<std::size_t>(joint_values.rows());
             const std::size_t l = link_ids.size();
-            double* data = new double[16 * m * l];
-            nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+            auto data = std::make_unique<double[]>(16 * m * l);
             {
                 nb::gil_scoped_release nogil;
+                if (static_cast<Eigen::Index>(joint_ids.size()) != joint_values.cols())
+                    throw std::invalid_argument("link_transforms_batch: joint_ids length (" +
+                                                std::to_string(joint_ids.size()) + ") != joint_values columns (" +
+                                                std::to_string(joint_values.cols()) + ")");
+                validate_set_state_joint_ids(self, joint_ids, "link_transforms_batch");
+                std::string unknown;
+                for (const auto& id : link_ids) {
+                    if (!self.getLink(id)) {
+                        if (!unknown.empty()) unknown += ", ";
+                        unknown += id.name();
+                    }
+                }
+                if (!unknown.empty())
+                    throw std::invalid_argument("link_transforms_batch: unknown link ids: " + unknown);
                 for (std::size_t row = 0; row < m; ++row) {
                     const Eigen::VectorXd values = joint_values.row(static_cast<Eigen::Index>(row)).transpose();
                     const auto state = self.getState(joint_ids, values);
                     for (std::size_t link = 0; link < l; ++link) {
-                        Eigen::Map<Eigen::Matrix<double, 4, 4, Eigen::RowMajor>>(data + 16 * (row * l + link)) =
+                        Eigen::Map<Eigen::Matrix<double, 4, 4, Eigen::RowMajor>>(data.get() + 16 * (row * l + link)) =
                             state.link_transforms.at(link_ids[link]).matrix();
                     }
                 }
             }
-            return nb::ndarray<nb::numpy, double, nb::shape<-1, -1, 4, 4>, nb::c_contig>(data, {m, l, 4, 4}, owner);
-        }, "joint_ids"_a, "joint_values"_a, "link_ids"_a)
+            double* raw = data.release();
+            nb::capsule owner(raw, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+            return nb::ndarray<nb::numpy, double, nb::shape<-1, -1, 4, 4>, nb::c_contig>(raw, {m, l, 4, 4}, owner);
+        }, "joint_ids"_a, "joint_values"_a, "link_ids"_a,
+           "World transforms of `link_ids` at each row of `joint_values` ((M, N) for the N `joint_ids`), "
+           "as an (M, L, 4, 4) array; the environment's state is not changed.")
         .def("setState", [](te::Environment& self,
                             const tsg::SceneState::JointValues& joints,
                             const tc::JointIdTransformMap& floating_joints) {
             validate_set_state_joint_ids(self, keys_of(joints));  // GH #43
             validate_floating_joints(self, floating_joints, "setState");
             self.setState(joints, floating_joints);
-        }, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{})
-        .def("setState", set_state_names_values,
-             "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{})
+        }, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
+           "Set the active-joint values `joints` (and floating-joint transforms). Unknown or non-active "
+           "joints raise ValueError before anything changes.")
+        .def("setState", [](te::Environment& self,
+                            const std::vector<tc::JointId>& joint_ids,
+                            const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                            const tc::JointIdTransformMap& floating_joints) {
+            validate_set_state(self, joint_ids, joint_values);  // GH #43
+            validate_floating_joints(self, floating_joints, "setState");
+            self.setState(joint_ids, joint_values, floating_joints);
+        }, "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
+           "Set `joint_values` for `joint_ids` (and floating-joint transforms).")
         .def("setState", [](te::Environment& self, const tc::JointIdTransformMap& floating_joints) {
             validate_floating_joints(self, floating_joints, "setState");
             self.setState(floating_joints);
-        }, "floating_joints"_a)
-        .def("setStateByNamesAndValues", set_state_names_values,
-             "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{})
-        // Event callbacks
-        .def("addEventCallback", [](te::Environment& self, std::size_t hash, const PyEventCallbackFn& fn) {
-            self.addEventCallback(hash, fn);
-        }, "hash"_a, "fn"_a)
-        .def("removeEventCallback", &te::Environment::removeEventCallback, "hash"_a)
-        .def("clearEventCallbacks", &te::Environment::clearEventCallbacks)
-        // Commands - RemoveJointCommand
-        .def("applyCommand", [](te::Environment& self, const te::RemoveJointCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::RemoveJointCommand>(cmd.getJointId());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - AddLinkCommand
-        .def("applyCommand", [](te::Environment& self, const te::AddLinkCommand& cmd) {
-            std::shared_ptr<te::Command> cmd_ptr;
-            if (cmd.getJoint() != nullptr) {
-                cmd_ptr = std::make_shared<te::AddLinkCommand>(*cmd.getLink(), *cmd.getJoint(), cmd.replaceAllowed());
-            } else {
-                cmd_ptr = std::make_shared<te::AddLinkCommand>(*cmd.getLink(), cmd.replaceAllowed());
-            }
-            // Building collision shapes for a mesh-heavy link takes seconds; hold no GIL. Python
-            // can still be re-entered from inside this region - an event callback fires on every
-            // applied command - which is why PyEventCallbackFn re-acquires the GIL.
-            // ponytail: deadlocks if a Python event callback is registered AND another Python
-            // thread calls a writer that keeps the GIL (setState, ...): callbacks fire under the
-            // env's shared lock, so this thread holds it while re-acquiring the GIL, and the writer
-            // holds the GIL while waiting for the unique lock (docs/developer/threading.md).
+        }, "floating_joints"_a, NoGil(), "Set floating-joint transforms.")
+        // Event callbacks: a plain callable, keyed by the environment.
+        .def("addEventCallback", [](te::Environment& self, PyEventCallable fn) {
+            const PyEventCallbackFn callback{ gil_safe_object(std::move(fn)) };
             nb::gil_scoped_release nogil;
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - RemoveLinkCommand
-        .def("applyCommand", [](te::Environment& self, const te::RemoveLinkCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::RemoveLinkCommand>(cmd.getLinkId());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - AddSceneGraphCommand
-        .def("applyCommand", [](te::Environment& self, const te::AddSceneGraphCommand& cmd) {
-            std::shared_ptr<te::Command> cmd_ptr;
-            if (cmd.getJoint() != nullptr) {
-                cmd_ptr = std::make_shared<te::AddSceneGraphCommand>(*cmd.getSceneGraph(), *cmd.getJoint(), cmd.getPrefix());
-            } else {
-                cmd_ptr = std::make_shared<te::AddSceneGraphCommand>(*cmd.getSceneGraph(), cmd.getPrefix());
-            }
-            nb::gil_scoped_release nogil;  // see AddLinkCommand above
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - AddTrajectoryLinkCommand
-        .def("applyCommand", [](te::Environment& self, const te::AddTrajectoryLinkCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::AddTrajectoryLinkCommand>(cmd);
-            // The convex-hull methods build collision geometry for every state.
-            nb::gil_scoped_release nogil;  // see AddLinkCommand above
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - AddKinematicsInformationCommand
-        .def("applyCommand", [](te::Environment& self, const te::AddKinematicsInformationCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::AddKinematicsInformationCommand>(cmd.getKinematicsInformation());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - AddContactManagersPluginInfoCommand
-        .def("applyCommand", [](te::Environment& self, const te::AddContactManagersPluginInfoCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::AddContactManagersPluginInfoCommand>(cmd.getContactManagersPluginInfo());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ModifyAllowedCollisionsCommand
-        .def("applyCommand", [](te::Environment& self, const te::ModifyAllowedCollisionsCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ModifyAllowedCollisionsCommand>(cmd.getAllowedCollisionMatrix(), cmd.getModifyType());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - RemoveAllowedCollisionLinkCommand
-        .def("applyCommand", [](te::Environment& self, const te::RemoveAllowedCollisionLinkCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::RemoveAllowedCollisionLinkCommand>(cmd.getLinkId());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ChangeJointPositionLimitsCommand
-        .def("applyCommand", [](te::Environment& self, const te::ChangeJointPositionLimitsCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeJointPositionLimitsCommand>(cmd.getLimits());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ChangeJointVelocityLimitsCommand
-        .def("applyCommand", [](te::Environment& self, const te::ChangeJointVelocityLimitsCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeJointVelocityLimitsCommand>(cmd.getLimits());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ChangeJointAccelerationLimitsCommand
-        .def("applyCommand", [](te::Environment& self, const te::ChangeJointAccelerationLimitsCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeJointAccelerationLimitsCommand>(cmd.getLimits());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ChangeCollisionMarginsCommand
-        // Note: 0.33 API change - uses CollisionMarginPairData and CollisionMarginPairOverrideType
-        .def("applyCommand", [](te::Environment& self, const te::ChangeCollisionMarginsCommand& cmd) {
-            // Handle both default margin and pair margins
-            auto default_margin = cmd.getDefaultCollisionMargin();
-            if (default_margin.has_value()) {
-                auto cmd_ptr = std::make_shared<te::ChangeCollisionMarginsCommand>(
-                    default_margin.value(), cmd.getCollisionMarginPairData(), cmd.getCollisionMarginPairOverrideType());
-                return self.applyCommand(cmd_ptr);
-            } else {
-                auto cmd_ptr = std::make_shared<te::ChangeCollisionMarginsCommand>(
-                    cmd.getCollisionMarginPairData(), cmd.getCollisionMarginPairOverrideType());
-                return self.applyCommand(cmd_ptr);
-            }
-        }, "command"_a)
-        // Commands - ChangeLinkCollisionEnabledCommand
-        .def("applyCommand", [](te::Environment& self, const te::ChangeLinkCollisionEnabledCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeLinkCollisionEnabledCommand>(cmd.getLinkId(), cmd.getEnabled());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ChangeLinkVisibilityCommand
-        .def("applyCommand", [](te::Environment& self, const te::ChangeLinkVisibilityCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeLinkVisibilityCommand>(cmd.getLinkId(), cmd.getEnabled());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ChangeJointOriginCommand
-        .def("applyCommand", [](te::Environment& self, const te::ChangeJointOriginCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeJointOriginCommand>(cmd.getJointId(), cmd.getOrigin());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ChangeLinkOriginCommand
-        .def("applyCommand", [](te::Environment& self, const te::ChangeLinkOriginCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeLinkOriginCommand>(cmd.getLinkId(), cmd.getOrigin());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - MoveJointCommand
-        .def("applyCommand", [](te::Environment& self, const te::MoveJointCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::MoveJointCommand>(cmd.getJointId(), cmd.getParentLink());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - MoveLinkCommand
-        .def("applyCommand", [](te::Environment& self, const te::MoveLinkCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::MoveLinkCommand>(*cmd.getJoint());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - ReplaceJointCommand
-        .def("applyCommand", [](te::Environment& self, const te::ReplaceJointCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ReplaceJointCommand>(*cmd.getJoint());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // Commands - SetActive{Discrete,Continuous}ContactManagerCommand
-        .def("applyCommand", [](te::Environment& self, const te::SetActiveDiscreteContactManagerCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::SetActiveDiscreteContactManagerCommand>(cmd.getName());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        .def("applyCommand", [](te::Environment& self, const te::SetActiveContinuousContactManagerCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::SetActiveContinuousContactManagerCommand>(cmd.getName());
-            return self.applyCommand(cmd_ptr);
-        }, "command"_a)
-        // The list form takes the Python objects as they are: nanobind's shared_ptr caster keeps each
-        // one alive while C++ holds it and drops it under the GIL, so no per-type copy is needed.
+            // The key is the address of the callback's holder, unique while it is registered;
+            // a key C++ code already uses is skipped.
+            auto key = reinterpret_cast<std::size_t>(callback.fn.get());
+            const auto existing = self.getEventCallbacks();
+            while (existing.find(key) != existing.end()) ++key;
+            self.addEventCallback(key, callback);
+            return key;
+        }, "fn"_a,
+           "Register `fn(event)`, called after each change with a CommandAppliedEvent or a "
+           "SceneStateChangedEvent; returns the key for removeEventCallback.\n\n"
+           "`fn` runs on the thread that changed the environment, under its lock: it must not change "
+           "the environment. The environment keeps `fn` alive; `clone()` does not copy it.")
+        .def("removeEventCallback", &te::Environment::removeEventCallback, "key"_a, NoGil(),
+             "Unregister the callback addEventCallback returned `key` for; an unknown key is ignored.")
+        .def("clearEventCallbacks", &te::Environment::clearEventCallbacks, NoGil(), "Unregister every event callback.")
+        // Commands. nanobind's shared_ptr caster keeps a Python-created command alive while the
+        // history holds it, and drops it under the GIL: no per-type copy.
+        .def("applyCommand", [](te::Environment& self, std::shared_ptr<const te::Command> command) {
+            return self.applyCommand(std::move(command));
+        }, "command"_a, NoGil(),
+           "Apply one command; True on success. The command joins the history (getCommandHistory).")
         .def("applyCommands", [](te::Environment& self, const CommandList& commands) {
-            require_commands(commands, "applyCommands");
-            nb::gil_scoped_release nogil;  // see AddLinkCommand above
-            return self.applyCommands(commands);
-        }, "commands"_a)
+            return self.applyCommands(require_commands(commands, "applyCommands"));
+        }, "commands"_a, NoGil(),
+           "Apply the commands in order; False, and stop, at the first that fails.")
         // Every command applied since construction, init's own included; each element arrives as
         // its bound derived class.
-        .def("getCommandHistory", &te::Environment::getCommandHistory)
-        // State solver
-        .def("getStateSolver", [](const te::Environment& self) {
-            return self.getStateSolver();
-        })
+        .def("getCommandHistory", &te::Environment::getCommandHistory, NoGil(),
+             "Every command applied since init, init's own included, each as its derived class.")
+        .def("getStateSolver", [](const te::Environment& self) { return self.getStateSolver(); }, NoGil(),
+             "A new state solver at the current state, independent of the environment.")
         // Joint/Link info
-        .def("getJointIds", &te::Environment::getJointIds)
-        .def("getActiveJointIds", &te::Environment::getActiveJointIds)
-        .def("getLinkIds", &te::Environment::getLinkIds)
-        .def("getActiveLinkIds", [](const te::Environment& self) {
-            return self.getActiveLinkIds();
-        })
+        .def("getJointIds", &te::Environment::getJointIds, NoGil(), "Every joint id.")
+        .def("getActiveJointIds", &te::Environment::getActiveJointIds, NoGil(),
+             "The active (non-fixed, non-mimic) joint ids, in state-vector order.")
+        .def("getLinkIds", &te::Environment::getLinkIds, NoGil(), "Every link id.")
+        .def("getActiveLinkIds", [](const te::Environment& self) { return self.getActiveLinkIds(); }, NoGil(),
+             "Links moved by an active joint.")
         // gh-187: the joint_ids forms walk the scene graph, which throws a bare runtime_error
         // on an unknown joint; validate for a ValueError naming every unknown joint.
         .def("getActiveLinkIds", [](const te::Environment& self, const std::vector<tc::JointId>& joint_ids) {
             validate_joint_ids_exist(self, joint_ids, "getActiveLinkIds");
             return self.getActiveLinkIds(joint_ids);
-        }, "joint_ids"_a)
-        .def("getStaticLinkIds", [](const te::Environment& self) {
-            return self.getStaticLinkIds();
-        })
+        }, "joint_ids"_a, NoGil(), "Links moved by any of `joint_ids`.")
+        .def("getStaticLinkIds", [](const te::Environment& self) { return self.getStaticLinkIds(); }, NoGil(),
+             "Links no active joint moves.")
         .def("getStaticLinkIds", [](const te::Environment& self, const std::vector<tc::JointId>& joint_ids) {
             validate_joint_ids_exist(self, joint_ids, "getStaticLinkIds");
             return self.getStaticLinkIds(joint_ids);
-        }, "joint_ids"_a)
-        .def("getRootLinkId", &te::Environment::getRootLinkId)
-        .def("getCurrentJointValues", [](const te::Environment& self) {
-            return self.getCurrentJointValues();
-        })
-        .def("getCurrentJointValues", get_current_joint_values_by_ids, "joint_ids"_a)
-        .def("getCurrentJointValuesByNames", get_current_joint_values_by_ids, "joint_ids"_a)
+        }, "joint_ids"_a, NoGil(), "Links none of `joint_ids` moves.")
+        .def("getRootLinkId", &te::Environment::getRootLinkId, NoGil(), "The scene graph's root link.")
+        .def("getCurrentJointValues", [](const te::Environment& self) { return self.getCurrentJointValues(); },
+             NoGil(), "The active joints' current values, in getActiveJointIds order.")
+        .def("getCurrentJointValues", get_current_joint_values_by_ids, "joint_ids"_a, NoGil(),
+             "The current values of `joint_ids`; a non-active id raises KeyError.")
         // Transforms
-        .def("getLinkTransform", &te::Environment::getLinkTransform, "link_id"_a)
-        .def("getRelativeLinkTransform", &te::Environment::getRelativeLinkTransform,
-             "from_link_id"_a, "to_link_id"_a)
-        // gh-188: getLinkTransforms. The (names, values[, floating_joints]) overloads return the
+        .def("getLinkTransform", [](const te::Environment& self, const tc::LinkId& link_id) {
+            require_link(self, link_id);
+            return self.getLinkTransform(link_id);
+        }, "link_id"_a, NoGil(), "The link's current world transform; an unknown link raises KeyError.")
+        .def("getRelativeLinkTransform", [](const te::Environment& self, const tc::LinkId& from_link_id,
+                                            const tc::LinkId& to_link_id) {
+            require_link(self, from_link_id);
+            require_link(self, to_link_id);
+            return self.getRelativeLinkTransform(from_link_id, to_link_id);
+        }, "from_link_id"_a, "to_link_id"_a, NoGil(),
+           "The transform of `to_link_id` in the frame of `from_link_id`; an unknown link raises KeyError.")
+        // gh-188: getLinkTransforms. The (ids, values[, floating_joints]) overloads return the
         // C++ out-param (accepted out-param rule) and validate like setState (GH #43): they feed
         // the same state-solver path.
-        .def("getLinkTransforms", [](const te::Environment& self) {
-            return self.getLinkTransforms();
-        })
-        .def("getLinkTransforms", [](const te::Environment& self,
-                                     const std::vector<tc::JointId>& joint_ids,
-                                     const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            validate_set_state(self, joint_ids, joint_values, "getLinkTransforms");
-            tc::LinkIdTransformMap link_transforms;
-            self.getLinkTransforms(link_transforms, joint_ids, joint_values);
-            return link_transforms;
-        }, "joint_ids"_a, "joint_values"_a)
+        .def("getLinkTransforms", [](const te::Environment& self) { return self.getLinkTransforms(); }, NoGil(),
+             "Every link's current world transform.")
         .def("getLinkTransforms", [](const te::Environment& self,
                                      const std::vector<tc::JointId>& joint_ids,
                                      const Eigen::Ref<const Eigen::VectorXd>& joint_values,
@@ -1121,79 +811,88 @@ NB_MODULE(environment, m) {
             tc::LinkIdTransformMap link_transforms;
             self.getLinkTransforms(link_transforms, joint_ids, joint_values, floating_joints);
             return link_transforms;
-        }, "joint_ids"_a, "joint_values"_a, "floating_joints"_a)
+        }, "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
+           "Every link's world transform at `joint_values` for `joint_ids`, without changing the environment.")
         .def("getCurrentFloatingJointValues", [](const te::Environment& self) {
             return self.getCurrentFloatingJointValues();
-        })
+        }, NoGil(), "Every floating joint's current transform.")
         .def("getCurrentFloatingJointValues", [](const te::Environment& self,
                                                  const std::vector<tc::JointId>& joint_ids) {
             const std::string unknown = unknown_floating_joint_ids(self, joint_ids);
             if (!unknown.empty())
                 throw nb::key_error(("Floating joint not found: " + unknown).c_str());
             return self.getCurrentFloatingJointValues(joint_ids);
-        }, "joint_ids"_a)
+        }, "joint_ids"_a, NoGil(), "The current transforms of `joint_ids`; a non-floating id raises KeyError.")
         // gh-188: id-keyed getters raise KeyError on a miss instead of None / an unasked-for bool.
         // getJointLimits copies: the C++ getter hands out a pointer into the scene graph.
         .def("getJointLimits", [](const te::Environment& self, const tc::JointId& joint_id) {
             auto ptr = self.getJointLimits(joint_id);
             if (!ptr) throw nb::key_error(("Joint not found: " + joint_id.name()).c_str());
             return tsg::JointLimits(*ptr);
-        }, "joint_id"_a)
+        }, "joint_id"_a, NoGil(), "A copy of the joint's limits; an unknown joint raises KeyError.")
         .def("getLinkCollisionEnabled", [](const te::Environment& self, const tc::LinkId& link_id) {
             require_link(self, link_id);
             return self.getLinkCollisionEnabled(link_id);
-        }, "link_id"_a)
+        }, "link_id"_a, NoGil(), "Whether the link takes part in collision checks; KeyError for an unknown link.")
         .def("getLinkVisibility", [](const te::Environment& self, const tc::LinkId& link_id) {
             require_link(self, link_id);
             return self.getLinkVisibility(link_id);
-        }, "link_id"_a)
-        .def("getContactManagersPluginInfo", &te::Environment::getContactManagersPluginInfo)
-        // Link/Joint access - dereference shared_ptr for cross-module compatibility
-        .def("getLink", [](const te::Environment& self, const tc::LinkId& name) -> const tsg::Link& {
-            auto ptr = self.getLink(name);
-            if (!ptr) throw std::runtime_error("Link not found: " + name.name());
-            return *ptr;
-        }, "name"_a, nb::rv_policy::reference_internal)
-        .def("getJoint", [](const te::Environment& self, const tc::JointId& name) -> const tsg::Joint& {
-            auto ptr = self.getJoint(name);
-            if (!ptr) throw std::runtime_error("Joint not found: " + name.name());
-            return *ptr;
-        }, "name"_a, nb::rv_policy::reference_internal)
+        }, "link_id"_a, NoGil(), "Whether the link is visible; KeyError for an unknown link.")
+        .def("getContactManagersPluginInfo", &te::Environment::getContactManagersPluginInfo, NoGil(),
+             "The contact-manager plugin configuration.")
+        // The scene graph's own Link / Joint, shared: a command that removes or replaces one
+        // leaves the Python object valid (it keeps the old one alive).
+        .def("getLink", [](const te::Environment& self, const tc::LinkId& link_id) {
+            auto link = self.getLink(link_id);
+            if (!link) throw nb::key_error(("Link not found: " + link_id.name()).c_str());
+            return link;
+        }, "link_id"_a, NoGil(), "The link (shared, read-only); an unknown link raises KeyError.")
+        .def("getJoint", [](const te::Environment& self, const tc::JointId& joint_id) {
+            auto joint = self.getJoint(joint_id);
+            if (!joint) throw nb::key_error(("Joint not found: " + joint_id.name()).c_str());
+            return joint;
+        }, "joint_id"_a, NoGil(), "The joint (shared, read-only); an unknown joint raises KeyError.")
         // Groups
-        .def("getGroupNames", &te::Environment::getGroupNames)
-        .def("getGroupJointIds", &te::Environment::getGroupJointIds, "group_name"_a)
-        // Return unique_ptr directly - nanobind transfers ownership to Python
-        // Previously returned a reference which became dangling when the unique_ptr
-        // was destroyed at the end of the lambda, causing segfaults after setState()
-        //
-        // keep_alive<0, 1>: groups/contact managers are built from plugin
-        // instances (OPW/KDL/UR kinematics, bullet/fcl collision) whose vtables
-        // live in dylibs owned by the Environment's plugin loader. If Python
-        // destroys the Environment first, the loader dlcloses those dylibs and
-        // the survivors' destructors virtual-call into unmapped pages (gh-72).
+        .def("getGroupNames", &te::Environment::getGroupNames, NoGil(), "The SRDF group names.")
+        .def("getGroupJointIds", [](const te::Environment& self, const std::string& group_name) {
+            require_group(self, group_name);
+            return self.getGroupJointIds(group_name);
+        }, "group_name"_a, NoGil(), "The group's joint ids; an unknown group raises KeyError.")
+        // Groups and contact managers come back by unique/shared_ptr, owned by Python.
+        // keep_alive<0, 1>: they are built from plugin instances (OPW/KDL/UR kinematics,
+        // bullet/fcl collision) whose code lives in dylibs the Environment's plugin loader owns.
+        // If Python destroyed the Environment first, the loader would dlclose those dylibs and the
+        // survivors' destructors would call into unmapped pages (gh-72).
         .def("getJointGroup", [](const te::Environment& self, const std::string& group_name) {
-            auto ptr = self.getJointGroup(group_name);
-            if (!ptr) throw std::runtime_error("Failed to get joint group: " + group_name);
-            return ptr;
-        }, "group_name"_a, nb::keep_alive<0, 1>())
-        .def("getJointGroup", [](const te::Environment& self, const std::string& name,
+            require_group(self, group_name);
+            return self.getJointGroup(group_name);
+        }, "group_name"_a, nb::keep_alive<0, 1>(), NoGil(),
+           "The SRDF group as a JointGroup at the current state; an unknown group raises KeyError.")
+        .def("getJointGroup", [](const te::Environment& self, const std::string& group_name,
                                  const std::vector<tc::JointId>& joint_ids) {
             validate_joint_ids_exist(self, joint_ids, "getJointGroup");
-            return self.getJointGroup(name, joint_ids);
-        }, "name"_a, "joint_ids"_a, nb::keep_alive<0, 1>())
+            return self.getJointGroup(group_name, joint_ids);
+        }, "group_name"_a, "joint_ids"_a, nb::keep_alive<0, 1>(), NoGil(),
+           "A new JointGroup named `group_name` over `joint_ids`; unknown joints raise ValueError.")
         .def("getKinematicGroup", [](const te::Environment& self, const std::string& group_name,
                                       const std::string& ik_solver_name) {
-            auto ptr = self.getKinematicGroup(group_name, ik_solver_name);
-            if (!ptr) throw std::runtime_error("Failed to get kinematic group: " + group_name);
-            return ptr;
-        }, "group_name"_a, "ik_solver_name"_a = "", nb::keep_alive<0, 1>())
-        // TCP
-        .def("findTCPOffset", &te::Environment::findTCPOffset, "manip_info"_a)
-        // gh-183. findTCPOffset keeps the GIL: it holds the env's shared lock while it calls the
-        // callback, which takes the GIL, so releasing it would let a writer that holds the GIL
-        // (setState) deadlock against it.
+            require_ik_solver(self, group_name, ik_solver_name);
+            auto group = self.getKinematicGroup(group_name, ik_solver_name);
+            if (!group)
+                throw std::runtime_error("getKinematicGroup: inverse kinematics solver '" + ik_solver_name +
+                                         "' of group '" + group_name + "' is configured but failed to load");
+            return group;
+        }, "group_name"_a, "ik_solver_name"_a = "", nb::keep_alive<0, 1>(), NoGil(),
+           "The SRDF group with its IK solver (the group's default when `ik_solver_name` is empty). An "
+           "unknown group or solver raises KeyError; a configured solver that fails to load, RuntimeError.")
+        // TCP. The callbacks take the GIL themselves.
+        .def("findTCPOffset", &te::Environment::findTCPOffset, "manip_info"_a, NoGil(),
+             "The TCP offset `manip_info.tcp_offset` names: a transform, a link, a group TCP, or what a "
+             "find-TCP callback returns; RuntimeError when none locates it.")
         .def("addFindTCPOffsetCallback", [](te::Environment& self, PyFindTCPOffsetCallable fn) {
-            self.addFindTCPOffsetCallback(PyFindTCPOffsetFn(std::move(fn)));
+            const PyFindTCPOffsetFn callback{ gil_safe_object(std::move(fn)) };
+            nb::gil_scoped_release nogil;
+            self.addFindTCPOffsetCallback(callback);
         }, "fn"_a,
         "Register `fn(manip_info) -> Isometry3d` as a source of TCP offsets for `findTCPOffset`.\n\n"
         "`findTCPOffset` asks the callbacks, in registration order, only for a `tcp_offset` name that "
@@ -1203,54 +902,61 @@ NB_MODULE(environment, m) {
         "as \"not located\": `findTCPOffset` tries the next one and raises `RuntimeError` "
         "(\"Could not find tcp by name ...\") when none returns a transform. The callback's own "
         "exception is not reported (upstream catches it with `catch (...)`).\n\n"
-        "`fn` may run on any thread, under this environment's lock: it must not call into this "
+        "`fn` may run on any thread, under this environment's lock: it must not change this "
         "environment, and must not keep it alive itself (a closure over it, or an attribute holding "
         "it): the environment keeps `fn` alive from C++, so the garbage collector cannot see that "
         "cycle.\n\n"
         "Args:\n"
         "    fn: Callable taking the `ManipulatorInfo` and returning the TCP offset.")
-        // Contact managers
-        // GIL released for the same reason as applyCommand: on the first call these build every
-        // collision shape in the scene, which is where an SDF- or mesh-heavy environment spends its
-        // seconds when no manager was cached for applyCommand to update. No event callbacks fire
-        // here and the env is only read-locked, so the applyCommand caveat does not apply.
+        // Contact managers. On the first call these build every collision shape in the scene.
         .def("getDiscreteContactManager", [](const te::Environment& self) {
             return self.getDiscreteContactManager();
-        }, nb::keep_alive<0, 1>(), nb::call_guard<nb::gil_scoped_release>())
+        }, nb::keep_alive<0, 1>(), NoGil(), "A clone of the active discrete contact manager, at the current state.")
         .def("getContinuousContactManager", [](const te::Environment& self) {
             return self.getContinuousContactManager();
-        }, nb::keep_alive<0, 1>(), nb::call_guard<nb::gil_scoped_release>())
+        }, nb::keep_alive<0, 1>(), NoGil(), "A clone of the active continuous contact manager, at the current state.")
         .def("getDiscreteContactManager", [](const te::Environment& self, const std::string& name) {
             require_discrete_contact_manager(self, name);
             auto manager = self.getDiscreteContactManager(name);
-            if (!manager) throw std::runtime_error("Failed to create discrete contact manager: " + name);
+            if (!manager)
+                throw std::runtime_error("getDiscreteContactManager: plugin '" + name + "' is registered but failed to load");
             return manager;
-        }, "name"_a, nb::keep_alive<0, 1>(), nb::call_guard<nb::gil_scoped_release>())
+        }, "name"_a, nb::keep_alive<0, 1>(), NoGil(),
+           "A new discrete contact manager from plugin `name`; an unregistered name raises KeyError.")
         .def("getContinuousContactManager", [](const te::Environment& self, const std::string& name) {
             require_continuous_contact_manager(self, name);
             auto manager = self.getContinuousContactManager(name);
-            if (!manager) throw std::runtime_error("Failed to create continuous contact manager: " + name);
+            if (!manager)
+                throw std::runtime_error("getContinuousContactManager: plugin '" + name + "' is registered but failed to load");
             return manager;
-        }, "name"_a, nb::keep_alive<0, 1>(), nb::call_guard<nb::gil_scoped_release>())
-        .def("setActiveDiscreteContactManager", &te::Environment::setActiveDiscreteContactManager, "name"_a)
-        .def("setActiveContinuousContactManager", &te::Environment::setActiveContinuousContactManager, "name"_a)
-        .def("clearCachedDiscreteContactManager", &te::Environment::clearCachedDiscreteContactManager)
-        .def("clearCachedContinuousContactManager", &te::Environment::clearCachedContinuousContactManager)
+        }, "name"_a, nb::keep_alive<0, 1>(), NoGil(),
+           "A new continuous contact manager from plugin `name`; an unregistered name raises KeyError.")
+        .def("setActiveDiscreteContactManager", &te::Environment::setActiveDiscreteContactManager, "name"_a, NoGil(),
+             "Make plugin `name` the active discrete contact manager; False if it is not registered.")
+        .def("setActiveContinuousContactManager", &te::Environment::setActiveContinuousContactManager, "name"_a,
+             NoGil(), "Make plugin `name` the active continuous contact manager; False if it is not registered.")
+        .def("clearCachedDiscreteContactManager", &te::Environment::clearCachedDiscreteContactManager, NoGil(),
+             "Drop the cached discrete manager: the next call rebuilds it.")
+        .def("clearCachedContinuousContactManager", &te::Environment::clearCachedContinuousContactManager, NoGil(),
+             "Drop the cached continuous manager: the next call rebuilds it.")
         // ACM and collision
-        .def("getAllowedCollisionMatrix", &te::Environment::getAllowedCollisionMatrix)
-        .def("getCollisionMarginData", &te::Environment::getCollisionMarginData)
+        .def("getAllowedCollisionMatrix", &te::Environment::getAllowedCollisionMatrix, NoGil(),
+             "The allowed collision matrix (shared, read-only).")
+        .def("getCollisionMarginData", &te::Environment::getCollisionMarginData, NoGil(),
+             "The collision margins (shared, read-only).")
         // Locator
-        .def("setResourceLocator", &te::Environment::setResourceLocator, "locator"_a)
-        .def("getResourceLocator", &te::Environment::getResourceLocator)
-        // Kinematics information (from SRDF)
-        .def("getKinematicsInformation", &te::Environment::getKinematicsInformation)
-        // clone() is a pure C++ deep-copy (no Python callback) and is mutex-serialised
-        // against setState() (Environment::clone takes a shared_lock on the same mutex_),
-        // so releasing the GIL lets a background thread clone the env WITHOUT blocking the
-        // UI thread — the collision scan clones off-thread for a responsive sweep.
-        .def("clone", [](const te::Environment& self) { return self.clone(); },
-             nb::call_guard<nb::gil_scoped_release>());
-    bind_value_equality(environment, nb::call_guard<nb::gil_scoped_release>());
+        .def("setResourceLocator", &te::Environment::setResourceLocator, "locator"_a, NoGil(),
+             "Replace the resource locator commands resolve URLs with.")
+        .def("getResourceLocator", &te::Environment::getResourceLocator, NoGil(), "The resource locator.")
+        .def("getKinematicsInformation", &te::Environment::getKinematicsInformation, NoGil(),
+             "The SRDF kinematics information: groups, group states, TCPs and IK plugin configuration.")
+        .def("clone", [](const te::Environment& self) { return self.clone(); }, NoGil(),
+             "A deep copy, find-TCP callbacks included and event callbacks not; it compares equal.");
+    // operator== (environment.cpp) holds a shared lock on the left operand's mutex. It compares
+    // initialized, the revisions, the command types (through the non-virtual Command::operator==),
+    // the current state and both timestamps: two environments built separately differ by their
+    // timestamps; a clone() compares equal.
+    bind_value_equality(environment, NoGil());
 
     // Private test oracle; see GilProbeFn.
     nb::class_<GilProbe>(m, "_GilProbe")

@@ -90,9 +90,14 @@ void require_link(const tk::JointGroup& group, const tcommon::LinkId& link_id) {
         throw nb::key_error(("no link '" + link_id.name() + "' in joint group '" + group.getName() + "'").c_str());
 }
 
-// Upstream defaults, named: the binding's keyword defaults must not drift from the headers.
-constexpr double SINGULARITY_THRESHOLD_DEFAULT = 0.01;  // [singular value] utils.h:129 default
-constexpr double CHECK_KINEMATICS_TOL_DEFAULT = 1e-3;   // [m and rad] validate.h:38 default, compared to both distances
+// Upstream default arguments, which C++ exposes as no symbol, restated for the keywords; they
+// must not drift from the headers.
+// [smallest singular value of the Jacobian; its rows mix m/rad and 1/rad] isNearSingularity's
+// threshold default (utils.h:129).
+constexpr double SINGULARITY_THRESHOLD_DEFAULT = 0.01;
+// [m for the translation distance, rad for the angle distance] checkKinematics' tol default
+// (validate.h:38); the one value bounds both.
+constexpr double CHECK_KINEMATICS_TOL_DEFAULT = 1e-3;
 
 // numericalJacobian reads poses with operator[] (an unknown link inserts an uninitialized
 // Isometry3d) and writes jacobian(0..5, i) for every joint value without sizing it (utils.cpp:36-104).
@@ -190,7 +195,6 @@ NB_MODULE(kinematics, m) {
             // LinkIdTransformMap -> plain dict keyed by LinkId (indexable by str)
             return std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>(result.begin(), result.end());
         }, "joint_angles"_a)
-        // Note: In 0.33, calcJacobian has a non-virtual wrapper returning MatrixXd
         .def("calcJacobian", [](const tk::ForwardKinematics& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
                                 const tcommon::LinkId& link_id) {
@@ -201,7 +205,10 @@ NB_MODULE(kinematics, m) {
         .def("getTipLinkIds", &tk::ForwardKinematics::getTipLinkIds)
         .def("numJoints", &tk::ForwardKinematics::numJoints)
         .def("getSolverName", &tk::ForwardKinematics::getSolverName)
-        .def("clone", [](const tk::ForwardKinematics& self) { return self.clone(); });
+        .def("clone", [](const tk::ForwardKinematics& self) { return self.clone(); },
+             // gh-72: a clone runs the plugin library's code (its vtable lives there), so it keeps
+             // the original, and through it whatever owns that library, alive.
+             nb::keep_alive<0, 1>(), "An independent copy; it keeps this object alive (gh-72).");
 
     // ========== InverseKinematics (abstract) ==========
     // calcInvKin releases the GIL here and on KinematicGroup: numerical solvers such as TRAC-IK
@@ -219,10 +226,13 @@ NB_MODULE(kinematics, m) {
         .def("getWorkingFrame", &tk::InverseKinematics::getWorkingFrame)
         .def("getTipLinkIds", &tk::InverseKinematics::getTipLinkIds)
         .def("getSolverName", &tk::InverseKinematics::getSolverName)
-        .def("clone", [](const tk::InverseKinematics& self) { return self.clone(); });
+        .def("clone", [](const tk::InverseKinematics& self) { return self.clone(); },
+             // gh-72: a clone runs the plugin library's code (its vtable lives there), so it keeps
+             // the original, and through it whatever owns that library, alive.
+             nb::keep_alive<0, 1>(), "An independent copy; it keeps this object alive (gh-72).");
 
     // ========== JointGroup ==========
-    // One body for calcJacobian(q, link_id, link_point) and its alias calcJacobianWithPoint.
+    // calcJacobian(q, link_id, link_point), checked.
     auto jacobian_at_point = [](const tk::JointGroup& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
                                 const tcommon::LinkId& link_id,
@@ -266,8 +276,6 @@ NB_MODULE(kinematics, m) {
             require_link(self, link_id);
             return self.calcJacobian(joint_angles, base_link_id, link_id, link_point);
         }, "joint_angles"_a, "base_link_id"_a, "link_id"_a, "link_point"_a)
-        .def("calcJacobianWithPoint", jacobian_at_point, "joint_angles"_a, "link_id"_a, "link_point"_a,
-             "Alias of `calcJacobian(joint_angles, link_id, link_point)`, the native form.")
         .def("getJointIds", &tk::JointGroup::getJointIds)
         .def("getLinkIds", &tk::JointGroup::getLinkIds)
         .def("getActiveLinkIds", &tk::JointGroup::getActiveLinkIds)
@@ -283,8 +291,7 @@ NB_MODULE(kinematics, m) {
         .def("checkJoints", &tk::JointGroup::checkJoints, "vec"_a);
 
     // ========== KinematicGroup (extends JointGroup) ==========
-    // One body for calcInvKin(list[KinGroupIKInput], seed) and its alias calcInvKinMultiple:
-    // KinGroupIKInputs is opaque (NB_MAKE_OPAQUE above), so a list does not convert to it.
+    // calcInvKin(list[KinGroupIKInput], seed): KinGroupIKInputs is opaque (NB_MAKE_OPAQUE above), so a list does not convert to it.
     auto inv_kin_from_list = [](const tk::KinematicGroup& self,
                                 const std::vector<tk::KinGroupIKInput>& tip_link_poses,
                                 const Eigen::Ref<const Eigen::VectorXd>& seed) {
@@ -316,8 +323,6 @@ NB_MODULE(kinematics, m) {
             return self.calcInvKin(tip_link_pose, seed);
         }, "tip_link_pose"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("calcInvKin", inv_kin_from_list, "tip_link_poses"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>())
-        .def("calcInvKinMultiple", inv_kin_from_list, "tip_link_poses"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>(),
-             "Alias of `calcInvKin(tip_link_poses, seed)` with a list, the native form.")
         .def("getAllValidWorkingFrames", &tk::KinematicGroup::getAllValidWorkingFrames)
         .def("getAllPossibleTipLinkIds", &tk::KinematicGroup::getAllPossibleTipLinkIds)
         .def("getInverseKinematics", &tk::KinematicGroup::getInverseKinematics,
@@ -331,6 +336,7 @@ NB_MODULE(kinematics, m) {
         .def("__init__", [](tk::KinematicsPluginFactory* self,
                             const tesseract_nb::StrictPath& config_path,
                             const tcommon::ResourceLocator& locator) {
+            require_located_file(config_path.value, locator);
             new (self) tk::KinematicsPluginFactory(config_path.value, locator);
         }, "config_path"_a, "locator"_a)
         // Constructor with string and locator

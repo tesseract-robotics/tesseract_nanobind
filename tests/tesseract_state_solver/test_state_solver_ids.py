@@ -31,7 +31,7 @@ def _solver():
 def test_set_state_from_str_names_and_index_transforms_by_str():
     solver = _solver()
     values = np.full(7, 0.1)
-    solver.setStateByNamesAndValues(IIWA_JOINTS, values)
+    solver.setState(IIWA_JOINTS, values)
     state = solver.getState()
     assert state.joints["joint_a3"] == 0.1
     assert isinstance(state.link_transforms["tool0"], tesseract_common.Isometry3d)

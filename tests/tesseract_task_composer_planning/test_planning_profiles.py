@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 import tesseract_robotics.motion_planners_trajopt as trajopt
-import tesseract_robotics.task_composer_planning as tcp_module
 from tesseract_robotics.collision import CollisionCheckConfig
 from tesseract_robotics.motion_planners_trajopt import (
     BasicTrustRegionSQPParameters,

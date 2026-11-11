@@ -600,99 +600,100 @@ class TestAnyPolyAsContactResultMapVector:
             AnyPoly_as_ContactResultMapVector(AnyPoly())
 
 
+@pytest.fixture(scope="module")
+def pipeline_run():
+    """Run FreespacePipeline with a contact-check profile rigged to flag the
+    path as colliding (1.5m default margin) so DiscreteContactCheckTask
+    populates 'contact_results' on its node info data_storage. Mirrors the
+    upstream gtest at tesseract_task_composer/test/
+    tesseract_task_composer_planning_unit.cpp::TaskComposerDiscreteContactCheckTaskTests
+    ('Failure collision' case)."""
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("tesseract_robotics.planning")
+
+    config_file = _resolve_task_composer_config()
+
+    from tesseract_robotics.collision import (
+        CollisionEvaluatorType,
+        ContactManagerConfig,
+    )
+    from tesseract_robotics.motion_planners import (
+        assignCurrentStateAsSeed,
+    )
+    from tesseract_robotics.planning import (
+        JointTarget,
+        MotionProgram,
+        Robot,
+        TaskComposer,
+    )
+    from tesseract_robotics.planning.profiles import (
+        create_freespace_pipeline_profiles,
+    )
+    from tesseract_robotics.task_composer import (
+        AnyPoly_wrap_CompositeInstruction,
+        AnyPoly_wrap_EnvironmentConst,
+        AnyPoly_wrap_ProfileDictionary,
+        TaskComposerDataStorage,
+    )
+    from tesseract_robotics.task_composer_planning import (
+        ContactCheckProfile,
+    )
+
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
+    joint_names = robot.get_joint_names("manipulator")
+    j_start = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+    j_end = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+    robot.set_joints(j_start, joint_names=joint_names)
+
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+        .set_joint_names(joint_names)
+        .move_to(JointTarget(j_start))
+        .move_to(JointTarget(j_end))
+    )
+    profiles = create_freespace_pipeline_profiles(planning_time=2.0)
+
+    # 1.5m default margin → every link counts as in collision with everything
+    # else, guaranteeing DiscreteContactCheckTask flags the trajectory and
+    # writes the per-step contact_results vector to its info data_storage.
+    forcing = ContactCheckProfile()
+    forcing.contact_manager_config = ContactManagerConfig(1.5)
+    forcing.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
+    for profile_name in ("FREESPACE", "DEFAULT"):
+        profiles.addProfile("DiscreteContactCheckTask", profile_name, forcing)
+
+    composer = TaskComposer.from_config(config_path=config_file)
+    composite = program.to_composite_instruction(joint_names)
+    assignCurrentStateAsSeed(composite, robot.env)
+
+    task = composer.factory.createTaskComposerNode("FreespacePipeline")
+    input_key = task.getInputPortMappings().single("planning_input")
+
+    task_data = TaskComposerDataStorage()
+    task_data.setData(input_key, AnyPoly_wrap_CompositeInstruction(composite))
+    task_data.setData("environment", AnyPoly_wrap_EnvironmentConst(robot.env))
+    task_data.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
+
+    future = composer.executor.run(task, task_data)
+    future.wait()
+    infos = list(future.context.task_infos.getInfoMap().values())
+
+    yield infos
+
+    del future
+    del task_data
+    del task
+    del composer
+    gc.collect()
+
+
 class TestPipelineDataStorageExposure:
     """End-to-end coverage for the data_storage exposure + contact_results
     extraction path: run FreespacePipeline (which contains DiscreteContactCheckTask),
     then read per-node data_storage out of getInfoMap and unwrap the contact
     results vector via AnyPoly_as_ContactResultMapVector."""
-
-    @pytest.fixture(scope="class")
-    def pipeline_run(self):
-        """Run FreespacePipeline with a contact-check profile rigged to flag the
-        path as colliding (1.5m default margin) so DiscreteContactCheckTask
-        populates 'contact_results' on its node info data_storage. Mirrors the
-        upstream gtest at tesseract_task_composer/test/
-        tesseract_task_composer_planning_unit.cpp::TaskComposerDiscreteContactCheckTaskTests
-        ('Failure collision' case)."""
-        np = pytest.importorskip("numpy")
-        pytest.importorskip("tesseract_robotics.planning")
-
-        config_file = _resolve_task_composer_config()
-
-        from tesseract_robotics.collision import (
-            CollisionEvaluatorType,
-            ContactManagerConfig,
-        )
-        from tesseract_robotics.motion_planners import (
-            assignCurrentStateAsSeed,
-        )
-        from tesseract_robotics.planning import (
-            JointTarget,
-            MotionProgram,
-            Robot,
-            TaskComposer,
-        )
-        from tesseract_robotics.planning.profiles import (
-            create_freespace_pipeline_profiles,
-        )
-        from tesseract_robotics.task_composer import (
-            AnyPoly_wrap_CompositeInstruction,
-            AnyPoly_wrap_EnvironmentConst,
-            AnyPoly_wrap_ProfileDictionary,
-            TaskComposerDataStorage,
-        )
-        from tesseract_robotics.task_composer_planning import (
-            ContactCheckProfile,
-        )
-
-        robot = Robot.from_tesseract_support(
-            "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
-        )
-        joint_names = robot.get_joint_names("manipulator")
-        j_start = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
-        j_end = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
-        robot.set_joints(j_start, joint_names=joint_names)
-
-        program = (
-            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
-            .set_joint_names(joint_names)
-            .move_to(JointTarget(j_start))
-            .move_to(JointTarget(j_end))
-        )
-        profiles = create_freespace_pipeline_profiles(planning_time=2.0)
-
-        # 1.5m default margin → every link counts as in collision with everything
-        # else, guaranteeing DiscreteContactCheckTask flags the trajectory and
-        # writes the per-step contact_results vector to its info data_storage.
-        forcing = ContactCheckProfile()
-        forcing.contact_manager_config = ContactManagerConfig(1.5)
-        forcing.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
-        for profile_name in ("FREESPACE", "DEFAULT"):
-            profiles.addProfile("DiscreteContactCheckTask", profile_name, forcing)
-
-        composer = TaskComposer.from_config(config_path=config_file)
-        composite = program.to_composite_instruction(joint_names)
-        assignCurrentStateAsSeed(composite, robot.env)
-
-        task = composer.factory.createTaskComposerNode("FreespacePipeline")
-        input_key = task.getInputPortMappings().single("planning_input")
-
-        task_data = TaskComposerDataStorage()
-        task_data.setData(input_key, AnyPoly_wrap_CompositeInstruction(composite))
-        task_data.setData("environment", AnyPoly_wrap_EnvironmentConst(robot.env))
-        task_data.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
-
-        future = composer.executor.run(task, task_data)
-        future.wait()
-        infos = list(future.context.task_infos.getInfoMap().values())
-
-        yield infos
-
-        del future
-        del task_data
-        del task
-        del composer
-        gc.collect()
 
     def test_discrete_contact_check_data_storage_yields_contact_results(self, pipeline_run):
         """DiscreteContactCheckTask, on a colliding trajectory, stores the per-step

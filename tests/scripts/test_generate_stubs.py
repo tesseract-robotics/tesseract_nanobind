@@ -174,11 +174,41 @@ def test_check_reports_unified_diff():
 
 def test_binding_sources_match_extension_modules():
     """The audit (scripts/audit_ownership.py, binding_modules) takes its module list from
-    src/bindings/*.cpp (minus NON_MODULE_SOURCES) because it must not import the package;
-    this pins that set to the modules the build actually produces."""
-    sources = {p.stem for p in (REPO_ROOT / "src" / "bindings").glob("*.cpp")} - set(
-        _own.NON_MODULE_SOURCES
-    )
+    src/bindings/*.cpp because it must not import the package: each module's primary, minus the
+    parts linked into a module (MODULE_PARTS) and the helpers (NON_MODULE_SOURCES). This pins
+    that set to the modules the build actually produces."""
+    parts = {s for stems in _own.MODULE_PARTS.values() for s in stems}
+    sources = {p.stem for p in (REPO_ROOT / "src" / "bindings").glob("*.cpp")}
     built = {m.rsplit(".", 1)[-1].removeprefix("_") for m in MODULES}
-    assert sources == built
-    assert sources == set(_own.binding_modules())
+    assert sources - parts - _own.NON_MODULE_SOURCES == built
+    assert set(_own.binding_modules()) == built
+
+
+_PRIVATE_EXTENSION_REF = re.compile(r"\btesseract_robotics\.(\w+)\._\1\b")
+
+
+def test_stubs_name_public_paths_not_private_extensions():
+    """Cross references read `tesseract_robotics.common.Isometry3d`, never `common._common`.
+
+    A wrapped package star-imports its `_<pkg>` extension, so the public path names the same
+    object; users and type checkers should never see the private module.
+    """
+    offenders = []
+    for stub in sorted((REPO_ROOT / "src" / "tesseract_robotics").rglob("*.pyi")):
+        for lineno, line in enumerate(stub.read_text(encoding="utf-8").splitlines(), 1):
+            if _PRIVATE_EXTENSION_REF.search(line):
+                offenders.append(f"{stub.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
+    assert not offenders, "\n".join(offenders[:20])
+
+
+def test_publish_paths_rewrites_only_wrapped_extension_references():
+    publish_paths = _load("generate_stubs").publish_paths
+    assert (
+        publish_paths("x: tesseract_robotics.common._common.Isometry3d")
+        == "x: tesseract_robotics.common.Isometry3d"
+    )
+    assert publish_paths("import tesseract_robotics.common._common") == (
+        "import tesseract_robotics.common"
+    )
+    unchanged = "tesseract_robotics.collision.ContactResult; tesseract_robotics.common._x.Y"
+    assert publish_paths(unchanged) == unchanged

@@ -155,7 +155,7 @@ def test_jacobian_change_ref_point_matches_calc_jacobian_with_point():
     link = "tool0"
     p_link = np.array([0.05, -0.02, 0.1])
 
-    expected = jg.calcJacobianWithPoint(q, link, p_link)
+    expected = jg.calcJacobian(q, link, p_link)
     J = jg.calcJacobian(q, link)
     p_base = jg.calcFwdKin(q)[link].rotation @ p_link
     tesseract_common.jacobianChangeRefPoint(J, p_base)
@@ -187,14 +187,6 @@ def _joint_group(joint_names):
     scene_state = tesseract_state_solver.KDLStateSolver(scene_graph).getState(_IIWA_STATE_Q)
     jg = tesseract_kinematics.JointGroup("group", joint_names, scene_graph, scene_state)
     return jg, scene_state
-
-
-def test_calc_jacobian_link_point_overload_is_the_alias():
-    jg, _ = _joint_group(_IIWA_JOINTS)
-    nptest.assert_array_equal(
-        jg.calcJacobian(_IIWA_Q, "tool0", _LINK_POINT),
-        jg.calcJacobianWithPoint(_IIWA_Q, "tool0", _LINK_POINT),
-    )
 
 
 def test_calc_jacobian_in_group_base_is_the_plain_jacobian():
@@ -243,7 +235,6 @@ def test_calc_jacobian_active_link_relative_to_itself_is_zero():
     [
         lambda jg, q: jg.calcJacobian(q, "no_such_link"),
         lambda jg, q: jg.calcJacobian(q, "no_such_link", _LINK_POINT),
-        lambda jg, q: jg.calcJacobianWithPoint(q, "no_such_link", _LINK_POINT),
         lambda jg, q: jg.calcJacobian(q, "no_such_link", "tool0"),
         lambda jg, q: jg.calcJacobian(q, "base", "no_such_link"),
         lambda jg, q: jg.calcJacobian(q, "no_such_link", "tool0", _LINK_POINT),
@@ -252,7 +243,6 @@ def test_calc_jacobian_active_link_relative_to_itself_is_zero():
     ids=[
         "link",
         "link_point",
-        "with_point_alias",
         "base_unknown",
         "base_link_unknown",
         "base_unknown_point",
@@ -297,7 +287,6 @@ def test_calc_inv_kin_accepts_a_list():
 
     expected = kg.calcInvKin(opaque, seed)
     _assert_same_solutions(kg.calcInvKin([ik_input], seed), expected)
-    _assert_same_solutions(kg.calcInvKinMultiple([ik_input], seed), expected)
 
 
 def _kinematic_group_from_factory(joint_names=_IIWA_JOINTS):
