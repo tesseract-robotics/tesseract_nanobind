@@ -11,6 +11,7 @@ import clang.cindex as ci
 import pytest
 
 from tests.audit._load import audit, load
+from tests.audit._prov import PROV
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -220,8 +221,7 @@ def test_type_fallbacks_counted(typed_report):
 
 
 def test_report_renders_type_fallbacks(typed_report):
-    prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    text = audit.render_markdown([typed_report], prov, COVERAGE, NO_LEDGER)
+    text = audit.render_markdown([typed_report], PROV, COVERAGE, NO_LEDGER)
     assert (
         "| module | covered | gaps | deviations | accepted | quoted types | type fallbacks |"
         in text
@@ -231,8 +231,7 @@ def test_report_renders_type_fallbacks(typed_report):
 
 
 def test_json_has_type_fallbacks(typed_report):
-    prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov, COVERAGE, NO_LEDGER)
+    assert '"type_fallbacks": 2' in audit.to_json([typed_report], PROV, COVERAGE, NO_LEDGER)
 
 
 def test_path_annotation_covers_a_string_parameter():
@@ -283,8 +282,7 @@ def test_out_param_does_not_count_as_a_python_parameter(typed_report):
 
 
 def test_gap_row_names_the_unreachable_parameters(typed_report):
-    prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    page = audit.render_markdown([typed_report], prov, COVERAGE, NO_LEDGER)
+    page = audit.render_markdown([typed_report], PROV, COVERAGE, NO_LEDGER)
     assert "`b` unreachable" in page
 
 

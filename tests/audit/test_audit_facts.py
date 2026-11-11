@@ -149,6 +149,23 @@ def test_include_facts_equal_the_fresh_extraction_and_a_hit_does_not_parse(cache
     assert WIDGETS in hit.included
 
 
+def test_direct_includes_reach_through_the_headers_beside_the_tu(tmp_path):
+    """A module's TUs share declarations through a header beside them
+    (`trajopt_ifopt_bindings.h`): what that header #includes is the TU's own direct include,
+    or the split TUs would audit none of it and hand the headers to another module."""
+    (tmp_path / "alpha.cpp").write_text('#include "alpha_bindings.h"\n')
+    (tmp_path / "alpha_bindings.h").write_text(f"#pragma once\n#include <{WIDGETS_SPELLING}>\n")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    # A quoted header found through -I, not beside the TU, holds no direct include.
+    (elsewhere / "shared.h").write_text(f"#pragma once\n#include <{WIDGETS_SPELLING}>\n")
+    (tmp_path / "beta.cpp").write_text('#include "shared.h"\n')
+    alpha = audit.parse_tu(tmp_path / "alpha.cpp", (FIXTURE_INCLUDE,))
+    assert WIDGETS in audit.direct_includes(alpha)
+    beta = audit.parse_tu(tmp_path / "beta.cpp", (FIXTURE_INCLUDE, elsewhere))
+    assert audit.direct_includes(beta) == ((elsewhere / "shared.h").resolve(),)
+
+
 def test_api_facts_equal_the_fresh_extraction_in_order_and_a_hit_does_not_parse(cache):
     tu = audit.parse_tu(IDENTITY, (FIXTURE_INCLUDE,))
     headers = frozenset({WIDGETS})

@@ -236,18 +236,32 @@ def inclusions(tu: ci.TranslationUnit) -> tuple[tuple[str, Path], ...]:
 
 
 def direct_includes(tu: ci.TranslationUnit) -> tuple[Path, ...]:
-    """The files the TU's main file `#include`s itself, resolved, in order.
+    """The files the TU's main file `#include`s itself, resolved, in order, and those the
+    headers beside it that it reaches #include (`audit_ownership.binding_local_headers`): a
+    module's TUs share such a header, so its includes are the binding's own.
 
-    Read from the main file's inclusion directives, not `get_includes()` depth: a header
-    that an earlier include already pulled in is reported there only at that depth.
+    Read from the inclusion directives, not `get_includes()` depth: a header that an earlier
+    include already pulled in is reported there only at that depth.
     """
     main = Path(tu.spelling).resolve()
-    return tuple(
-        Path(c.get_included_file().name).resolve()
+    directives = [
+        (Path(c.location.file.name).resolve(), Path(c.get_included_file().name).resolve())
         for c in tu.cursor.get_children()
         if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
-        and Path(c.location.file.name).resolve() == main
-    )
+    ]
+    binding = {main}
+    grown = True
+    while grown:
+        reached = {
+            included
+            for where, included in directives
+            if where in binding
+            and included.parent == main.parent
+            and included.suffix in HEADER_SUFFIXES
+        }
+        grown = not reached <= binding
+        binding |= reached
+    return tuple(included for where, included in directives if where in binding)
 
 
 def audited_headers(
