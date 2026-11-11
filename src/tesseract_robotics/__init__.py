@@ -53,16 +53,18 @@ def _filesystem_path(resource: object) -> Path | None:
 
 
 def _conda_share(relative: str) -> Path | None:
-    """`$CONDA_PREFIX/share/<relative>` (or conda on Windows' `Library/share`), if it exists.
+    """`share/<relative>` of `$TESSERACT_CPP_PREFIX`, else `$CONDA_PREFIX`, if it exists.
 
-    The editable install (pixi dev env) gets its data from the tesseract-robotics conda packages.
+    The editable install (pixi dev env) gets its data from the native stack's install prefix
+    (`pixi run native-build`; the env sets `TESSERACT_CPP_PREFIX`).
     """
-    prefix = os.environ.get("CONDA_PREFIX")
-    if not prefix:
-        return None
-    for share in (Path(prefix) / "share", Path(prefix) / "Library" / "share"):
-        if (share / relative).exists():
-            return share
+    for variable in ("TESSERACT_CPP_PREFIX", "CONDA_PREFIX"):
+        prefix = os.environ.get(variable)
+        if not prefix:
+            continue
+        for share in (Path(prefix) / "share", Path(prefix) / "Library" / "share"):
+            if (share / relative).exists():
+                return share
     return None
 
 

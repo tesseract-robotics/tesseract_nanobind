@@ -166,6 +166,9 @@ class Stack:
             "TESSERACT_CPP_PREFIX": str(self.install),
             "CMAKE_PREFIX_PATH": os.pathsep.join([str(self.install), str(self.vcpkg_prefix)]),
             "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+            # CMakeLists.txt appends it to the extensions' RPATH, so the editable install runs
+            # without a library search path.
+            "TESSERACT_DEV_RPATH": str(self.vcpkg_prefix / "lib"),
             **self.runtime_library_env(),
         }
         if self.host.name == "osx":
