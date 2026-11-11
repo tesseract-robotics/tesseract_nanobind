@@ -905,7 +905,13 @@ def test_bytes_resource_byte_buffer_ctor_accepted(real_reports):
     assert "BytesResource.__init__" not in {g.symbol for g in real_reports["common"].gaps}
 
 
-PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
+PROV = {
+    "tesseract": "4cf644d7",
+    "tesseract_planning": "4e27d94b",
+    "trajopt": "98b85d55",
+    "libclang": "clang version 23",
+    "stubs": "abc1234",
+}
 COVERAGE = audit.Coverage(audited=("fixture",), unaudited={"other": "Not yet audited."}, total=2)
 NO_LEDGER: dict = {}  # these report tests check rendering, not outcomes
 
@@ -1080,3 +1086,26 @@ def test_common_audits_directly_included_acm():
     tu = audit.parse_tu(audit.primary_source("common"))
     headers = audit.audited_headers(tu, "common", audit.owner_prefixes(), audit.INCLUDE_DIRS)
     assert "allowed_collision_matrix.h" in {h.name for h in headers}
+
+
+def test_provenance_pins_the_audited_upstream_sources_from_the_rosinstall(tmp_path):
+    """The report names the C++ it parsed: the rosinstall's commits, shortened like git's %h."""
+    rosinstall = tmp_path / "dependencies.rosinstall"
+    rosinstall.write_text(
+        "- git: {local-name: tesseract, uri: u, version: 4cf644d704bd8961c7cdaf193f72488fa501f5c0}\n"
+        "- git: {local-name: tesseract_planning, uri: u, version: 0.36.0}\n"
+        "- git: {local-name: trajopt, uri: u, version: 98b85d559e9fc7cb60a4dbfeb6d3baa177c94df5}\n"
+        "- git: {local-name: ruckig, uri: u, version: v0.14.0}\n"
+    )
+    assert audit.upstream_pins(rosinstall) == {
+        "tesseract": "4cf644d7",
+        "tesseract_planning": "0.36.0",
+        "trajopt": "98b85d55",
+    }
+
+
+def test_provenance_without_an_audited_pin_raises(tmp_path):
+    rosinstall = tmp_path / "dependencies.rosinstall"
+    rosinstall.write_text("- git: {local-name: tesseract, uri: u, version: abc}\n")
+    with pytest.raises(audit.UpstreamPinError, match="tesseract_planning, trajopt"):
+        audit.upstream_pins(rosinstall)

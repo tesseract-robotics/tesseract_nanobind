@@ -166,6 +166,8 @@ def test_cli_defines_only_main():
 # `_gap_arity` joins this set when #251 lands (0b plan Task 0 table).
 REPORT = {
     "REPORT_PATH", "LIMITATION", "_git", "libclang_version", "provenance", "_table",
+    # provenance: the audited upstream pins
+    "AUDITED_UPSTREAM", "ROSINSTALL", "SHORT_SHA_LEN", "UpstreamPinError", "upstream_pins",
     "render_markdown", "to_json", "_unaudited_patterns", "_where", "_gap_arity",
     # D10 outcome ledger
     "LEDGER_PATH", "ISSUE_REF", "LEDGER_FIELDS", "NO_OUTCOME", "MalformedLedgerError",
