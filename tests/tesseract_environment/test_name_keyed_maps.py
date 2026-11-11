@@ -118,10 +118,24 @@ def test_a_setter_takes_names_and_ids_mixed():
     assert all(type(key) is str for key in state.joints)
 
 
+def _ty_executable() -> str:
+    """ty beside the running interpreter (a venv or pixi env's bin/Scripts), else on PATH.
+
+    CI runs the wheel tests as `<venv>/bin/python -m pytest` without activating the venv, so a
+    ty installed into it is next to the interpreter but not on PATH.
+    """
+    beside = Path(sys.executable).parent
+    for candidate in (beside / "ty", beside / "ty.exe"):
+        if candidate.is_file():
+            return str(candidate)
+    on_path = shutil.which("ty")
+    assert on_path is not None, f"ty is neither beside {sys.executable} nor on PATH"
+    return on_path
+
+
 @pytest.mark.timeout(120)
 def test_typed_reads_type_check_clean():
-    ty = shutil.which("ty")
-    assert ty is not None, "ty is not on PATH; run the tests in the pixi default environment"
+    ty = _ty_executable()
     result = subprocess.run(
         [ty, "check", "--python", sys.prefix, "--output-format", "concise", str(TYPED_MODULE)],
         capture_output=True,
