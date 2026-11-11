@@ -266,40 +266,6 @@ stubs = { cmd = "python scripts/generate_stubs.py", depends-on = [
 ], description = "Regenerate the committed .pyi stubs from the built extension modules" }
 stubs-check = { cmd = "python scripts/generate_stubs.py --check", description = "Fail if any committed .pyi stub differs from the built extension modules" }
 
-# Upstream-main C++ stack from the packaging/ feedstock submodules (dev branches),
-# built with each feedstock's own build-locally.py — the same scripts its CI runs.
-# All builds write to packaging/output, which rattler-build also reads as a channel,
-# so each feedstock links the ones built before it. FEEDSTOCK_CONFIG is the
-# .ci_support config for the host platform (set per target below). Setting
-# OSX_SDK_DIR accepts Apple's macOS SDK licence (conda-smithy downloads the SDK there).
-# CI is defined but empty: conda-forge-ci-setup 4.30.1 reads $CI under `set -u`
-# (GitHub Actions sets it; build-locally.py does not).
-# conda-forge's build setup appends CONDA_BUILD_SYSROOT to .ci_support/<config>.yaml in
-# place (CI checkouts are throwaway); a second local run then fails on a duplicate key,
-# so every build restores .ci_support first.
-# descartes-light has no tesseract dependency and nothing build-relevant past the
-# packaged 0.4.10, so the chain takes it from the channel.
-# tesseract main needs boost_plugin_loader 0.4.5 (PluginLoader::acquireLibraryLifetimeTokens);
-# the channel has 0.4.3.
-build-feedstock-boost-plugin-loader = { cmd = "mkdir -p $PIXI_PROJECT_ROOT/packaging/SDKs && git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/boost-plugin-loader-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, description = "Build the boost-plugin-loader feedstock (dev branch) into packaging/output" }
-build-feedstock-tesseract = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/tesseract-robotics-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
-    "build-feedstock-boost-plugin-loader",
-], description = "Build the tesseract feedstock (dev branch) against the local boost-plugin-loader" }
-build-feedstock-trajopt = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/trajopt-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
-    "build-feedstock-tesseract",
-], description = "Build the trajopt feedstock (dev branch) against the local tesseract" }
-build-feedstock-planning = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/tesseract-robotics-planning-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
-    "build-feedstock-trajopt",
-], description = "Build the tesseract_planning feedstock (dev branch) against the local tesseract + trajopt" }
-# rattler-build indexes packaging/output after every build with a rattler-index
-# >=0.31, whose `repodata_revisions` map pixi 0.70.1 (the pinned CI version) can't
-# parse ("invalid type: map, expected a sequence"). Re-index with 0.30.x, the last
-# format it reads, after the last feedstock build.
-index-feedstock-channel = { cmd = "pixi exec --spec 'rattler-index==0.30.11' rattler-index fs --force packaging/output", description = "Re-index packaging/output in the repodata format pixi 0.70.1 reads" }
-build-feedstock = { cmd = "pixi run index-feedstock-channel", depends-on = [
-    "build-feedstock-planning",
-], description = "Build the upstream-main C++ stack from the packaging/ feedstocks, then index them as a local channel" }
-
 [tool.pixi.target.osx-arm64.tasks]
 # Same as above plus the libomp prefix: Apple clang has no OpenMP of its own.
 native-build = { cmd = "python scripts/native_stack.py all --libomp-prefix $CONDA_PREFIX", description = "Build the native C++ stack into .native/<triplet>, exactly as the wheel workflow does (scripts/native_stack.py); skipped when its inputs are unchanged" }
@@ -308,15 +274,8 @@ install = { cmd = "python scripts/native_stack.py exec --libomp-prefix $CONDA_PR
 ], description = "Install the bindings (editable) and the support data against .native/<triplet>" }
 
 
-[tool.pixi.target.osx-arm64.activation.env]
-FEEDSTOCK_CONFIG = "osx_arm64_"
-
-[tool.pixi.target.linux-64.activation.env]
-FEEDSTOCK_CONFIG = "linux_64_"
-
-
 # The native stack `pixi run native-build` writes: the default, py312 and py315 envs run the
-# bindings built against it (the upstream and packaged envs use their conda prefix instead).
+# bindings built against it (the upstream env uses its conda prefix instead).
 [tool.pixi.feature.native.target.osx-arm64.activation.env]
 TESSERACT_CPP_PREFIX = "$PIXI_PROJECT_ROOT/.native/arm64-osx-dynamic-release/ws/install"
 
@@ -419,8 +378,7 @@ audit-telemetry = { cmd = "python scripts/audit_telemetry_report.py", descriptio
 audit-cache-prune = { cmd = "python scripts/audit_cache_prune.py", description = "Drop the libclang fact-cache entries a run did not use (CI, before saving the cache)" }
 
 # Tooling to build and test the bindings against a 0.36 C++ stack, shared by the
-# upstream (source-built) and packaged (feedstock-built) envs. Built with conda's
-# compilers, as the feedstocks are.
+# upstream env (source-built). Built with conda's compilers.
 [tool.pixi.feature.bindings-dev]
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 
@@ -440,7 +398,7 @@ nanobind = "==2.12.0"  # exact: committed .pyi stubs are stubgen output of this 
 pytest = ">=7.0"
 pytest-xdist = ">=3.0"
 
-# Compilers as in the feedstocks' .ci_support (compiler('c') / compiler('cxx')): these
+# Compilers (compiler('c') / compiler('cxx')): these
 # activation packages export CC/CXX, CXXFLAGS and CMAKE_ARGS, which the
 # c-compiler 2.x metapackage no longer pulls in.
 [tool.pixi.feature.bindings-dev.target.osx-arm64.dependencies]
@@ -463,14 +421,14 @@ pyyaml = "*"
 
 # Inner loop for upstream main: the upstream/ submodules are compiled incrementally
 # (scripts/build_upstream.sh) and installed into this env's prefix, so the env carries
-# only their third-party deps — the union of the feedstock recipes' host sections —
+# only their third-party deps — the union of the stack's third-party libraries —
 # and no tesseract packages.
 [tool.pixi.feature.upstream]
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
 
 [tool.pixi.feature.upstream.dependencies]
-# third-party C++ deps (versions as pinned in the feedstocks' conda_build_config / .ci_support)
+# third-party C++ deps (conda-forge)
 libboost-devel = "1.88.*"
 eigen-abi-devel = "5.0.1.*"
 cereal = "*"
@@ -513,33 +471,9 @@ test-upstream = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q 
     "build-upstream",
 ], description = "Run the test suite against the upstream-main build" }
 
-# The 0.36 dev packages built by the feedstocks' `dev` branches on CI and published
-# to the `dev` label of the tesseract-robotics channel (tesseract_nanobind#224). The
-# label wins over tesseract-robotics `main` (0.35) and conda-forge. For a local
-# feedstock build instead, point this at "./packaging/output" (the ./ prefix makes it
-# a local channel) and run `pixi run index-feedstock-channel` first.
-[tool.pixi.feature.packaged]
-platforms = ["osx-arm64"]
-channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
-
-[tool.pixi.feature.packaged.dependencies]
-tesseract-robotics = "==0.36.0.dev20261103"
-tesseract-robotics-planning = "==0.36.0.dev20261014"
-trajopt = "==0.36.0.dev20261013"
-# header-only, no run_exports, run dep unpinned in the planning recipe: match the
-# taskflow tesseract-robotics-planning was built with (its rendered_recipe.yaml)
-taskflow = "3.11.*"
-
-[tool.pixi.feature.packaged.tasks]
-build-packaged = { cmd = "pip install -e . --no-build-isolation", env = { SKBUILD_BUILD_DIR = "build/packaged-{wheel_tag}" }, description = "Build the bindings against the packaged 0.36 dev stack" }
-test-packaged = { cmd = "python -m pytest tests --ignore=tests/benchmarks -q -n auto", depends-on = [
-    "build-packaged",
-], description = "Run the test suite against the packaged 0.36 dev stack" }
-
 [tool.pixi.environments]
 default = { features = ["profile", "viewer", "native"], solve-group = "default" }
 upstream = { features = ["bindings-dev", "upstream", "viewer"], no-default-feature = true, solve-group = "upstream" }
-packaged = { features = ["bindings-dev", "packaged", "viewer"], no-default-feature = true, solve-group = "packaged" }
 py312 = { features = ["py312", "viewer", "native"], solve-group = "py312" }
 py315 = { features = ["py315", "native"], solve-group = "py315" }
 wheel-312 = { features = ["wheel-test", "wheel-py312"], no-default-feature = true, solve-group = "wheel-312" }

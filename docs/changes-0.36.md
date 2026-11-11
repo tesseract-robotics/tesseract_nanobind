@@ -19,10 +19,8 @@
 
 !!! warning "Unreleased"
     This page tracks the `upstream-main` branch (issue #141, PR #161), which builds
-    against the 0.36 dev packages on the `tesseract-robotics/label/dev` channel:
-    `tesseract-robotics` `0.36.0.dev20261103`, `trajopt` `0.36.0.dev20261013` and
-    `tesseract-robotics-planning` `0.36.0.dev20261014`, built from tesseract `2b79e91`,
-    trajopt `a504b22` and tesseract_planning `a648382` ahead of the 0.36 release.
+    against tesseract, trajopt and tesseract_planning `master` ahead of the 0.36 release
+    (the commits in `dependencies.rosinstall`, built by `scripts/native_stack.py`).
     Released wheels (0.35.0.x) still expose the 0.35 API.
 
 Each section below names what was removed or renamed and shows the 0.35 call next to
