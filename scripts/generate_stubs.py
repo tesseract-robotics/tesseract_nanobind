@@ -6,9 +6,10 @@ module cannot be left without a stub. Each stub is rendered by
 depends on what is imported, and a shared process would make one module's
 stub depend on the modules rendered before it. Its id parameters are then
 widened to the implicit `str` / `tuple` conversions (`widen_implicit_id_stubs.py`),
-which stubgen does not record, and cross references to a wrapped package's private
+which stubgen does not record, cross references to a wrapped package's private
 extension (`tesseract_robotics.common._common.Isometry3d`) are rewritten to the
-public path (`tesseract_robotics.common.Isometry3d`).
+public path (`tesseract_robotics.common.Isometry3d`), and nanobind's
+`scipy.sparse.csr_matrix[float]` loses its subscript (not a valid type expression).
 
 Usage:
     pixi run stubs         # rewrite the committed stubs
@@ -63,6 +64,18 @@ def publish_paths(stub: str) -> str:
     return _PRIVATE_EXTENSION_PATH.sub(r"tesseract_robotics.\1", stub)
 
 
+# nanobind's Eigen sparse caster names its Python type `scipy.sparse.csr_matrix[<scalar>]`
+# (csc_matrix for column-major). scipy's csr_matrix is not a Generic class to a type checker
+# (and scipy-stubs bounds the parameter to numpy scalar types, not `float`), so the subscript
+# is an invalid type expression; the bare class is the exact static type.
+_SPARSE_SUBSCRIPT = re.compile(r"\b(scipy\.sparse\.cs[rc]_matrix)\[[^\]]*\]")
+
+
+def unparameterize_sparse(stub: str) -> str:
+    """Drop the scalar subscript from `scipy.sparse.csr_matrix[...]` / `csc_matrix[...]`."""
+    return _SPARSE_SUBSCRIPT.sub(r"\1", stub)
+
+
 class StubRenderError(RuntimeError):
     """nanobind.stubgen failed for a module."""
 
@@ -106,7 +119,7 @@ def render(module: str) -> str:
     )
     if proc.returncode != 0:
         raise StubRenderError(f"stubgen failed for {module}:\n{proc.stderr}")
-    return publish_paths(widen(proc.stdout))
+    return unparameterize_sparse(publish_paths(widen(proc.stdout)))
 
 
 def render_all(modules: list[str]) -> dict[str, str]:

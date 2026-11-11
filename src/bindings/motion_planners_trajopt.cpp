@@ -228,8 +228,8 @@ NB_MODULE(motion_planners_trajopt, m) {
         .def_rw("polish_refine_iter", &OSQPSettings::polish_refine_iter);
     // Free operator== in tesseract::motion_planners (trajopt_osqp_solver_profile.h)
     osqp_settings
-        .def("__eq__", [](const OSQPSettings& a, const OSQPSettings& b) { return tp::operator==(a, b); }, nb::is_operator())
-        .def("__ne__", [](const OSQPSettings& a, const OSQPSettings& b) { return !tp::operator==(a, b); }, nb::is_operator());
+        .def("__eq__", [](const OSQPSettings& a, const OSQPSettings& b) { return tp::operator==(a, b); }, TNB_EQ_ATTRS)
+        .def("__ne__", [](const OSQPSettings& a, const OSQPSettings& b) { return !tp::operator==(a, b); }, TNB_NE_ATTRS);
     osqp_settings.attr("__hash__") = nb::none();
 
     // ========== TrajOptOSQPSolverProfile ==========

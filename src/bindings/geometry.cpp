@@ -113,7 +113,7 @@ Class bind_mesh_ctors(Class cls, const char* name, TailArgs... tail_args) {
             nb::arg("mesh_textures").none() = nb::none(), tail_args...);
     // The class's own operator== (Geometry's compares only type and UUID): polygon_mesh.cpp:111,
     // mesh.cpp:106, convex_mesh.cpp:80 (adds the creation method) @ 0.35.0.
-    cls.def("__eq__", &T::operator==).def("__ne__", &T::operator!=);
+    cls.def("__eq__", &T::operator==, TNB_EQ_ATTRS).def("__ne__", &T::operator!=, TNB_NE_ATTRS);
     return cls;
 }
 
@@ -283,8 +283,8 @@ NB_MODULE(geometry, m) {
                      throw std::invalid_argument("Geometry.setUUID: not a UUID string: '" + s + "'");
                  }
              }, "uuid"_a, "Set the UUID from its canonical string; a malformed string raises ValueError")
-        .def("__eq__", &tg::Geometry::operator==)
-        .def("__ne__", &tg::Geometry::operator!=);
+        .def("__eq__", &tg::Geometry::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Geometry::operator!=, TNB_NE_ATTRS);
 
     // GeometriesConst - vector of const geometry shared_ptr
     using GeometriesConst = std::vector<std::shared_ptr<const tg::Geometry>>;
@@ -308,8 +308,8 @@ NB_MODULE(geometry, m) {
         .def("getX", &tg::Box::getX, "Get X dimension")
         .def("getY", &tg::Box::getY, "Get Y dimension")
         .def("getZ", &tg::Box::getZ, "Get Z dimension")
-        .def("__eq__", &tg::Box::operator==)
-        .def("__ne__", &tg::Box::operator!=)
+        .def("__eq__", &tg::Box::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Box::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tg::Box& self) {
             return "Box(" + std::to_string(self.getX()) + ", " +
                    std::to_string(self.getY()) + ", " +
@@ -321,8 +321,8 @@ NB_MODULE(geometry, m) {
         .def(nb::init<double>(), "r"_a, "Create a sphere with radius r")
         .def(nb::init<>(), "Create a default sphere")
         .def("getRadius", &tg::Sphere::getRadius, "Get the radius")
-        .def("__eq__", &tg::Sphere::operator==)
-        .def("__ne__", &tg::Sphere::operator!=)
+        .def("__eq__", &tg::Sphere::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Sphere::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tg::Sphere& self) {
             return "Sphere(" + std::to_string(self.getRadius()) + ")";
         });
@@ -334,8 +334,8 @@ NB_MODULE(geometry, m) {
         .def(nb::init<>(), "Create a default cylinder")
         .def("getRadius", &tg::Cylinder::getRadius, "Get the radius")
         .def("getLength", &tg::Cylinder::getLength, "Get the length")
-        .def("__eq__", &tg::Cylinder::operator==)
-        .def("__ne__", &tg::Cylinder::operator!=)
+        .def("__eq__", &tg::Cylinder::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Cylinder::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tg::Cylinder& self) {
             return "Cylinder(r=" + std::to_string(self.getRadius()) +
                    ", l=" + std::to_string(self.getLength()) + ")";
@@ -348,8 +348,8 @@ NB_MODULE(geometry, m) {
         .def(nb::init<>(), "Create a default capsule")
         .def("getRadius", &tg::Capsule::getRadius, "Get the radius")
         .def("getLength", &tg::Capsule::getLength, "Get the length")
-        .def("__eq__", &tg::Capsule::operator==)
-        .def("__ne__", &tg::Capsule::operator!=)
+        .def("__eq__", &tg::Capsule::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Capsule::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tg::Capsule& self) {
             return "Capsule(r=" + std::to_string(self.getRadius()) +
                    ", l=" + std::to_string(self.getLength()) + ")";
@@ -362,8 +362,8 @@ NB_MODULE(geometry, m) {
         .def(nb::init<>(), "Create a default cone")
         .def("getRadius", &tg::Cone::getRadius, "Get the radius")
         .def("getLength", &tg::Cone::getLength, "Get the length")
-        .def("__eq__", &tg::Cone::operator==)
-        .def("__ne__", &tg::Cone::operator!=)
+        .def("__eq__", &tg::Cone::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Cone::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tg::Cone& self) {
             return "Cone(r=" + std::to_string(self.getRadius()) +
                    ", l=" + std::to_string(self.getLength()) + ")";
@@ -378,8 +378,8 @@ NB_MODULE(geometry, m) {
         .def("getB", &tg::Plane::getB, "Get coefficient b")
         .def("getC", &tg::Plane::getC, "Get coefficient c")
         .def("getD", &tg::Plane::getD, "Get coefficient d")
-        .def("__eq__", &tg::Plane::operator==)
-        .def("__ne__", &tg::Plane::operator!=)
+        .def("__eq__", &tg::Plane::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Plane::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tg::Plane& self) {
             return "Plane(" + std::to_string(self.getA()) + ", " +
                    std::to_string(self.getB()) + ", " +
@@ -508,8 +508,8 @@ NB_MODULE(geometry, m) {
              "Materialize the dense sample grid from the sampler (idempotent, no-op if already discretized).\n"
              "A function-backed field must be discretized before it can be serialized or compared; that\n"
              "happens automatically at those boundaries, so call this only to pin the snapshot up front.")
-        .def("__eq__", &tg::SignedDistanceField::operator==)
-        .def("__ne__", &tg::SignedDistanceField::operator!=)
+        .def("__eq__", &tg::SignedDistanceField::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::SignedDistanceField::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tg::SignedDistanceField& self) {
             const Eigen::Vector3i& d = self.getDimensions();
             return "SignedDistanceField(dimensions=[" + std::to_string(d.x()) + ", " + std::to_string(d.y()) +
@@ -527,8 +527,8 @@ NB_MODULE(geometry, m) {
         .def("getResource", &tg::CompoundMesh::getResource, "Get the resource used to create this mesh")
         .def("getScale", &tg::CompoundMesh::getScale, "Get the scale applied to the mesh")
         // #247: compares every mesh; the inherited Geometry.__eq__ compares type and UUID only
-        .def("__eq__", &tg::CompoundMesh::operator==)
-        .def("__ne__", &tg::CompoundMesh::operator!=);
+        .def("__eq__", &tg::CompoundMesh::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::CompoundMesh::operator!=, TNB_NE_ATTRS);
 
     // octomap::OcTree - minimal binding so callers can construct/load and
     // pass it to tesseract::geometry::Octree
@@ -589,8 +589,8 @@ NB_MODULE(geometry, m) {
         .def("getPruned", &tg::Octree::getPruned, "Whether the octree was pruned")
         .def("calcNumSubShapes", &tg::Octree::calcNumSubShapes,
              "Calculate the number of sub-shapes (expensive)")
-        .def("__eq__", &tg::Octree::operator==)
-        .def("__ne__", &tg::Octree::operator!=)
+        .def("__eq__", &tg::Octree::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tg::Octree::operator!=, TNB_NE_ATTRS)
         .def_static("prune", &tg::Octree::prune, "octree"_a,
                     "Prune the octomap OcTree using tesseract's occupancy-threshold rule");
 

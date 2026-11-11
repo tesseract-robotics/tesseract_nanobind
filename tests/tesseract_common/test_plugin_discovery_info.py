@@ -44,3 +44,24 @@ def test_plugin_infos_derive_from_it():
         ProfilesPluginInfo,
     ):
         assert issubclass(cls, PluginDiscoveryInfo)
+
+
+def test_derived_insert_accepts_the_base():
+    # A *PluginInfo is a PluginDiscoveryInfo, so its insert takes one too (the inherited
+    # PluginDiscoveryInfo::insert: search paths and libraries only), as well as its own type.
+    base = PluginDiscoveryInfo()
+    base.search_paths = ["/base"]
+    base.search_libraries = ["lib_base"]
+    for cls in (
+        KinematicsPluginInfo,
+        ContactManagersPluginInfo,
+        TaskComposerPluginInfo,
+        ProfilesPluginInfo,
+    ):
+        info = cls()
+        info.insert(base)
+        assert info.search_paths == ["/base"], cls.__name__
+        assert info.search_libraries == ["lib_base"], cls.__name__
+        same = cls()
+        same.insert(info)
+        assert same == info, cls.__name__

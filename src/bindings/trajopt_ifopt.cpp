@@ -379,6 +379,14 @@ NB_MODULE(_trajopt_ifopt, m) {
               return ti::calcForwardNumJac(checked, x, epsilon);
           },
           "f"_a, "x"_a, "epsilon"_a,
+          // stubgen types f's argument with the caster's input name (array | Sequence[float]),
+          // but f is handed a read-only float64 array. An argument type is contravariant, so
+          // the wider annotation would reject every f written for an array.
+          nb::sig("def calcForwardNumJac("
+                  "f: collections.abc.Callable[[Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]], "
+                  "Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]], "
+                  "x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], "
+                  "epsilon: float) -> scipy.sparse.csr_matrix"),
           "Forward-difference Jacobian of f at x (sparse matrix, len(f(x)) x len(x)); raises "
           "NumericalJacobianSizeError if f's output length changes");
 

@@ -656,10 +656,10 @@ NB_MODULE(trajopt_sqp, m) {
     piqp_settings
         .def("__eq__", [](const piqp::Settings<double>& a, const piqp::Settings<double>& b) {
             return tesseract::motion_planners::operator==(a, b);
-        }, nb::is_operator())
+        }, TNB_EQ_ATTRS)
         .def("__ne__", [](const piqp::Settings<double>& a, const piqp::Settings<double>& b) {
             return !tesseract::motion_planners::operator==(a, b);
-        }, nb::is_operator());
+        }, TNB_NE_ATTRS);
     piqp_settings.attr("__hash__") = nb::none();  // mutable value type, as bind_value_equality
 
     nb::class_<tsqp::PIQPSolver, tsqp::QPSolver>(m, "PIQPSolver", "PIQP-based (interior point) QP solver")

@@ -123,7 +123,7 @@ class Differentiable(Component):
         SUM_TO_SCALAR = 1
         """All values summed into one row"""
 
-    def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
+    def getJacobian(self) -> scipy.sparse.csr_matrix:
         """
         Get the Jacobian (sparse matrix); a constraint set must be linked to variables first
         """
@@ -155,7 +155,7 @@ class ConstraintSet(Differentiable):
         Get the linked optimization variables (protected in C++, exposed via trampoline)
         """
 
-    def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
+    def getJacobian(self) -> scipy.sparse.csr_matrix:
         """Get the constraint Jacobian (sparse matrix)"""
 
     def update(self) -> int:
@@ -287,12 +287,12 @@ def calcBoundsErrors(input: Annotated[NDArray[numpy.float64], dict(shape=(None,)
 def calcBoundsViolations(input: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], bounds: Sequence[Bounds]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
     """Bound violation per entry: the magnitude of calcBoundsErrors"""
 
-def calcNumericalConstraintGradient(variables: Variables, constraint_set: ConstraintSet, epsilon: float = 1e-08) -> scipy.sparse.csr_matrix[float]:
+def calcNumericalConstraintGradient(variables: Variables, constraint_set: ConstraintSet, epsilon: float = 1e-08) -> scipy.sparse.csr_matrix:
     """
     Forward-difference Jacobian of constraint_set's values over variables (sparse matrix). Perturbs each variable in turn through variables.setVariables, calling update() and getValues(), and restores the variables afterwards.
     """
 
-def calcForwardNumJac(f: Callable[[Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]], Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]], x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], epsilon: float) -> scipy.sparse.csr_matrix[float]:
+def calcForwardNumJac(f: Callable[[Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]], Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]], x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], epsilon: float) -> scipy.sparse.csr_matrix:
     """
     Forward-difference Jacobian of f at x (sparse matrix, len(f(x)) x len(x)); raises NumericalJacobianSizeError if f's output length changes
     """
@@ -319,7 +319,7 @@ class CartPosConstraint(ConstraintSet):
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Calculate error values for given joint values"""
 
-    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix:
         """
         The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
         """
@@ -392,9 +392,9 @@ class CollisionCoeffData:
     @overload
     def __init__(self, default_collision_coeff: float) -> None: ...
 
-    def __eq__(self, arg: CollisionCoeffData, /) -> bool: ...
+    def __eq__(self, other: object, /) -> bool: ...
 
-    def __ne__(self, arg: CollisionCoeffData, /) -> bool: ...
+    def __ne__(self, other: object, /) -> bool: ...
 
     __hash__: None = None
 
@@ -428,9 +428,9 @@ class TrajOptCollisionConfig:
     @overload
     def __init__(self, margin: float, coeff: float, request: tesseract_robotics.collision.ContactRequest = ..., type: tesseract_robotics.collision.CollisionEvaluatorType = tesseract_robotics.collision.CollisionEvaluatorType.DISCRETE, longest_valid_segment_length: float = 0.005, check_program_mode: tesseract_robotics.collision.CollisionCheckProgramType = tesseract_robotics.collision.CollisionCheckProgramType.ALL) -> None: ...
 
-    def __eq__(self, arg: TrajOptCollisionConfig, /) -> bool: ...
+    def __eq__(self, other: object, /) -> bool: ...
 
-    def __ne__(self, arg: TrajOptCollisionConfig, /) -> bool: ...
+    def __ne__(self, other: object, /) -> bool: ...
 
     __hash__: None = None
 
@@ -752,7 +752,7 @@ class DiscreteCollisionNumericalConstraint(ConstraintSet):
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
 
-    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix:
         """
         The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables and an update() since the last variable change
         """
@@ -858,10 +858,10 @@ class CartLineConstraint(ConstraintSet):
     def getInfo(self) -> CartLineInfo:
         """The constraint's CartLineInfo"""
 
-    def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
+    def getJacobian(self) -> scipy.sparse.csr_matrix:
         """Get the constraint Jacobian (sparse matrix), one row per index"""
 
-    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix:
         """
         The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
         """
@@ -933,7 +933,7 @@ class CartAxisConeConstraint(ConstraintSet):
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """The angle phi between the axes for the given joint values"""
 
-    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix:
         """
         The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
         """
@@ -963,7 +963,7 @@ class CartAxisAlignConstraint(ConstraintSet):
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """The two tilt rows for the given joint values"""
 
-    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix:
         """
         The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
         """
@@ -1028,7 +1028,7 @@ class InverseKinematicsConstraint(ConstraintSet):
     def setBounds(self, bounds: Sequence[Bounds]) -> None:
         """Set the bounds, one per row; raises BoundsSizeError otherwise"""
 
-    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix:
         """
         The constraint Jacobian at joint_vals, the constraint var's values (sparse matrix, sized like getJacobian()); needs linked variables
         """

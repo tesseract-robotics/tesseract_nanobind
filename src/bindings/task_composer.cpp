@@ -687,10 +687,10 @@ NB_MODULE(task_composer, m) {
     node_info_container
         .def("__eq__", [](const tp::TaskComposerNodeInfoContainer& self, const tp::TaskComposerNodeInfoContainer& other) {
             return &self == &other || self == other;
-        }, nb::is_operator())
+        }, TNB_EQ_ATTRS)
         .def("__ne__", [](const tp::TaskComposerNodeInfoContainer& self, const tp::TaskComposerNodeInfoContainer& other) {
             return !(&self == &other || self == other);
-        }, nb::is_operator());
+        }, TNB_NE_ATTRS);
     node_info_container.attr("__hash__") = nb::none();
 
     // ========== TaskComposerContext ==========
@@ -1065,10 +1065,10 @@ NB_MODULE(task_composer, m) {
         .def_rw("initial_data", &tp::TaskComposerLog::initial_data)
         .def_rw("context", &tp::TaskComposerLog::context, nb::for_setter(nb::arg("value").none()))
         .def_rw("dotgraph", &tp::TaskComposerLog::dotgraph)
-        .def("__eq__", log_equal, nb::is_operator())
+        .def("__eq__", log_equal, TNB_EQ_ATTRS)
         .def("__ne__", [log_equal](const tp::TaskComposerLog& a, const tp::TaskComposerLog& b) {
             return !log_equal(a, b);
-        }, nb::is_operator());
+        }, TNB_NE_ATTRS);
     log.attr("__hash__") = nb::none();
 
     bind_anypoly(m);  // task_composer_anypoly.cpp

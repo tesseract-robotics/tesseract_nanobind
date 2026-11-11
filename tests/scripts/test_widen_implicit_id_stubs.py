@@ -44,22 +44,24 @@ def test_annotated_parentheses_do_not_end_the_parameter_list():
     )
 
 
-def test_id_classes_keep_their_own_signatures_and_widening_resumes_after():
+def test_id_classes_widen_their_own_parameters():
+    # str -> LinkId and tuple -> LinkIdPair convert implicitly in the id classes' own methods
+    # too: LinkIdPair("a", "b"), LinkId("a") < "b". Their __eq__ / __ne__ take `object`.
     stub = (
+        "class LinkIdPair:\n"
+        "    def __init__(self, link_id1: LinkId, link_id2: LinkId) -> None: ...\n"
+        "    def __init__(self, pair: tuple[LinkId, LinkId]) -> None: ...\n"
+        "    def __eq__(self, other: object, /) -> bool: ...\n"
         "class LinkId:\n"
-        "    def __eq__(self, arg: LinkId, /) -> bool: ...\n"
-        "\n"
-        "def top(a: LinkId) -> None: ...\n"
-        "class Link:\n"
-        "    def __init__(self, id: LinkId) -> None: ...\n"
+        "    def __lt__(self, arg: LinkId, /) -> bool: ...\n"
     )
     assert widen(stub) == (
+        "class LinkIdPair:\n"
+        "    def __init__(self, link_id1: LinkId | str, link_id2: LinkId | str) -> None: ...\n"
+        "    def __init__(self, pair: tuple[LinkId | str, LinkId | str]) -> None: ...\n"
+        "    def __eq__(self, other: object, /) -> bool: ...\n"
         "class LinkId:\n"
-        "    def __eq__(self, arg: LinkId, /) -> bool: ...\n"
-        "\n"
-        "def top(a: LinkId | str) -> None: ...\n"
-        "class Link:\n"
-        "    def __init__(self, id: LinkId | str) -> None: ...\n"
+        "    def __lt__(self, arg: LinkId | str, /) -> bool: ...\n"
     )
 
 

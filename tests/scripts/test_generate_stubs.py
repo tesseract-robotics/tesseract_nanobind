@@ -212,3 +212,22 @@ def test_publish_paths_rewrites_only_wrapped_extension_references():
     )
     unchanged = "tesseract_robotics.collision.ContactResult; tesseract_robotics.common._x.Y"
     assert publish_paths(unchanged) == unchanged
+
+
+def test_sparse_matrix_annotations_are_unparameterized():
+    """nanobind names an Eigen sparse matrix `scipy.sparse.csr_matrix[float]`; scipy's
+    csr_matrix is not generic to a type checker, so the stub names the bare class."""
+    strip = _load("generate_stubs").unparameterize_sparse
+    assert strip("-> scipy.sparse.csr_matrix[float]:") == "-> scipy.sparse.csr_matrix:"
+    assert strip("(a: scipy.sparse.csc_matrix[int], b: list[float])") == (
+        "(a: scipy.sparse.csc_matrix, b: list[float])"
+    )
+
+
+def test_stubs_have_no_parameterized_sparse_matrix():
+    offenders = [
+        str(stub.relative_to(REPO_ROOT))
+        for stub in sorted((REPO_ROOT / "src" / "tesseract_robotics").rglob("*.pyi"))
+        if re.search(r"scipy\.sparse\.cs[rc]_matrix\[", stub.read_text(encoding="utf-8"))
+    ]
+    assert not offenders, offenders

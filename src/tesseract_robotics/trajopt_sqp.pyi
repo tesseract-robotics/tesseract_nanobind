@@ -86,9 +86,9 @@ class SQPParameters:
 
     def __init__(self) -> None: ...
 
-    def __eq__(self, arg: SQPParameters, /) -> bool: ...
+    def __eq__(self, other: object, /) -> bool: ...
 
-    def __ne__(self, arg: SQPParameters, /) -> bool: ...
+    def __ne__(self, other: object, /) -> bool: ...
 
     __hash__: None = None
 
@@ -450,7 +450,7 @@ class QPSolver:
     def getSolverStatus(self) -> QPSolverStatus:
         """Get solver status"""
 
-    def updateHessianMatrix(self, hessian: scipy.sparse.csr_matrix[float]) -> bool:
+    def updateHessianMatrix(self, hessian: scipy.sparse.csr_matrix) -> bool:
         """
         Set the Hessian H (sparse, num_vars square) of the objective x'Hx + g'x
         """
@@ -467,7 +467,7 @@ class QPSolver:
     def updateBounds(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool:
         """Set both constraint bounds (num_cnts each)"""
 
-    def updateLinearConstraintsMatrix(self, linear_constraints_matrix: scipy.sparse.csr_matrix[float]) -> bool:
+    def updateLinearConstraintsMatrix(self, linear_constraints_matrix: scipy.sparse.csr_matrix) -> bool:
         """Set the constraint matrix A (sparse, num_cnts x num_vars)"""
 
     def setWarmStart(self, qp_problem: QPProblem) -> bool:
@@ -652,7 +652,7 @@ class QPProblem:
     def getConstraintMeritCoeff(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get the constraint merit coefficients, one per constraint set"""
 
-    def getHessian(self) -> scipy.sparse.csr_matrix[float]:
+    def getHessian(self) -> scipy.sparse.csr_matrix:
         """
         The QP Hessian (sparse, getNumQPVars() square), from the last convexify()
         """
@@ -660,7 +660,7 @@ class QPProblem:
     def getGradient(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """The QP gradient (getNumQPVars()), from the last convexify()"""
 
-    def getConstraintMatrix(self) -> scipy.sparse.csr_matrix[float]:
+    def getConstraintMatrix(self) -> scipy.sparse.csr_matrix:
         """
         The QP constraint matrix (sparse, getNumQPConstraints() x getNumQPVars()), from the last convexify()
         """
@@ -954,9 +954,9 @@ class PIQPSettings:
     @compute_timings.setter
     def compute_timings(self, arg: bool, /) -> None: ...
 
-    def __eq__(self, arg: PIQPSettings, /) -> bool: ...
+    def __eq__(self, other: object, /) -> bool: ...
 
-    def __ne__(self, arg: PIQPSettings, /) -> bool: ...
+    def __ne__(self, other: object, /) -> bool: ...
 
     __hash__: None = None
 
