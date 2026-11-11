@@ -27,8 +27,7 @@ Related Examples:
 - lowlevel/scene_graph_c_api_example.py - direct command API
 - geometry_showcase_example.py - creating geometry for links
 
-Building a Scene Graph (low-level section)
-------------------------------------------
+**Building a Scene Graph (low-level section)**
 `build_scene_graph()` builds upstream's five-link test graph directly with
 `SceneGraph`, `Link` and `Joint`, without an `Environment`, and queries it.
 

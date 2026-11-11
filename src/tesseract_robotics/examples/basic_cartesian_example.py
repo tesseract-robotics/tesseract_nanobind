@@ -66,6 +66,7 @@ from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.collision import CollisionEvaluatorType
 from tesseract_robotics.command_language import ProfileDictionary
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.geometry import Octree, OctreeSubType, PointCloud, createOctree
 from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
@@ -95,9 +96,9 @@ OCTREE_ORIGIN = (1.0, 0.0, 0.0)
 def add_point_cloud_octree(robot):
     """Attach the C++ example's octomap, built from point-cloud data, as `octomap_attached`.
 
-    Mirrors ``addPointCloud()`` in basic_cartesian_example.cpp: a 20 x 20 x 20 grid of points at
+    Mirrors `addPointCloud()` in basic_cartesian_example.cpp: a 20 x 20 x 20 grid of points at
     0.05 m pitch spanning [-0.5, 0.45] m, ``createOctree(cloud, 2 * pitch, prune=False,
-    binary=True)``, BOX sub-shapes, on ``base_link`` at (1.0, 0, 0). Every 0.1 m voxel holds points,
+    binary=True)`, BOX sub-shapes, on `base_link`` at (1.0, 0, 0). Every 0.1 m voxel holds points,
     so the octree is a solid 1 m cube of 1000 boxes — the collision load of a scanned part, with no
     gaps to route through. Swap the grid for a scanner's points and the rest is unchanged.
     """
@@ -116,9 +117,9 @@ def add_point_cloud_octree(robot):
 
 
 def _discrete_collision_config(margin, coeff):
-    """``trajopt_common::TrajOptCollisionConfig(margin, coeff)``, enabled, checked LVS-discrete.
+    """`trajopt_common::TrajOptCollisionConfig(margin, coeff)`, enabled, checked LVS-discrete.
 
-    The nested ``collision_check_config`` is configured and assigned back whole, so the write
+    The nested `collision_check_config` is configured and assigned back whole, so the write
     does not depend on whether the binding's getter returns a reference or a copy.
     """
     config = TrajOptCollisionConfig(margin, coeff)
@@ -236,7 +237,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
         composer = TaskComposer.from_config()
     result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
 
-    assert result.successful, f"Planning failed: {result.message}"
+    require_success(result, "basic Cartesian")
     print(f"Planning successful! Trajectory: {len(result)} waypoints")
 
     return {"result": result, "robot": robot, "joint_names": joint_names}

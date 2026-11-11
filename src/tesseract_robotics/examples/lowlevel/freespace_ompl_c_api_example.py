@@ -34,6 +34,7 @@ from tesseract_robotics.command_language import (
     StateWaypointPoly,
 )
 from tesseract_robotics.common import Isometry3d, ManipulatorInfo, Translation3d
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.examples.lowlevel.example_support import (
     add_fixed_link,
     load_support_environment,
@@ -104,7 +105,7 @@ def run():
 
     print("Running OMPLPipeline...")
     result = run_pipeline(env, program, profiles, "OMPLPipeline")
-    assert result.successful, f"Planning failed: {result.message}"
+    require_success(result, "freespace")
     print(f"Planning successful! {len(result)} waypoints")
 
     return {"result": result, "env": env, "joint_names": JOINT_NAMES}

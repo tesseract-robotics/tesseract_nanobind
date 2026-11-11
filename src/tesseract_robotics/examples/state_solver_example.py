@@ -1,6 +1,5 @@
 """
 State Solver Example
-====================
 
 Turns the IIWA's first joint into a floating joint, drives the state solver
 through every native `setState` / `getState` / `getJacobian` /
@@ -12,8 +11,7 @@ C++ Reference:
     state_solver/test/state_solver_test_suite.h  (runSetFloatingJointStateTest :766-820,
         runAddSceneGraphTest :1120-1215, getSubSceneGraph :28-57, runCompareStateSolver)
 
-Overview
---------
+**Overview**
 1. `OFKTStateSolver.replaceJoint` makes `joint_a1` FLOATING at x = 1.25, then the
    floating value moves to y = 1.5 and z = 1.5, as upstream.
 2. Every native overload of `setState`, `getState`, `getJacobian` and
@@ -21,8 +19,7 @@ Overview
 3. `insertSceneGraph` attaches upstream's two-link sub-graph through a FIXED
    joint, then again with the prefix `prefix_` through a FLOATING joint.
 
-Key Concepts
-------------
+**Key Concepts**
 **Floating joints**:
     A FLOATING joint has no joint value; its pose relative to the parent is set
     directly as an `Isometry3d` through `floating_joint_values`. It is not an

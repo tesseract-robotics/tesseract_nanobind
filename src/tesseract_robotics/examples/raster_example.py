@@ -6,15 +6,13 @@ manufacturing processes like welding, painting, milling, and surface
 treatment. The robot executes multiple linear passes (raster strokes)
 with freespace transitions between them.
 
-PIPELINE OVERVIEW
------------------
+**PIPELINE OVERVIEW**
 1. LOAD ROBOT: ABB IRB2400 6-DOF industrial robot
 2. DEFINE WAYPOINTS: Linear raster path along Y-axis at constant X,Z
 3. BUILD PROGRAM: Multiple raster segments with approach/transition/retract
 4. PLAN: TrajOpt optimizes collision-free trajectory
 
-KEY CONCEPTS DEMONSTRATED
--------------------------
+**KEY CONCEPTS DEMONSTRATED**
 1. Raster Pattern Structure:
    - Raster segment: linear moves through Cartesian waypoints (process path)
    - Transition: freespace move between raster segments (no process)
@@ -34,8 +32,7 @@ KEY CONCEPTS DEMONSTRATED
    - Z = 0.8m (constant height)
    - Y varies from -0.3m to +0.3m (7 waypoints, 0.1m spacing)
 
-ROBOT CONFIGURATION (from C++)
-------------------------------
+**ROBOT CONFIGURATION (from C++)**
 ABB IRB2400:
 - 6-DOF industrial manipulator
 - Home position: all joints at zero
@@ -45,8 +42,7 @@ ABB IRB2400:
 The C++ example uses OPWInvKin for analytical inverse kinematics
 (specific to ABB robot geometry).
 
-PLANNING APPROACH
------------------
+**PLANNING APPROACH**
 The C++ example uses a two-stage planning approach:
 1. Descartes: samples valid IK solutions along Cartesian path
 2. TrajOpt: optimizes trajectory using Descartes solution as seed
@@ -55,21 +51,18 @@ This Python example uses TrajOpt directly for simplicity. For the
 full Descartes+TrajOpt pipeline, see chain_example.py which uses
 CartesianPipeline with create_cartesian_pipeline_profiles().
 
-C++ SOURCE
-----------
+**C++ SOURCE**
 tesseract_planning/tesseract_motion_planners/examples/raster_example.cpp
 Author: Levi Armstrong, Southwest Research Institute, August 2020
 
-USE CASES
----------
+**USE CASES**
 - Welding seams (linear weld paths with travel moves between)
 - Spray painting (parallel strokes covering surface area)
 - Surface milling (raster cuts for material removal)
 - Grinding/polishing (overlapping passes for surface finish)
 - Laser processing (engraving, cutting, ablation)
 
-RELATED EXAMPLES
-----------------
+**RELATED EXAMPLES**
 - basic_cartesian_example.py: single Cartesian path
 - puzzle_piece_auxillary_axes_example.py: complex surface following
 - glass_upright_example.py: orientation-constrained motion
@@ -83,6 +76,7 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -190,7 +184,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     profiles = create_trajopt_default_profiles()
     result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
 
-    assert result.successful, f"Planning failed: {result.message}"
+    require_success(result, "raster")
     print(f"Planning successful! {len(result)} waypoints")
     # --8<-- [end:plan]
 

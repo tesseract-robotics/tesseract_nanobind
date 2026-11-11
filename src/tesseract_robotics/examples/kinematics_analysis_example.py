@@ -1,6 +1,5 @@
 """
 Kinematics Analysis Example
-===========================
 
 Checks IIWA Jacobians against finite differences, then analyses them:
 manipulability, singularity, joint-angle harmonizing, limits, and the pose
@@ -12,8 +11,7 @@ C++ Reference:
     common/test/tesseract_common_unit.cpp  (calcTransformError, applyTolerances,
         calcJacobianTransformErrorDiff_Toleranced)
 
-Overview
---------
+**Overview**
 1. Port of upstream `runJacobianTest`: every native `calcJacobian` overload, and
    `jacobianChangeBase` / `jacobianChangeRefPoint`, against all three
    `numericalJacobian` overloads, at upstream's q with its link points and
@@ -28,8 +26,7 @@ Overview
 7. `calcTransformError`, `calcRotationalError`, `applyTolerances` and the four
    `calcJacobianTransformErrorDiff` overloads, on upstream's unit-test values.
 
-Key Concepts
-------------
+**Key Concepts**
 **Finite-difference tolerance**:
     `numericalJacobian` is a forward difference with δ = 1e-8
     (kinematics/core/src/utils.cpp:44, 80). Its error is truncation, δ/2 times the

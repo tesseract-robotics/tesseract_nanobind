@@ -1,6 +1,5 @@
 """
 Plugin Configuration Example
-============================
 
 Builds the plugin information that tesseract's YAML configs hold, contact
 managers, profiles and task composer, in Python instead of YAML, merges it with
@@ -15,8 +14,7 @@ C++ Reference:
     support/urdf/contact_manager_plugins.yaml
     tesseract_planning task_composer/config/task_composer_plugins.yaml
 
-Overview
---------
+**Overview**
 1. `ContactManagersPluginInfo` as in `contact_manager_plugins.yaml`, built as a
    Bullet part and an FCL part and merged with `insert`; it equals the shipped
    file's information and, applied to a URDF-only IIWA environment with
@@ -31,8 +29,7 @@ Overview
    classes the libraries export): every configured class is available, and
    `TaskComposer.get_available_pipelines()` lists only configured names.
 
-Key Concepts
-------------
+**Key Concepts**
 **insert merges, it does not replace**:
     `insert(other)` appends `other`'s search paths and libraries, adds or
     overwrites its plugins by name, and takes its default plugin only when

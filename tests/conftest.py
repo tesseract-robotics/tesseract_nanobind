@@ -12,6 +12,9 @@ cost with no margin; both were replaced, and the seeds that exposed them replay
 in tests/examples/test_examples.py.
 """
 
+import os
+from pathlib import Path
+
 import pytest
 
 from tesseract_robotics.motion_planners_ompl import RNG_setSeed
@@ -41,3 +44,32 @@ def _seed_ompl_rng():
 def zigzag_square_poses() -> list[Pose]:
     """The standard zigzag square toolpath (`planning.toolpaths.zigzag_square`, #84)."""
     return zigzag_square()
+
+
+TWC_SUPPORT_ENV = "TWC_SUPPORT_PATH"
+# Set to 1 to run without the TWC workcell: the tests that need it skip instead of failing.
+SKIP_TWC_ENV = "TESSERACT_TESTS_WITHOUT_TWC"
+TWC_SUBMODULE = Path(__file__).resolve().parents[1] / "ws/src/tesseract_ros_workcell/twc_support"
+
+
+@pytest.fixture(scope="session")
+def twc_support() -> Path:
+    """The `twc_support` directory of the TWC workcell submodule.
+
+    A missing workcell fails the test, naming the fix, so coverage is not lost without notice.
+    CI sets `TWC_SUPPORT_PATH`; a path there that does not exist fails too. A developer without
+    the submodule opts out explicitly with `TESSERACT_TESTS_WITHOUT_TWC=1`.
+    """
+    if env_path := os.environ.get(TWC_SUPPORT_ENV):
+        path = Path(env_path)
+    else:
+        path = TWC_SUBMODULE
+    if path.is_dir():
+        return path
+    if os.environ.get(SKIP_TWC_ENV) == "1":
+        pytest.skip(f"{SKIP_TWC_ENV}=1 and no twc_support at {path}")
+    pytest.fail(
+        f"no twc_support at {path}: run 'git submodule update --init ws/src/tesseract_ros_workcell', "
+        f"set {TWC_SUPPORT_ENV}, or set {SKIP_TWC_ENV}=1 to run without it",
+        pytrace=False,
+    )

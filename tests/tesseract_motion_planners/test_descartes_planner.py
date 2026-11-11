@@ -28,7 +28,6 @@ from tesseract_robotics.common import (
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
-    VectorIsometry3d,
 )
 from tesseract_robotics.environment import Environment
 from tesseract_robotics.kinematics import KinematicGroup
@@ -421,7 +420,7 @@ class TestDescartesToolPoseSamplers:
 
     def test_sample_fixed(self):
         samples = sampleFixed(self.POSE)
-        assert type(samples) is VectorIsometry3d
+        assert isinstance(samples, list)
         assert len(samples) == 1
         np.testing.assert_array_equal(samples[0].matrix, self.POSE.matrix)
 
@@ -431,7 +430,7 @@ class TestDescartesToolPoseSamplers:
         samples = sampleToolZAxis(
             self.POSE, resolution=np.pi / 2, minimum=-np.pi, maximum=np.pi / 2
         )
-        assert type(samples) is VectorIsometry3d
+        assert isinstance(samples, list)
         assert len(samples) == 4
         z_axis = self.POSE.matrix[:3, 2]
         for sample in samples:

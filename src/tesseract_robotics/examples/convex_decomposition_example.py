@@ -1,6 +1,5 @@
 """
 Convex Decomposition Example
-============================
 
 Port of upstream's `create_convex_decomposition` command-line tool: split a
 mesh into convex hulls with V-HACD and write each hull to a PLY file.
@@ -11,8 +10,7 @@ C++ Reference:
     collision/vhacd/src/convex_decomposition_vhacd.cpp  (compute)
     support/meshes/car_seat/visual/seat.dae, support/meshes/car_seat/collision/seat_*.stl
 
-Overview
---------
+**Overview**
 1. The command-line options of upstream's tool, with its short flags and value
    ranges. Defaults are `VHACDParameters()`'s.
 2. Decompose the car-seat visual mesh `seat.dae` at those defaults, check that
@@ -24,8 +22,7 @@ Overview
    with tesseract support (`car_seat/collision/seat_*.stl`), which was made
    with other, unrecorded parameters.
 
-Key Concepts
-------------
+**Key Concepts**
 **Deviations from the C++ tool**:
     `--input` defaults to `seat.dae` and `--output` to `seat.ply`, so the example
     runs without arguments; upstream requires both. Upstream reads only PLY

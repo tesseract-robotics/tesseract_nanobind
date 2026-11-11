@@ -44,6 +44,7 @@ from tesseract_robotics.common import (
     Quaterniond,
     Translation3d,
 )
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.examples.lowlevel.example_support import (
     add_fixed_link,
     load_support_environment,
@@ -178,7 +179,7 @@ def run(ifopt: bool = False):
     pipeline = "TrajOptIfoptPipeline" if ifopt else "TrajOptPipeline"
     print(f"Running {pipeline}...")
     result = run_pipeline(env, program, _profiles(ifopt), pipeline)
-    assert result.successful, f"Planning failed: {result.message}"
+    require_success(result, "basic Cartesian")
     print(f"Planning successful! {len(result)} waypoints")
 
     return {"result": result, "env": env, "joint_names": JOINT_NAMES}

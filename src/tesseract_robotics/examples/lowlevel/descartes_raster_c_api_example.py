@@ -54,6 +54,8 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import Environment
+from tesseract_robotics.examples.failures import require_success
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
 from tesseract_robotics.motion_planners import PlannerRequest
 from tesseract_robotics.motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
@@ -172,7 +174,8 @@ def run():
     srdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     )
-    assert env.init(urdf_path, srdf_path, locator)
+    if not env.init(urdf_path, srdf_path, locator):
+        raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     manip_info = ManipulatorInfo()
     manip_info.tcp_frame = "tool0"
@@ -244,7 +247,7 @@ def run():
     # Solve the whole program with Descartes (ladder graph over IK samples).
     descartes_planner = DescartesMotionPlannerD(DESCARTES_DEFAULT_NAMESPACE)
     descartes_response = descartes_planner.solve(request)
-    assert descartes_response.successful, f"Descartes failed: {descartes_response.message}"
+    require_success(descartes_response, "Descartes")
     descartes_moves = list(_iter_move_instructions(descartes_response.results))
     print(f"Descartes solved {len(descartes_moves)} waypoints")
 
@@ -253,7 +256,7 @@ def run():
 
     trajopt_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
     trajopt_response = trajopt_planner.solve(request)
-    assert trajopt_response.successful, f"TrajOpt failed: {trajopt_response.message}"
+    require_success(trajopt_response, "TrajOpt")
 
     trajopt_moves = list(_iter_move_instructions(trajopt_response.results))
     print(f"TrajOpt refined {len(trajopt_moves)} waypoints:")

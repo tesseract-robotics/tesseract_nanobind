@@ -5,6 +5,7 @@ import sys
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.environment import Environment
+from tesseract_robotics.planning.errors import EnvironmentInitError
 
 shapes_urdf = """
 <robot name="mesh_viewer" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
@@ -51,7 +52,8 @@ def run():
 
     # GeneralResourceLocator searches the support data given as `paths`
     locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
-    assert t_env.init(shapes_urdf, locator)
+    if not t_env.init(shapes_urdf, locator):
+        raise EnvironmentInitError("failed to initialize the shapes environment")
     return {"env": t_env, "locator": locator}
 
 

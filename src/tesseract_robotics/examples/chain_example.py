@@ -33,6 +33,7 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -126,27 +127,18 @@ def run(pipeline="CartesianPipeline", num_planners=None, *, composer: TaskCompos
     print(f"Planning with {pipeline}...")
     start_time = time.time()
 
-    try:
-        result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
-        planning_time = time.time() - start_time
-
-        if result.successful:
-            print(f"Success in {planning_time:.2f}s, {len(result)} waypoints")
-        else:
-            print(f"Failed in {planning_time:.2f}s: {result.message}")
-
-    except Exception as e:
-        planning_time = time.time() - start_time
-        print(f"Exception after {planning_time:.2f}s: {e}")
-        result = None
+    result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
+    planning_time = time.time() - start_time
     # --8<-- [end:descartes_then_trajopt]
+    require_success(result, "chain")
+    print(f"Success in {planning_time:.2f}s, {len(result)} waypoints")
 
     return {
         "result": result,
         "robot": robot,
         "joint_names": joint_names,
         "planning_time": planning_time,
-        "success": result.successful if result else False,
+        "success": True,
     }
 
 
@@ -162,7 +154,7 @@ def main() -> int:
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
-    return 0 if results["success"] else 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 """
 Environment Commands Example
-============================
 
 Builds ABB IRB2400 environments from files, from an SRDF carrying a calibration,
 and from a list of commands, and reads back what each one recorded: the command
@@ -12,8 +11,7 @@ C++ Reference:
     srdf/test/tesseract_srdf_unit.cpp  (LoadSRDFSaveUnit calibration fixture :672-690)
     common/src/resource_locator.cpp  (GeneralResourceLocator :52-200)
 
-Overview
---------
+**Overview**
 1. `GeneralResourceLocator` built three ways (default variables, explicit
    `paths`, explicit `environment_variables`), `loadEnvironmentVariable` and
    `addPath`; then `Environment.init(Path, Path, locator)` and `init(Path, locator)`.
@@ -33,8 +31,7 @@ Overview
 6. `BytesResource` from `bytes` and from a list of byte values, with a parent
    locator that resolves a relative url next to the resource.
 
-Key Concepts
-------------
+**Key Concepts**
 **The command history is the environment**:
     Every change is a command. `init(urdf, srdf)` is `init(getInitCommands(...))`,
     so replaying `getCommandHistory()` rebuilds the same scene graph, state and
@@ -78,7 +75,6 @@ from tesseract_robotics.environment import (
     ChangeLinkVisibilityCommand,
     Command,
     Environment,
-    EventCallbackFn,
     Events,
 )
 from tesseract_robotics.srdf import SRDFModel
@@ -293,11 +289,10 @@ def run_in(fixture_root: Path) -> dict[str, Any]:
     events = []
 
     def on_event(event):
-        # copy what is needed: the event is valid only inside the callback
         if event.type == Events.COMMAND_APPLIED:
             events.append((event.revision, history_types(event.commands)))
 
-    urdf_only.addEventCallback(1, EventCallbackFn(on_event))
+    urdf_only.addEventCallback(on_event)
 
     # A URDF-only environment has no contact-manager plugins until the command adds them
     plugin_info_empty_before = urdf_only.getContactManagersPluginInfo().empty()

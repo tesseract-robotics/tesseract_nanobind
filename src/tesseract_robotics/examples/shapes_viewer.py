@@ -1,14 +1,11 @@
 """Simple shapes viewer example using tesseract_robotics with nanobind bindings."""
 
-import os
-import re
 import sys
-import traceback
-from typing import override
 
-from tesseract_robotics import get_tesseract_support_path
-from tesseract_robotics.common import ResourceLocator, SimpleLocatedResource
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.environment import Environment
+from tesseract_robotics.planning.errors import EnvironmentInitError
 
 shapes_urdf = """
 <robot name="multipleshapes" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
@@ -74,39 +71,14 @@ shapes_urdf = """
 """
 
 
-class TesseractSupportResourceLocator(ResourceLocator):
-    """Resource locator for tesseract_support package resources."""
-
-    def __init__(self):
-        super().__init__()
-
-    @override
-    def locateResource(self, url):
-        try:
-            if os.path.exists(url):
-                return SimpleLocatedResource(url, url, self)
-
-            url_match = re.match(r"^package:\/\/tesseract_support\/(.*)$", url)
-            if url_match is None:
-                print(f"url_match failed for: {url}")
-                return None
-
-            tesseract_support = str(get_tesseract_support_path())
-
-            filename = os.path.join(tesseract_support, os.path.normpath(url_match.group(1)))
-            return SimpleLocatedResource(url, filename, self)
-        except Exception:
-            traceback.print_exc()
-            return None
-
-
 def run():
     # --8<-- [start:setup]
     t_env = Environment()
 
     # locator must be kept alive by maintaining a reference
-    locator = TesseractSupportResourceLocator()
-    assert t_env.init(shapes_urdf, locator)
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    if not t_env.init(shapes_urdf, locator):
+        raise EnvironmentInitError("failed to initialize the shapes environment")
     # --8<-- [end:setup]
     return {"env": t_env, "locator": locator}
 

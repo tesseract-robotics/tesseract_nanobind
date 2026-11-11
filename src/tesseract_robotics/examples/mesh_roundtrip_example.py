@@ -1,6 +1,5 @@
 """
 Mesh Round-Trip Example
-=======================
 
 Load meshes from bytes, paths and resources; rebuild one through the full
 mesh constructors; write meshes to PLY and load them back.
@@ -14,8 +13,7 @@ C++ Reference:
     urdf/src/utils.cpp:140-145  (writeMeshToFile = writeSimplePlyFile)
     support/meshes/box_2m.ply, support/meshes/tesseract_material_mesh.glb
 
-Overview
---------
+**Overview**
 1. `createMeshFromBytes` / `createConvexMeshFromBytes` on the bytes of `box_2m.ply`.
 2. `tesseract_material_mesh.glb` through `create*MeshFromPath` and
    `create*MeshFromResource` with `normals`, `vertex_colors` and
@@ -27,8 +25,7 @@ Overview
 5. `Isometry3d.apply_points` / `apply_directions` on the glb mesh's vertices and normals.
 6. `PointCloud.Point` into a `PointCloud`, then `createOctree`.
 
-Key Concepts
-------------
+**Key Concepts**
 **triangulate defaults to True**:
     Upstream's C++ `createMeshFromBytes` defaults `triangulate` to false
     (`mesh_parser.h:541`); the binding defaults it to true, as the URDF parser

@@ -1,18 +1,11 @@
 """The TWC rail cell draws its rail, and the carriage stays on it (#380)."""
 
 import importlib
-import os
-from pathlib import Path
 
 import numpy as np
 import pytest
 
-SUBMODULE = Path(__file__).resolve().parents[2] / "ws/src/tesseract_ros_workcell/twc_support"
-# CI sets the variable, so a broken path there fails rather than skips.
-pytestmark = pytest.mark.skipif(
-    "TWC_SUPPORT_PATH" not in os.environ and not SUBMODULE.exists(),
-    reason="needs the TWC workcell: git submodule update --init ws/src/tesseract_ros_workcell",
-)
+pytestmark = pytest.mark.usefixtures("twc_support")
 
 RAIL_JOINT = "rail_joint_1"
 # Along the rail's own axis, its local y. A carriage may touch the rail's end.
@@ -22,7 +15,6 @@ ON_RAIL_ATOL_M = 1e-4
 
 
 def _twc():
-    # Imported late: the module looks for the workcell when it loads.
     return importlib.import_module("tesseract_robotics.examples.twc_workcell_positioner_viewer")
 
 

@@ -118,7 +118,7 @@ def test_a_published_entry_is_included_once_on_its_page():
 def test_a_page_only_includes_players_the_manifest_places_there():
     entries = {entry.module: entry for entry in manifest.load_manifest()}
     for path in (REPO / "docs").rglob("*.md"):
-        if "superpowers" in path.parts or path == REPO / "docs/index.md":
+        if path == REPO / "docs/index.md":
             continue
         page = path.relative_to(REPO / "docs").as_posix()
         for module in players.included_modules(path.read_text("utf-8")):

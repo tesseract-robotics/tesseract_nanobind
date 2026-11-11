@@ -36,6 +36,7 @@ from tesseract_robotics.environment import (
     MoveJointCommand,
     MoveLinkCommand,
 )
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
 from tesseract_robotics.scene_graph import Joint, JointType
 
 
@@ -57,7 +58,8 @@ def run():
 
     # Initialize environment (loads URDF/SRDF, builds scene graph)
     env = Environment()
-    assert env.init(urdf_path, srdf_path, locator)
+    if not env.init(urdf_path, srdf_path, locator):
+        raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     print(f"Environment initialized: {env.getName()}")
     print(f"Root link: {env.getRootLinkId()}")

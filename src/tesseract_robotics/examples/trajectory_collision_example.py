@@ -1,6 +1,5 @@
 """
 Trajectory Collision Example
-============================
 
 Collision checks of single states, swept segments and whole trajectories, and a
 trajectory turned into a collision link with `AddTrajectoryLinkCommand`.
@@ -13,8 +12,7 @@ C++ Reference:
     environment/include/tesseract/environment/commands/add_trajectory_link_command.h:52-73
     support/urdf/boxbot.urdf
 
-Overview
---------
+**Overview**
 1. boxbot: two unit boxes 0.1 m in collision, checked with both
    `checkTrajectoryState` overloads (discrete and continuous manager) and a
    swept `checkTrajectorySegment`; disabling `boxbot_link` through the
@@ -28,8 +26,7 @@ Overview
 4. `AddTrajectoryLinkCommand` once per `Method`, replacing the same link; the
    link's collision count follows from each method's documented semantics.
 
-Key Concepts
-------------
+**Key Concepts**
 **Penetration depth of the boxbot boxes**:
     The two unit boxes overlap by 0.1 m along x with their y and z faces
     coplanar. FCL reports the analytic -0.1 m. Bullet, the default discrete and

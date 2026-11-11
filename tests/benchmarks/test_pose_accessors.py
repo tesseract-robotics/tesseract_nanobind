@@ -39,9 +39,10 @@ matters mostly inside tight numerical loops, not for typical logging /
 formatting / one-off-read usage.
 """
 
-import pytest
+import time
+from collections.abc import Callable
 
-pytest.importorskip("pytest_benchmark")
+import pytest
 
 from tesseract_robotics.planning import Pose
 
@@ -116,3 +117,54 @@ def test_rpy_via_single_eulerangles_call(benchmark, sample_pose):
         return yaw, pitch, roll
 
     benchmark(read)
+
+
+# ---------- The documented claims, as ratios ----------
+
+# Calls per timed batch, and batches per measurement: the minimum over batches discards
+# scheduler noise, which only ever adds time.
+CALLS_PER_BATCH = 2000
+BATCHES = 15
+# The module docstring's reference run puts `pose.qx/qy/qz/qw` at 3.4x the bound-quaternion read
+# (4,500 ns vs 1,334 ns) and `pose.roll/pitch/yaw` at 2.4x the single `eulerAngles` call
+# (5,917 ns vs 2,458 ns). A property path must stay at least half as far from its baseline as
+# that run, so a different machine passes and a lost saving does not.
+MIN_QUATERNION_RATIO = 1.7
+MIN_RPY_RATIO = 1.2
+
+
+def _best_ns_per_call(fn: Callable[[], object]) -> float:
+    best = float("inf")
+    for _ in range(BATCHES):
+        start = time.perf_counter_ns()
+        for _ in range(CALLS_PER_BATCH):
+            fn()
+        best = min(best, (time.perf_counter_ns() - start) / CALLS_PER_BATCH)
+    return best
+
+
+def test_quaternion_properties_cost_more_than_one_bound_quaternion(sample_pose):
+    """transforms.py's perf note: bind `q = pose.quaternion` once for multi-component reads."""
+
+    def properties():
+        return sample_pose.qx, sample_pose.qy, sample_pose.qz, sample_pose.qw
+
+    def bound():
+        q = sample_pose.quaternion
+        return q.x, q.y, q.z, q.w
+
+    ratio = _best_ns_per_call(properties) / _best_ns_per_call(bound)
+    assert ratio >= MIN_QUATERNION_RATIO, f"qx..qw cost {ratio:.2f}x the bound quaternion"
+
+
+def test_rpy_properties_cost_more_than_one_euler_decomposition(sample_pose):
+    """transforms.py's perf note: three `roll/pitch/yaw` reads decompose the rotation three times."""
+
+    def properties():
+        return sample_pose.roll, sample_pose.pitch, sample_pose.yaw
+
+    def single():
+        return sample_pose.quaternion.eulerAngles("ZYX")
+
+    ratio = _best_ns_per_call(properties) / _best_ns_per_call(single)
+    assert ratio >= MIN_RPY_RATIO, f"roll/pitch/yaw cost {ratio:.2f}x one eulerAngles call"

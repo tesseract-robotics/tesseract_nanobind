@@ -13,8 +13,26 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from scipy.spatial.transform import Rotation
 
 import tesseract_robotics.examples
+from tesseract_robotics.planning import Robot
+from tesseract_robotics.planning.composer import PlanningResult, TrajectoryPoint
+
+from ..planning_validity import (
+    JointGoal,
+    assert_trajectory_valid,
+)
+
+# `tesseract_robotics.examples` re-exports each `run` under its module's name: import the modules.
+online_example = importlib.import_module("tesseract_robotics.examples.online_planning_example")
+sqp_example = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
+
+
+# End joints of the freespace examples (rad), as in their C++ originals.
+FREESPACE_GOAL = JointGoal.build([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+# online_planning_example.cpp: target_joint_position << 5.5, 3, 0, 0, 0, 0, 0, 0
+TARGET_8DOF = JointGoal.build([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 # === Viewer Examples ===
 
@@ -913,64 +931,131 @@ def test_sdf_collision_example():
 
 @pytest.mark.planning
 def test_freespace_ompl_example():
-    tesseract_robotics.examples.freespace_ompl_example()
+    outcome = tesseract_robotics.examples.freespace_ompl_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"], FREESPACE_GOAL)
 
 
 @pytest.mark.planning
 def test_basic_cartesian_example():
-    tesseract_robotics.examples.basic_cartesian_example()
+    outcome = tesseract_robotics.examples.basic_cartesian_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"])
 
 
 @pytest.mark.planning
 def test_glass_upright_example():
-    tesseract_robotics.examples.glass_upright_example()
+    outcome = tesseract_robotics.examples.glass_upright_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"], FREESPACE_GOAL)
 
 
 @pytest.mark.planning
 def test_pick_and_place_example():
-    tesseract_robotics.examples.pick_and_place_example()
+    outcome = tesseract_robotics.examples.pick_and_place_example()
+    # The pick ends with the tool at the part, by design: its contact is the goal, not a fault,
+    # so only the place phase, planned with the part attached, is collision-checked.
+    assert_trajectory_valid(
+        Robot.build(outcome["pick_env"]), outcome["pick_result"], check_collision=False
+    )
+    assert_trajectory_valid(outcome["robot"], outcome["place_result"])
 
 
 @pytest.mark.planning
 def test_car_seat_example():
-    tesseract_robotics.examples.car_seat_example()
+    outcome = tesseract_robotics.examples.car_seat_example()
+    # The pick ends with the tool at the part, by design: its contact is the goal, not a fault,
+    # so only the place phase, planned with the part attached, is collision-checked.
+    assert_trajectory_valid(
+        Robot.build(outcome["pick_env"]), outcome["pick_result"], check_collision=False
+    )
+    assert_trajectory_valid(outcome["robot"], outcome["place_result"])
 
 
 @pytest.mark.planning
 def test_car_seat_ifopt_example():
-    # run() asserts both plans succeed. The puzzle's ifopt run has no end-to-end test: it
-    # peaks at 3.2 GiB until the conda package ships tesseract_planning#787.
-    tesseract_robotics.examples.car_seat_example(pipeline="TrajOptIfoptPipeline")
+    # The puzzle's ifopt run has no end-to-end test: it peaks at 3.2 GiB until the conda
+    # package ships tesseract_planning#787.
+    outcome = tesseract_robotics.examples.car_seat_example(pipeline="TrajOptIfoptPipeline")
+    # The pick ends with the tool at the part, by design: its contact is the goal, not a fault,
+    # so only the place phase, planned with the part attached, is collision-checked.
+    assert_trajectory_valid(
+        Robot.build(outcome["pick_env"]), outcome["pick_result"], check_collision=False
+    )
+    assert_trajectory_valid(outcome["robot"], outcome["place_result"])
 
 
 @pytest.mark.planning
 def test_puzzle_piece_auxillary_axes_example():
-    tesseract_robotics.examples.puzzle_piece_auxillary_axes_example()
+    outcome = tesseract_robotics.examples.puzzle_piece_auxillary_axes_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"], group="manipulator_aux")
 
 
 @pytest.mark.planning
 def test_raster_example():
-    tesseract_robotics.examples.raster_example()
+    outcome = tesseract_robotics.examples.raster_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"])
 
 
 @pytest.mark.planning
 def test_online_planning_example():
-    tesseract_robotics.examples.online_planning_example()
+    outcome = tesseract_robotics.examples.online_planning_example()
+    assert len(outcome["trajectories"]) == ONLINE_ITERATIONS
+    for iteration, result in enumerate(outcome["trajectories"]):
+        # The human stood elsewhere for each plan: validate against where it stood then.
+        human_x = online_example.HUMAN_AMPLITUDE_M * np.sin(
+            online_example.HUMAN_PHASE_STEP_RAD * iteration
+        )
+        online_example.update_human_position(outcome["robot"], human_x, 0.0)
+        assert_trajectory_valid(outcome["robot"], result, TARGET_8DOF)
+
+
+# Distance of the final tool from the target after one SQP step per replan, measured over the
+# run's 11 solutions: at most 5.5e-5 m and 5.5e-2 rad (the orientation rows are soft costs).
+SQP_POSITION_TOL_M = 1e-4
+SQP_ORIENTATION_TOL_RAD = 0.06
+
+# run()'s default replanning cycles of online_planning_example, and of the SQP example.
+ONLINE_ITERATIONS = 5
+SQP_REPLANS = 10
 
 
 @pytest.mark.planning
 def test_online_planning_sqp_example():
-    tesseract_robotics.examples.online_planning_sqp_example()
+    outcome = tesseract_robotics.examples.online_planning_sqp_example()
+    assert len(outcome["trajectories"]) == 1 + SQP_REPLANS
+    robot, names, steps = outcome["robot"], outcome["joint_names"], outcome["steps"]
+    final = np.asarray(outcome["trajectories"][-1]).reshape(steps, len(names))
+    human_x = sqp_example.HUMAN_CENTER_M + sqp_example.HUMAN_AMPLITUDE_M * np.sin(
+        sqp_example.HUMAN_PHASE_STEP_RAD * (SQP_REPLANS - 1)
+    )
+    sqp_example.update_human_position(robot, human_x, 0.0)
+    result = PlanningResult(
+        successful=True, trajectory=[TrajectoryPoint(list(names), row) for row in final]
+    )
+    # One SQP step per replan does not restore hard feasibility after the human jumps: the final
+    # trajectory may sit inside the estop zones' 0.1 m margin (measured: -2.7 mm penetration).
+    # Limits and the goal are checked; the collision constraint is the solver's, not a promise.
+    assert_trajectory_valid(robot, result, check_collision=False)
+    # The goal is the target tool pose, not the joint vector: the 8-axis chain is redundant.
+    target = robot.fk("manipulator", TARGET_8DOF.positions, "tool0")
+    reached = robot.fk("manipulator", final[-1], "tool0")
+    position_error = np.linalg.norm(
+        np.asarray(reached.translation) - np.asarray(target.translation)
+    )
+    relative = np.asarray(reached.linear).T @ np.asarray(target.linear)
+    orientation_error = Rotation.from_matrix(relative).magnitude()
+    assert position_error <= SQP_POSITION_TOL_M
+    assert orientation_error <= SQP_ORIENTATION_TOL_RAD
 
 
 @pytest.mark.planning
 def test_freespace_hybrid_example():
-    assert tesseract_robotics.examples.freespace_hybrid_example()["success"]
+    outcome = tesseract_robotics.examples.freespace_hybrid_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"], FREESPACE_GOAL)
 
 
 @pytest.mark.planning
 def test_freespace_hybrid_ifopt_example():
-    assert tesseract_robotics.examples.freespace_hybrid_example(use_ifopt=True)["success"]
+    outcome = tesseract_robotics.examples.freespace_hybrid_example(use_ifopt=True)
+    assert_trajectory_valid(outcome["robot"], outcome["result"], FREESPACE_GOAL)
 
 
 @pytest.mark.planning
@@ -1099,7 +1184,8 @@ def test_freespace_clearance_objective_cases_share_the_ompl_margin():
 
 @pytest.mark.planning
 def test_chain_example():
-    tesseract_robotics.examples.chain_example()
+    outcome = tesseract_robotics.examples.chain_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"])
 
 
 # === Low-Level API Examples ===
@@ -1259,7 +1345,7 @@ def _min_distance_to(obstacle, env, joint_names, positions):
     for start, end in zip(positions[:-1], positions[1:]):
         steps = max(1, int(np.ceil(np.max(np.abs(end - start)) / CLEARANCE_SCAN_STEP_RAD)))
         for fraction in np.linspace(0.0, 1.0, steps + 1):
-            solver.setStateByNamesAndValues(joint_names, start + fraction * (end - start))
+            solver.setState(joint_names, start + fraction * (end - start))
             manager.setCollisionObjectsTransform(solver.getState().link_transforms)
             contacts = ContactResultMap()
             manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))

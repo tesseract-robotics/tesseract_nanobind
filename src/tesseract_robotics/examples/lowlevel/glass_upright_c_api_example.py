@@ -6,15 +6,13 @@ keeping the tool "upright" (like carrying a glass of water without spilling).
 
 C++ Source: tesseract_planning/examples/src/glass_upright_example.cpp
 
-Concept: "Upright" Constraint
------------------------------
+**Concept: "Upright" Constraint**
 The UPRIGHT move profile makes the Cartesian waypoint a constraint with
 coeff = [0, 0, 0, 1, 1, 1]: position free, orientation held. The composite profile
 adds an LVS-discrete collision cost and constraint (margin 0.01 m, buffer 0.01 m)
 and velocity smoothing.
 
-Pipeline Overview
------------------
+**Pipeline Overview**
 1. Load KUKA IIWA 7-DOF robot
 2. Add the 0.15 m sphere at (0.5, 0, 0.55)
 3. LINEAR moves between two joint states (only joint_a1 changes: -0.4 -> 0.4 rad)
@@ -38,6 +36,7 @@ from tesseract_robotics.command_language import (
     StateWaypointPoly,
 )
 from tesseract_robotics.common import Isometry3d, ManipulatorInfo, Translation3d
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.examples.lowlevel.example_support import (
     add_fixed_link,
     load_support_environment,
@@ -144,7 +143,7 @@ def run(ifopt: bool = False):
     pipeline = "TrajOptIfoptPipeline" if ifopt else "TrajOptPipeline"
     print(f"Running {pipeline} with the upright constraint...")
     result = run_pipeline(env, program, _profiles(ifopt), pipeline)
-    assert result.successful, f"Planning failed: {result.message}"
+    require_success(result, "glass upright")
     print(f"Planning successful! {len(result)} waypoints:")
     for i, state in enumerate(result.trajectory):
         print(f"  [{i}] {state.positions}")

@@ -6,15 +6,13 @@ system: a 7-DOF KUKA IIWA arm combined with a 2-DOF workpiece positioner.
 The positioner (auxiliary axes) can reorient the workpiece to improve
 reachability and avoid singularities during surface following operations.
 
-PIPELINE OVERVIEW
------------------
+**PIPELINE OVERVIEW**
 1. LOAD WORKCELL: 9-DOF system (7-DOF arm + 2-DOF positioner)
 2. LOAD TOOLPATH: Parse CSV file with ~50 Cartesian waypoints (puzzle piece edge)
 3. CONFIGURE TRAJOPT: Enable yaw freedom (coeff[5]=0) for auxiliary axis optimization
 4. PLAN: TrajOpt optimizes 9-DOF trajectory following Cartesian path
 
-KEY CONCEPTS DEMONSTRATED
--------------------------
+**KEY CONCEPTS DEMONSTRATED**
 1. Multi-Chain Kinematics:
    - "manipulator_aux" group: combines arm and positioner kinematic chains
    - Arm chain: grinder_frame (TCP) on KUKA IIWA end-effector
@@ -37,8 +35,7 @@ KEY CONCEPTS DEMONSTRATED
    - X-axis: computed orthogonal to normal
    - Y-axis: Z x X for right-handed frame
 
-ROBOT CONFIGURATION (from C++)
-------------------------------
+**ROBOT CONFIGURATION (from C++)**
 9 DOF joint order:
 - joint_a1 through joint_a7: KUKA IIWA arm (7 DOF)
 - joint_aux1: positioner Z-rotation (turntable)
@@ -52,8 +49,7 @@ Frames:
 - tcp_frame="grinder_frame": tool center point on arm end-effector
 - working_frame="part": workpiece frame attached to positioner
 
-TRAJOPT SETTINGS (from C++)
----------------------------
+**TRAJOPT SETTINGS (from C++)**
 Plan profile (CARTESIAN):
 - cartesian_constraint_config.coeff = [5,5,5,2,2,0]
 - Position (x,y,z) tightly constrained (coeff=5)
@@ -65,32 +61,26 @@ Composite profile (DEFAULT):
 - collision_cost_config.collision_check_config.type = DISCRETE
 - Solver: OSQP, max_iter=200
 
-C++ SOURCE
-----------
+**C++ SOURCE**
 tesseract_planning/tesseract_examples/src/puzzle_piece_auxillary_axes_example.cpp
 Author: Levi Armstrong, Southwest Research Institute, July 2019
 
-USE CASES
----------
+**USE CASES**
 - Surface grinding/polishing with tool orientation freedom
 - Welding with auxiliary rotation for weld pool control
 - Machining with coordinated workpiece repositioning
 - Any process where auxiliary axes extend workspace or improve reachability
 
-RELATED EXAMPLES
-----------------
+**RELATED EXAMPLES**
 - basic_cartesian_example.py: simple Cartesian path without auxiliary axes
 - glass_upright_example.py: orientation constraints for upright maintenance
 - raster_example.py: industrial raster patterns
 
-PERFORMANCE NOTE
-----------------
-First planning call takes ~10-15s due to dynamic plugin loading (dlopen).
-This is inherent to the TaskComposer plugin architecture (same in C++).
-Subsequent calls in the same process are fast (~8s for this 50-waypoint path).
-
-For interactive use, call composer.warmup() or use warmup=True:
-    composer = TaskComposer.from_config(warmup=True)  # loads plugins upfront
+**PERFORMANCE NOTE**
+Plugin loading is not the cost here: `composer.warmup()` takes 0.01 s after
+`TaskComposer.from_config()`. The plan itself takes 33 to 34 s for the 437 waypoints it returns
+(Apple M1 Max, release build, one composer for both runs). Pass one composer to every `run()`:
+    composer = TaskComposer.from_config()
 """
 
 from __future__ import annotations
@@ -104,6 +94,7 @@ from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.collision import CollisionEvaluatorType
 from tesseract_robotics.command_language import ProfileDictionary
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
@@ -340,19 +331,10 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
 
     # Plan: actual optimization time
     plan_start = time.time()
-    try:
-        result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
-        planning_time = time.time() - plan_start
-
-        if result.successful:
-            print(f"Planning: {planning_time:.2f}s ({len(result)} waypoints)")
-        else:
-            print(f"Planning failed: {planning_time:.2f}s - {result.message}")
-
-    except Exception as e:
-        planning_time = time.time() - plan_start
-        print(f"Planning exception: {planning_time:.2f}s - {e}")
-        result = None
+    result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
+    planning_time = time.time() - plan_start
+    require_success(result, pipeline)
+    print(f"Planning: {planning_time:.2f}s ({len(result)} waypoints)")
 
     total_time = warmup_time + planning_time
     print(f"Total: {total_time:.2f}s (warmup {warmup_time:.2f}s + plan {planning_time:.2f}s)")
@@ -363,7 +345,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
         "joint_names": joint_names,
         "planning_time": planning_time,
         "warmup_time": warmup_time,
-        "success": result.successful if result else False,
+        "success": True,
     }
 
 
@@ -380,7 +362,7 @@ def main() -> int:
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
-    return 0 if results["success"] else 1
+    return 0
 
 
 if __name__ == "__main__":

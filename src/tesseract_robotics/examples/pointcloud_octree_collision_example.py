@@ -1,36 +1,33 @@
 """
 Point Cloud → Octree Collision + Planning Example
-=================================================
 
-Builds a tesseract ``Octree`` from a point-cloud file, attaches it as a
+Builds a tesseract `Octree` from a point-cloud file, attaches it as a
 collision obstacle in front of an ABB IRB2400, and demonstrates the difference
 between a TrajOpt run with collision disabled (drives the arm through the
 obstacle) and one with the default collision-aware profile (routes around it).
 
-Pipeline
---------
-1. Load ``docs/assets/sample.ply`` via
-   ``tesseract_geometry.createMeshFromPath`` → an ``(N, 3)`` xyz array.
+**Pipeline**
+1. Load `docs/assets/sample.ply` via
+   `tesseract_geometry.createMeshFromPath` → an `(N, 3)` xyz array.
    The shipped PLY is already centred at the origin and pre-scaled into
    metres, so no per-run transform is needed.
-2. Push points into a ``tesseract_geometry.PointCloud`` and call
-   ``createOctree(...)`` to produce an ``octomap::OcTree``.
-3. Wrap in a ``tesseract_geometry.Octree`` and attach as a fixed-joint link
+2. Push points into a `tesseract_geometry.PointCloud` and call
+   `createOctree(...)` to produce an `octomap::OcTree`.
+3. Wrap in a `tesseract_geometry.Octree` and attach as a fixed-joint link
    with both Collision and Visual components (the viewer renders each leaf
    as an instanced cube).
-4. Run ``TrajOptPipeline`` twice on the same ``MotionProgram``: once with the
+4. Run `TrajOptPipeline` twice on the same `MotionProgram`: once with the
    collision cost/constraint disabled, once with the default profile. The two
    trajectories share start/goal/waypoint-count; only collision handling
    differs.
-5. Animate the chosen trajectory in ``TesseractViewer``; the "Trajectory"
+5. Animate the chosen trajectory in `TesseractViewer`; the "Trajectory"
    dropdown switches between them (robot tints red for the colliding plan,
    green for the collision-aware plan).
 
-Notes
------
-- The cloud file ships in ``docs/assets/`` of the source repo. Installed
-  wheels do not include it; pass ``--cloud PATH`` or set
-  ``TESSERACT_NANOBIND_SAMPLE_CLOUD`` to point at any file Assimp can read
+**Notes**
+- The cloud file ships in `docs/assets/` of the source repo. Installed
+  wheels do not include it; pass `--cloud PATH` or set
+  `TESSERACT_NANOBIND_SAMPLE_CLOUD` to point at any file Assimp can read
   (PLY / STL / OBJ / DAE — only the vertex positions are used).
 """
 
@@ -50,6 +47,7 @@ from tesseract_robotics.collision import (
     ContactTestType,
 )
 from tesseract_robotics.common import CollisionMarginData, GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.geometry import (
     Octree,
     OctreeSubType,
@@ -67,8 +65,8 @@ from tesseract_robotics.planning import (
     plan_freespace,
 )
 from tesseract_robotics.planning.profiles import (
+    STANDARD_PROFILE_NAMES,
     TRAJOPT_DEFAULT_NAMESPACE,
-    TRAJOPT_PROFILE_NAMES,
     create_trajopt_default_profiles,
 )
 
@@ -84,9 +82,9 @@ AWARE_LABEL = "collision-aware (green)"
 
 
 def _load_cloud_xyz(path: Path) -> np.ndarray:
-    """Return an ``(N, 3)`` float64 array of xyz points from any Assimp-loadable file.
+    """Return an `(N, 3)` float64 array of xyz points from any Assimp-loadable file.
 
-    Uses ``tesseract_geometry.createMeshFromPath`` so PLY / STL / OBJ / DAE
+    Uses `tesseract_geometry.createMeshFromPath` so PLY / STL / OBJ / DAE
     all work — we only keep the vertex positions.
     """
     meshes = createMeshFromPath(str(path))
@@ -164,7 +162,7 @@ def _trajopt_profiles_with_collision():
     profiles = create_trajopt_default_profiles()
     solver = TrajOptOSQPSolverProfile()
     solver.settings.max_iter = COLLISION_AWARE_OSQP_MAX_ITER
-    for name in TRAJOPT_PROFILE_NAMES:
+    for name in STANDARD_PROFILE_NAMES:
         profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, solver)
     return profiles
 
@@ -172,22 +170,22 @@ def _trajopt_profiles_with_collision():
 def _trajopt_profiles_without_collision():
     """Build a TrajOpt ProfileDictionary with collision cost + constraint disabled.
 
-    Same composite/plan layout as ``create_trajopt_default_profiles`` but with
-    ``collision_cost_config.enabled = False`` and
-    ``collision_constraint_config.enabled = False``. The optimiser converges
+    Same composite/plan layout as `create_trajopt_default_profiles` but with
+    `collision_cost_config.enabled = False` and
+    `collision_constraint_config.enabled = False`. The optimiser converges
     to a smoothed joint-space straight line — the "naive" path that drives
     the wrist through the cloud.
     """
     from tesseract_robotics.command_language import ProfileDictionary
-    from tesseract_robotics.planning.profiles import _create_trajopt_profiles
+    from tesseract_robotics.planning.profiles import create_trajopt_profile_pair
     from tesseract_robotics.task_composer_planning import ContactCheckProfile
 
-    composite, plan = _create_trajopt_profiles()
+    composite, plan = create_trajopt_profile_pair()
     composite.collision_cost_config.enabled = False
     composite.collision_constraint_config.enabled = False
 
     profiles = ProfileDictionary()
-    for name in TRAJOPT_PROFILE_NAMES:
+    for name in STANDARD_PROFILE_NAMES:
         profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, composite)
         profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
@@ -197,7 +195,7 @@ def _trajopt_profiles_without_collision():
     # realistic penetration registers) so the naive plan is allowed to finish.
     permissive = ContactCheckProfile()
     permissive.contact_manager_config.default_margin = -10.0
-    for name in TRAJOPT_PROFILE_NAMES:
+    for name in STANDARD_PROFILE_NAMES:
         profiles.addProfile("DiscreteContactCheckTask", name, permissive)
 
     return profiles
@@ -206,8 +204,8 @@ def _trajopt_profiles_without_collision():
 def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     """Build the scene, demonstrate collision vs. TrajOpt-planned trajectory.
 
-    Returns a dict with ``colliding_contacts``, ``aware_contacts``, ``result``
-    (the ``PlanningResult``), and ``robot`` so callers (tests, viewer) can
+    Returns a dict with `colliding_contacts`, `aware_contacts`, `result`
+    (the `PlanningResult`), and `robot` so callers (tests, viewer) can
     inspect outcomes.
     """
     cloud_path = cloud_path or _default_cloud_path()
@@ -310,10 +308,8 @@ def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     # Demo invariants — these are the whole point of the example. If they
     # ever fail (e.g. solver tuning drifts, or the cloud gets repositioned)
     # the printed numbers above stop matching the user-guide narrative.
-    assert colliding_result.successful, (
-        f"collision-disabled plan failed: {colliding_result.message}"
-    )
-    assert result.successful, f"collision-aware plan failed: {result.message}"
+    require_success(colliding_result, "collision-disabled plan")
+    require_success(result, "collision-aware plan")
     assert colliding_contacts > 0, (
         "collision-disabled plan should drive through the cloud, but "
         f"reported {colliding_contacts}/{len(colliding_result)} waypoints in contact"

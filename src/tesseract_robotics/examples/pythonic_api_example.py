@@ -7,8 +7,7 @@ Pythonic wrapper layer over the low-level C++ bindings (nanobind). The goal is t
 reduce boilerplate and hide the complexity of poly-type wrapping while preserving
 full access to the underlying Tesseract capabilities.
 
-Pipeline Overview
------------------
+**Pipeline Overview**
 The high-level API abstracts three major pain points of the raw C++ bindings:
 
 1. Environment Setup (Robot class)
@@ -24,8 +23,7 @@ The high-level API abstracts three major pain points of the raw C++ bindings:
    Low-level: 20+ lines with Link, Joint, Visual, Collision, AddLinkCommand
    High-level: create_obstacle(robot, name="box", geometry=box(1,1,1), transform=pose)
 
-Key Concepts
-------------
+**Key Concepts**
 Robot: Wraps tesseract_environment.Environment with:
   - from_urdf()/from_files()/from_tesseract_support() factory methods
   - fk()/ik() for kinematics (wraps KinematicGroup)
@@ -50,33 +48,32 @@ plan_freespace(): Convenience function that:
   - Handles AnyPoly wrapping for TaskComposerDataStorage
   - Returns PlanningResult with trajectory extraction
 
-Why Use This API?
------------------
+**Why Use This API?**
 - Reduces typical planning setup from 100+ lines to ~20 lines
 - No need to understand poly-type system (AnyPoly, WaypointPoly, InstructionPoly)
 - Numpy integration for trajectories and transforms
 - Type hints and IDE autocomplete support
 - Still allows dropping to low-level API when needed via .env, .to_composite_instruction()
 
-When to Use Low-Level API Instead
----------------------------------
+**When to Use Low-Level API Instead**
 - Custom planner pipelines not in TaskComposer config
 - Direct access to planner-specific options (OMPL algorithm selection)
 - Custom time parameterization settings
 - Performance-critical code (avoid Python object overhead)
 
-Related Examples
-----------------
+**Related Examples**
 - lowlevel/tesseract_planning_composer_c_api_example.py: the same TaskComposer steps in bindings
 - lowlevel/tesseract_planning_lowlevel_c_api_example.py: Raw planner access without TaskComposer
 - lowlevel/freespace_ompl_c_api_example.py: OMPL planning in bindings
 - lowlevel/basic_cartesian_c_api_example.py: TrajOpt Cartesian planning in bindings
 """
 
+import math
 import sys
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator, Quaterniond
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.planning import (
     CartesianTarget,
     JointTarget,
@@ -90,6 +87,9 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
+
+# Component of the unit quaternion [qx, qy, qz, qw] = [h, 0, h, 0]: 2 h^2 = 1.
+SQRT_HALF = math.sqrt(0.5)
 
 
 def main() -> int:
@@ -164,7 +164,7 @@ def main() -> int:
 
     # WHY from_xyz_quat: project canonical quaternion order is scalar-last
     # `[qx, qy, qz, qw]`. The factory bridges to Eigen's internal layout.
-    t1 = Pose.from_xyz_quat([0.5, 0, 0.8], [0, 0, 0.707, 0.707])
+    t1 = Pose.from_xyz_quat([0.5, 0, 0.8], [0, 0, SQRT_HALF, SQRT_HALF])
     print(f"   From position_quaternion: {t1}")
 
     # WHY @ chaining: Reads left-to-right as "translate then rotate"
@@ -228,14 +228,11 @@ def main() -> int:
         # Start at current position (joints)
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
         # Move to Cartesian target
-        .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, -0.2, 0.8], [0.707, 0, 0.707, 0])))
-        # Another Cartesian target
         .move_to(
-            CartesianTarget(
-                position=[0.8, 0.2, 0.8],
-                quaternion=[0.707, 0, 0.707, 0],
-            )
+            CartesianTarget(Pose.from_xyz_quat([0.8, -0.2, 0.8], [SQRT_HALF, 0, SQRT_HALF, 0]))
         )
+        # Another Cartesian target
+        .move_to(CartesianTarget.from_xyz_quat([0.8, 0.2, 0.8], [SQRT_HALF, 0, SQRT_HALF, 0]))
         # Back to joint target
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
     )
@@ -259,28 +256,25 @@ def main() -> int:
     # the TrajOptPipeline. For OMPL+TrajOpt, use TaskComposer directly.
     result = plan_freespace(robot, program)
 
-    if result.successful:
-        print("   Planning successful!")
-        print(f"   Trajectory has {len(result)} waypoints")
+    require_success(result, "freespace")
+    print("   Planning successful!")
+    print(f"   Trajectory has {len(result)} waypoints")
 
-        # WHY result iteration: PlanningResult implements __iter__ and __getitem__
-        # so you can treat it like a list of TrajectoryPoint objects
-        if result.trajectory:
-            print(f"   First point: {result[0].positions}")
-            print(f"   Last point: {result[-1].positions}")
+    # WHY result iteration: PlanningResult implements __iter__ and __getitem__
+    # so you can treat it like a list of TrajectoryPoint objects
+    print(f"   First point: {result[0].positions}")
+    print(f"   Last point: {result[-1].positions}")
 
-            # WHY to_numpy: Common workflow is to pass trajectory to numpy/scipy
-            # for analysis, interpolation, or export. to_numpy() returns (N, num_joints).
-            trajectory_array = result.to_numpy()
-            print(f"   Trajectory shape: {trajectory_array.shape}")
-    else:
-        print(f"   Planning failed: {result.message}")
+    # WHY to_numpy: Common workflow is to pass trajectory to numpy/scipy
+    # for analysis, interpolation, or export. to_numpy() returns (N, num_joints).
+    trajectory_array = result.to_numpy()
+    print(f"   Trajectory shape: {trajectory_array.shape}")
 
     print("\n" + "=" * 60)
     print("Example completed!")
     print("=" * 60)
 
-    return 0 if result.successful else 1
+    return 0
 
 
 if __name__ == "__main__":

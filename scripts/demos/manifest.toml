@@ -121,7 +121,7 @@ fov_rad = 0.75
 module = "online_planning_sqp_example"
 page = "examples/online-planning.md"
 title = "Online planning, SQP"
-blurb = "Real-time replanning through the low-level SQP API."
+blurb = "Replanning through the low-level SQP API, warm-started each tick."
 status = "published"
 floor_size_m = 20.0
 [example.camera]

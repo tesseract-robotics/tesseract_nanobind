@@ -59,6 +59,10 @@ from tesseract_robotics.motion_planners_simple import (
     SimpleMotionPlanner,
     generateInterpolatedProgram,
 )
+from tesseract_robotics.planning import Robot
+
+from ..planning_validity import assert_trajectory_valid
+from .planned_result import planning_result
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 
@@ -206,8 +210,7 @@ class TestOMPLPlanning:
         ompl_planner = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE)
         response = ompl_planner.solve(request)
 
-        assert response.successful, f"OMPL planning failed: {response.message}"
-        assert response.results is not None
+        assert_trajectory_valid(Robot.build(t_env), planning_result(response))
 
         # Interpolate results
         interpolated_results = generateInterpolatedProgram(
@@ -216,13 +219,7 @@ class TestOMPLPlanning:
         assert interpolated_results is not None
 
 
-# NOTE(#103): a TestOMPLSeedDeterminism contract test (same seed -> bit-identical
-# path via single-planner + optimize=False) lived here briefly. It was removed while
-# Windows linked OMPL statically into both the planner DLL and the Python extension,
-# each with its own copy of OMPL's RNGSeedGenerator. The Windows wheel now keeps
-# OMPL's RNG state in the shared ompl_runtime.dll, and the wheel workflow checks that a
-# seed set through one DLL is visible through another (docs/developer/windows-wheels.md).
-# Restoring the test would show whether RNG_setSeed reaches RRTConnect there too.
+# OMPL seed determinism is tested in test_ompl_planner.py (TestOMPLSeedDeterminism).
 
 
 class TestSimplePlanner:
@@ -272,10 +269,9 @@ class TestSimplePlanner:
         ompl_planner = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE)
         response = ompl_planner.solve(request)
 
-        if response.successful:
-            # Now test interpolation
-            interpolated = generateInterpolatedProgram(response.results, t_env, 3.14, 1.0, 3.14, 10)
-            assert interpolated is not None
+        assert response.successful, response.message
+        interpolated = generateInterpolatedProgram(response.results, t_env, 3.14, 1.0, 3.14, 10)
+        assert interpolated is not None
 
 
 # ---- shared helpers for the binding-gap tests below (#303, #332, #333) ----
