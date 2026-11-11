@@ -207,8 +207,8 @@ graph TD
 ```
 
 The C++ libraries keep their upstream names (`tesseract_collision`); the Python modules drop the
-`tesseract_` prefix (`tesseract_robotics.collision`, issue #42). The old names import for one
-release with a `DeprecationWarning` ([module names](../breaking-changes.md#036-module-names)).
+`tesseract_` prefix (`tesseract_robotics.collision`, issue #42). The old names are gone; there are
+no aliases ([module names](../breaking-changes.md#036-module-names)).
 
 ### Module Layout
 

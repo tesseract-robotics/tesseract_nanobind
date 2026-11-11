@@ -97,11 +97,8 @@ from tesseract_robotics.collision import ContactRequest
 from tesseract_robotics.common import Isometry3d
 ```
 
-**Deprecation.** Importing an old name still works for one release. It emits a `DeprecationWarning`
-and returns the same module object as the new name, so `tesseract_robotics.tesseract_collision is
-tesseract_robotics.collision` and every class, enum and function is identical. The aliases live in `src/tesseract_robotics/_legacy_names.py`.
-Removing them is a separate decision, made in a later release; move to the new names now. To find
-remaining uses, run Python with `-W error::DeprecationWarning`.
+**No aliases.** 0.36 is a breaking release: the old names are gone, and importing one raises
+`ModuleNotFoundError`. Every class, enum and function keeps its name; only the module path changes.
 
 **Layout.** Sixteen modules (14 of the renamed ones, plus `trajopt_ifopt` and `trajopt_sqp`) are the compiled extension itself, installed as
 `tesseract_robotics/<name>.abi3.so` with a `<name>.pyi` stub and no `__init__.py` wrapper. The other

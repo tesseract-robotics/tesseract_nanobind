@@ -13,8 +13,7 @@ its 0.36 replacement.
 
 !!! note "Module names"
     The Python modules lost their `tesseract_` prefix: `tesseract_robotics.tesseract_collision` is
-    now `tesseract_robotics.collision`. The old names import for one release with a
-    `DeprecationWarning`. The 0.35 snippets below keep the names 0.35 used. Full table:
+    now `tesseract_robotics.collision`. The old names are gone (no aliases). The 0.35 snippets below keep the names 0.35 used. Full table:
     [0.36 module names](breaking-changes.md#036-module-names).
 
 ## Links and joints: names → ids
