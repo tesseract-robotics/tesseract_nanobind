@@ -73,4 +73,6 @@ def combine(modules: Iterable[ModuleType]) -> ModuleType:
     return out
 
 
+# audit_parse imports it; kept out of `audit`, its names are the native build's, not the audit's.
+native_stack = load("native_stack")
 audit = combine(load(n) for n in SCRIPTS)

@@ -43,7 +43,7 @@ Other changes (rebases, tests, CI, a stub edit that only moves lines) leave it c
 
 ### Header source
 
-libclang parses the bindings against the native stack the wheels link against, not against conda headers: `ws/install/include` (tesseract, trajopt, tesseract_planning) and `vcpkg/installed/<triplet>/include` (Eigen, OMPL, Boost, ...), from `audit_parse.native_include_dirs`. `$AUDIT_NATIVE_ROOT` names the stack root; unset, it is the one `.native/<triplet>` that `pixi run native-build` made. A missing or ambiguous stack raises `NativeStackMissingError`. In CI, `.github/actions/native-linux` restores the wheel workflow's native-stack artifact or builds the stack with `scripts/native_stack.py`. The libclang resource dir (`stdarg.h`, ...) still comes from the audit env's `clang-22`.
+libclang parses the bindings against the native stack the wheels link against, not against conda headers: `ws/install/include` (tesseract, trajopt, tesseract_planning) and `vcpkg/installed/<triplet>/include` (Eigen, OMPL, Boost, ...), from `audit_parse.native_include_dirs`. `$AUDIT_NATIVE_ROOT` names the stack root; unset, it is the one `.native/<triplet>` that `pixi run native-build` made. The vcpkg prefix is the triplet the stack's vcpkg stage recorded in `vcpkg/installed/.native-stack-identity.json`: `vcpkg/installed` also holds the host triplet (`x64-linux` beside `x64-linux-dynamic-release`), so the directory listing cannot name it. A missing stack or identity file raises `NativeStackMissingError`. In CI, `.github/actions/native-linux` restores the wheel workflow's native-stack artifact or builds the stack with `scripts/native_stack.py`. The libclang resource dir (`stdarg.h`, ...) still comes from the audit env's `clang-22`.
 
 ## Audited modules
 

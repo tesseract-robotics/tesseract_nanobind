@@ -11,6 +11,7 @@ from pathlib import Path
 import audit_types
 import clang.cindex as ci
 import nanobind
+import native_stack
 from audit_ownership import (
     HEADER_SUFFIXES,
     INCLUDE_DIRECTIVE,
@@ -96,20 +97,21 @@ def native_root() -> Path:
 def native_include_roots(root: Path) -> tuple[Path, Path]:
     """The two include roots of a native stack: the colcon install and vcpkg's installed prefix.
 
+    The vcpkg prefix is the triplet the stack's vcpkg stage recorded in its identity file
+    (`scripts/native_stack.py`); `vcpkg/installed` also holds the host triplet's build tools.
+
     Raises:
-        NativeStackMissingError: either root is missing, or vcpkg holds not exactly one triplet.
+        NativeStackMissingError: either root is missing, or vcpkg has no recorded triplet.
     """
     install = root / "ws" / "install" / "include"
-    triplets = sorted(
-        d for d in (root / "vcpkg" / "installed").glob("*") if d.is_dir() and d.name != "vcpkg"
-    )
-    if len(triplets) != 1:
+    installed = root / "vcpkg" / "installed"
+    identity = native_stack.read_identity(installed)
+    if identity is None:
         raise NativeStackMissingError(
-            f"expected one vcpkg triplet under {root / 'vcpkg' / 'installed'}, "
-            f"found {[d.name for d in triplets]}; build the native stack "
+            f"no {native_stack.IDENTITY_FILE} under {installed}; build the native stack "
             f"(`pixi run native-build`) or set {NATIVE_ROOT_ENV} to its root"
         )
-    vcpkg = triplets[0] / "include"
+    vcpkg = installed / identity["triplet"] / "include"
     for include in (install, vcpkg):
         if not include.is_dir():
             raise NativeStackMissingError(f"{include} does not exist (native stack at {root})")
