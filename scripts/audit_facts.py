@@ -133,9 +133,7 @@ def fact_key(
     """
     cpp = cpp.resolve()
     include_dirs = [Path(a.removeprefix("-I")) for a in args if a.startswith("-I")]
-    repo_dirs = sorted(
-        {d.resolve() for d in (cpp.parent, *include_dirs) if d.resolve().is_relative_to(REPO_ROOT)}
-    )
+    repo_dirs = sorted({d.resolve() for d in (cpp.parent, *include_dirs) if _in_repo(d)})
     toolchain = {
         "args": list(args),
         "options": options,
@@ -145,6 +143,13 @@ def fact_key(
         "extractors": extractor_digest(extractors),
     }
     return FactKey(kind=kind, source=cpp, toolchain=json.dumps(toolchain, sort_keys=True))
+
+
+def _in_repo(directory: Path) -> bool:
+    """`directory` holds repo files. The pixi env can live inside the repo (`.pixi/envs/audit`
+    in CI); its dirs are covered by `environment_fingerprint`, not by a listing."""
+    d = directory.resolve()
+    return d.is_relative_to(REPO_ROOT) and not d.is_relative_to(CONDA_PREFIX.resolve())
 
 
 def tu_files(tu: ci.TranslationUnit) -> list[Path]:
