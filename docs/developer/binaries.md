@@ -89,7 +89,7 @@ versions and updates both the wheel filename and its WHEEL tags.
 ### Tests before publishing
 
 - **Stub drift gate.** Each build job installs the wheel it just built and runs
-  `scripts/generate_stubs.py --check`; Linux x86_64 also runs pyright.
+  `scripts/generate_stubs.py --check`; Linux x86_64 also runs ty (`ty check`).
 - **`test-wheel` job.** A fresh venv on each platform installs the wheel with pip and
   runs the test suite (without `tests/audit` and `tests/benchmarks`). Pull requests
   test the abi3 wheel on 3.12; pushes, tags and manual runs test it on 3.12, 3.13,

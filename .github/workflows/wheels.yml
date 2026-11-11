@@ -156,7 +156,7 @@ jobs:
         python3 -m venv check-venv
         source check-venv/bin/activate
         python -m pip install --upgrade pip
-        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0 pyright==1.1.414
+        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0 ty==0.0.101
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
     - name: typecheck
@@ -164,8 +164,8 @@ jobs:
       shell: bash
       working-directory: tesseract_nanobind
       run: |
-        source $GITHUB_WORKSPACE/check-venv/bin/activate
-        pyright src/tesseract_robotics
+        # ty, the type checker of record; the version the pixi env pins (pyproject.toml)
+        ty check --python "$GITHUB_WORKSPACE/check-venv" src/tesseract_robotics
     - name: fetch the TWC workcell the rail tests load
       if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
       shell: bash

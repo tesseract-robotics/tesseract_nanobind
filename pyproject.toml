@@ -240,7 +240,6 @@ loguru = ">=0.7.0"
 scipy = ">=1.17.1"             # Required for nanobind Eigen sparse matrix conversion
 
 # Type checking
-pyright = ">=1.1"
 pytest-testmon = ">=2.0"  # PyPI version for pytest>=7 compat
 
 # Build the native stack (scripts/native_stack.py): the same tools the wheel workflow pip-installs.
@@ -257,7 +256,6 @@ test-benchmark = { cmd = "python -m pytest tests/benchmarks -q", depends-on = [
 ], description = "Run benchmark tests (serial, no xdist)" }
 lint = "ruff check ."
 fmt = "ruff format ."
-typecheck = { cmd = "pyright src/tesseract_robotics", description = "Type check with pyright" }
 native-build = { cmd = "python scripts/native_stack.py all", description = "Build the native C++ stack into .native/<triplet>, exactly as the wheel workflow does (scripts/native_stack.py); skipped when its inputs are unchanged" }
 install = { cmd = "python scripts/native_stack.py exec -- pip install -e . --no-build-isolation && python scripts/native_stack.py exec -- pip install packaging/tesseract-robotics-nanobind-support --no-deps --no-build-isolation", depends-on = [
     "native-build",
@@ -378,14 +376,14 @@ py-spy = ">=0.4.2"
 [tool.pixi.feature.profile.tasks]
 gil-hotspots = { cmd = "python scripts/gil_hotspots.py all", description = "Record benchmarks and tests with py-spy --gil (asks for sudo); rank the bindings that hold the GIL (#124)" }
 
-# ty, the type checker of record (pre-push hook `typecheck-ty`). Pre-1.0: every release changes
+# ty, the type checker of record (pre-push hook and CI: `pixi run typecheck`). Pre-1.0: every release changes
 # diagnostics, so the range admits patch builds of one version only.
 [tool.pixi.feature.typecheck.dependencies]
 ty = ">=0.0.101,<0.0.102"
 
 [tool.pixi.feature.typecheck.tasks]
 # --python: the env's interpreter, so the editable package and its numpy/scipy resolve.
-typecheck-ty = { cmd = "ty check --python $CONDA_PREFIX src/tesseract_robotics", description = "Type check the package with ty (the checker of record)" }
+typecheck = { cmd = "ty check --python $CONDA_PREFIX src/tesseract_robotics", description = "Type check the package with ty (the checker of record)" }
 
 # Binding API audit (docs/developer/binding-api-audit.md): libclang reads the binding
 # TUs, ast reads the committed stubs. Dev-only: never in the default env or the wheel.
