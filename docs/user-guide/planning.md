@@ -37,8 +37,8 @@ flowchart TD
 | Planner | Kind | Use for | What it guarantees |
 | --- | --- | --- | --- |
 | OMPL | sampling | free space among obstacles | probabilistically complete: finds a path if one exists, given enough time; nothing within a fixed time |
-| TrajOpt | sequential convex optimization | smoothing, Cartesian paths, constraints | a local optimum of the costs; constraints hold where they are evaluated |
-| TrajOpt-Ifopt | SQP with OSQP | replanning from a warm start | as TrajOpt |
+| TrajOpt | sequential convex optimization | smoothing, Cartesian paths, constraints | on success, a local (stationary) point of the costs with constraints holding to the solver tolerance at the evaluated points; a failed solve guarantees neither |
+| TrajOpt-Ifopt | SQP with OSQP | replanning from a warm start | as TrajOpt: on success, a local (stationary) point of the costs with constraints holding to the solver tolerance at the evaluated points; a failed solve guarantees neither |
 | Descartes | graph search over IK solutions | dense Cartesian toolpaths | the minimum-cost path through the sampled solutions: optimal for that discretization, not for the continuous problem |
 | Simple | interpolation | seeds, joint moves | none; no collision checking |
 
@@ -311,8 +311,8 @@ A threshold that the first path meets ends the loop at that path. On
 `freespace_clearance_objective_example.py`, a 4.0 rad threshold ended OMPL in 0.04 to 0.07 s
 against 10.81 to 11.98 s for the default objective at `planning_time = 10`
 ([evidence and per-seed table](../examples/ompl.md#evidence)); on the sphere sweep of
-`freespace_hybrid_example.py`, an infinite threshold returns in 0.2 s against 3.0 s at
-`planning_time = 3` (`tests/tesseract_motion_planners/test_ompl_objective.py`).
+`freespace_hybrid_example.py`, `tests/tesseract_motion_planners/test_ompl_objective.py` asserts
+that an infinite threshold returns in under 2 s at `planning_time = 10.0`.
 
 !!! warning "Clearance is not reported on this stack"
     tesseract's OMPL state validators do not implement `clearance()`, so OMPL's default,
@@ -358,16 +358,10 @@ so `stateCost` is never called.
 | `OMPLStateSpaceTypeError` (a `TypeError`), building the subclass | the planning space is not a `RealVectorStateSpace` |
 | the override's own exception, from `solve` | `stateCost` raised on the thread that called `solve` (see the warning below) |
 
-On the sphere sweep the Python calls cost less than the solve's run-to-run noise. Measured with
-`scripts/bench_state_cost.py` (one RRTConnect planner on seed 1, an infinite cost threshold so
-the loop prices the first path once, motion-cost interpolation on, 5 processes per arm; Apple M1
-Max, Python 3.14):
-
-| Measure | Run 1 | Run 2 |
-|---|---|---|
-| `stateCost` calls per solve | 517, the same in every seeded run | 517 |
-| Solve median, C++ / Python `stateCost` | 15.2 ms (14.6 to 16.0) / 15.2 ms (15.0 to 16.4) | 16.1 / 16.3 ms |
-| Extra time per Python call | below resolution: under 1.4 ms / 517 = 2.7 µs | one C++ run at 29.5 ms widens the bound to 26 µs |
+`scripts/bench_state_cost.py` measures what the Python calls cost: one RRTConnect planner on
+seed 1 on the sphere sweep, an infinite cost threshold so the loop prices the first path once,
+motion-cost interpolation on, a C++ arm against a Python `stateCost` arm, each in its own
+processes. Run it on your machine; the figures depend on the hardware and the scene.
 
 !!! note "Each call takes the GIL"
     `solve` releases the GIL and every `stateCost` call takes it back. Parallel planners
@@ -397,6 +391,7 @@ both in the `TrajOptMotionPlannerTask` namespace: the **move profile**
 | Collision constraint | margin 0 m, buffer 5 mm, coefficient 10 |
 | Collision cost | margin 5 mm, buffer 10 mm, coefficient 50 |
 | Collision evaluator | `LVS_CONTINUOUS`, `longest_valid_segment_length` 0.1 (joint-space norm) |
+| Smoothing | `smooth_velocities`, `smooth_accelerations` and `smooth_jerks` stay at the C++ default (`True`); the Ifopt helper, `create_trajopt_ifopt_default_profiles`, sets all three to `False` |
 
 ```python
 from tesseract_robotics.planning.profiles import create_trajopt_profile_pair
@@ -491,8 +486,15 @@ result = plan_freespace(robot, upright, profiles=create_trajopt_upright_profiles
 assert result.successful, result.message
 ```
 
-A joint term weights joints the same way: `move.joint_cost_config.coeff = [100, 1, 1, 1, 1, 1]`
-makes moving joint 1 a hundred times as costly as the others. The
+A joint term weights joints the same way. `joint_cost_config` is disabled by default and the joint
+constraint is the default, so enable the cost and set the weights:
+
+```python
+move.joint_cost_config.enabled = True
+move.joint_cost_config.coeff = [100, 1, 1, 1, 1, 1]
+```
+
+The first joint's deviation from a joint target now weighs a hundred times that of the others. The
 [glass upright example](../examples/planning.md#glass-upright-orientation-constraint) runs
 the full scene.
 
@@ -615,7 +617,8 @@ waypoint's sampler constructs a `DescartesCollision`, which clones the environme
 contact manager, and a Bullet clone rebuilds and zero-fills its pool allocators. A `sample`
 profile of `DescartesMotionPlannerD.solve` on a 419-waypoint contour (`abb_irb2400`, redundant
 solutions on) puts about 97 % of the solve there, serially on the calling thread, before the
-parallel ladder build starts:
+parallel ladder build starts. Source: [#140](https://github.com/tesseract-robotics/tesseract_nanobind/issues/140) (0.35.0.7, macOS arm64; the issue does not record
+the chip):
 
 | Vertex collision | Threads | Wall | CPU / wall |
 |---|---|---|---|
@@ -647,8 +650,7 @@ contact_manager_plugins:
 
 Pool size is capacity, not semantics: the contacts are the same
 (`tests/tesseract_collision/test_bullet_pool_config.py`). Measured in
-[#140](https://github.com/tesseract-robotics/tesseract_nanobind/issues/140) (0.35.0.7, macOS
-arm64):
+[#140](https://github.com/tesseract-robotics/tesseract_nanobind/issues/140) (0.35.0.7, macOS arm64; the issue does not record the chip):
 
 | Scene | Planner | Default pools (4096/4096) | 16/16 pools | Output |
 |---|---|---|---|---|
@@ -673,7 +675,7 @@ recorded on the IRB2400:
 | `DescartesMotionPlannerTask: Failed to build graph` | a Cartesian waypoint has no valid IK solution: out of reach, every solution in collision, or no edge to the next waypoint | check the pose and the TCP ([Frames and the TCP](#frames-and-the-tcp)); sample the tool axis (`sample_axis`) |
 | `TrajOptMotionPlannerTask: Failed to find valid solution: OPT_PENALTY_ITERATION_LIMIT` | the constraints cannot all hold near the seed: a target out of reach or in collision, or an obstacle the straight seed cannot be pushed around | check the targets; plan around obstacles with `plan_ompl` |
 | `OMPLMotionPlannerTask: Failed to find valid solution: Exceeded allowed time` | no path within `planning_time`, or the start or goal is in collision (the log then reads `Goal state is in collision` with the link pair) | check the start and goal states; raise `planning_time` |
-| `DiscreteContactCheckTask: Contact(s) found: ...` with `Step: [link_a, link_b] @ distance` | the planned path is within the contact check's margin at the listed step | widen TrajOpt's collision cost margin; check the motion between waypoints with an LVS evaluator |
+| `DiscreteContactCheckTask: Contact(s) found:`, a `Format:` header, then one line per contact, `Step <n>: [link_a, link_b] @ <distance m>` (negative is penetration) | the planned path is within the contact check's margin at the listed step | widen TrajOpt's collision cost margin; check the motion between waypoints with an LVS evaluator |
 
 Check the start and goal states for contacts before you change planners:
 

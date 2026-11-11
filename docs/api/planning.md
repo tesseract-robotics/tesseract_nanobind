@@ -64,7 +64,7 @@ workflow (including pipeline warmup).
 ```python
 from tesseract_robotics.planning import TaskComposer
 
-composer = TaskComposer.from_config(warmup=True)  # ~10-15s one-time cost
+composer = TaskComposer.from_config(warmup=True)  # loads the factory and creates the common pipelines
 result = composer.plan(robot, program, pipeline="TrajOptPipeline")
 ```
 

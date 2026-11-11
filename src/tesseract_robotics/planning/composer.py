@@ -316,7 +316,7 @@ class TaskComposer:
             locator: Resource locator
             num_threads: Number of threads for executor (overrides YAML config)
             executor: Pre-configured executor (overrides num_threads and YAML)
-            warmup: Pre-load plugins to eliminate first-call latency (~10-15s).
+            warmup: Create the pipelines' task nodes at startup, so the first plan does not.
                     True = load common pipelines, list = specific pipelines, False = skip.
 
         Returns:
@@ -364,13 +364,14 @@ class TaskComposer:
 
     def warmup(self, pipelines: list[str] | None = None) -> list[str]:
         """
-        Pre-load plugin libraries to eliminate first-call latency.
+        Create the pipelines' task nodes ahead of the first plan.
 
-        The TaskComposer uses dynamic plugin loading (boost_plugin_loader / dlopen).
-        First call to createTaskComposerNode() loads the shared library, which
-        takes 10-15 seconds. Subsequent calls are instant (cached).
+        The TaskComposer loads its tasks as plugins (boost_plugin_loader / dlopen).
+        Building the composer loads the factory (about 0.3 to 1.0 s on an M1 Max);
+        the first plan through a pipeline is slower than later ones through the same
+        composer.
 
-        Call warmup() once at application startup to amortize this cost.
+        Call warmup() once at application startup to keep that off the first plan.
 
         Args:
             pipelines: Specific pipelines to load, or None for commonly used ones.
@@ -387,10 +388,10 @@ class TaskComposer:
             ```python
             # At application startup
             composer = TaskComposer.from_config()
-            composer.warmup()  # Takes ~10-15s, pre-loads common pipelines
+            composer.warmup()  # creates the common pipelines' nodes
 
             # Later planning calls are fast
-            result = composer.plan(robot, program)  # ~8s instead of ~22s
+            result = composer.plan(robot, program)  # does not pay for node creation
             ```
         """
         if pipelines is None:
