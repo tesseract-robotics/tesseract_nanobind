@@ -5,9 +5,13 @@ Provides factory functions for common geometry types and a high-level
 interface for adding obstacles to the environment.
 
 Example:
+    ```python
+    from tesseract_robotics import get_tesseract_resource_path
+    from tesseract_robotics.common import GeneralResourceLocator
     from tesseract_robotics.planning import Robot, box, sphere, create_obstacle, Pose
 
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
     # Add a box obstacle
     create_obstacle(
@@ -24,20 +28,21 @@ Example:
         geometry=sphere(0.1),
         transform=Pose.from_xyz(0.3, 0.2, 0.6),
     )
+    ```
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 if TYPE_CHECKING:
-    from tesseract_robotics.common import GeneralResourceLocator
     from tesseract_robotics.planning.core import Robot
 
-from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d, Resource
 from tesseract_robotics.geometry import (
     Box,
     Cone,
@@ -46,6 +51,14 @@ from tesseract_robotics.geometry import (
     Geometry,
     Mesh,
     Sphere,
+    createConvexMeshFromPath,
+    createMeshFromResource,
+)
+from tesseract_robotics.planning.errors import (
+    AmbiguousMeshError,
+    InvalidArrayShapeError,
+    MeshLoadError,
+    ResourceNotFoundError,
 )
 from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.scene_graph import (
@@ -56,6 +69,19 @@ from tesseract_robotics.scene_graph import (
     Material,
     Visual,
 )
+
+# URL schemes the resource locator resolves; anything else is a local path.
+URL_SCHEMES: Final = ("package://", "file://")
+
+# Triangulate faces; right for visual and plain meshes, wrong for convex hull input.
+TRIANGULATE: Final = True
+
+# Condense the file's meshes into one (upstream: for visual meshes only). A file that still yields
+# several meshes is reported, not truncated.
+FLATTEN: Final = True
+
+# Collision meshes are never flattened: each submesh keeps its own hull.
+FLATTEN_CONVEX: Final = False
 
 
 def box(x: float, y: float, z: float) -> Box:
@@ -114,100 +140,145 @@ def cone(radius: float, length: float) -> Cone:
     return Cone(radius, length)
 
 
-def mesh_from_file(
-    filepath: str | Path,
-    scale: np.ndarray | None = None,
-    locator: GeneralResourceLocator | None = None,
-) -> Mesh:
-    """
-    Load mesh geometry from file.
-
-    Supports common mesh formats (STL, DAE, OBJ, etc.)
+def _locate(filepath: str | Path, locator: GeneralResourceLocator) -> Resource:
+    """Resolve a `package://` / `file://` URL or a filesystem path to a located resource.
 
     Args:
-        filepath: Path to mesh file
-        scale: Optional scale factors [sx, sy, sz]
-        locator: Resolves package:// URLs (uses GeneralResourceLocator if not provided)
+        filepath: A URL with a `package://` or `file://` scheme, or a local path.
+        locator: Resolves the URL.
 
     Returns:
-        Mesh geometry
+        The located resource.
+
+    Raises:
+        ResourceNotFoundError: a local path is not an existing file, or the locator cannot
+            resolve the URL to one.
     """
-    from tesseract_robotics.common import GeneralResourceLocator
-    from tesseract_robotics.geometry import createMeshFromResource
-
-    locator = locator or GeneralResourceLocator()
-    filepath = str(filepath)
-
-    if scale is None:
-        scale = np.array([1.0, 1.0, 1.0])
+    text = str(filepath)
+    if text.startswith(URL_SCHEMES):
+        url = text
     else:
-        scale = np.asarray(scale, dtype=np.float64)
+        path = Path(filepath).resolve()
+        if not path.is_file():
+            raise ResourceNotFoundError(f"Mesh file does not exist: {path}")
+        url = path.as_uri()
+    resource = locator.locateResource(url)
+    if resource is None:
+        raise ResourceNotFoundError(f"Locator could not resolve mesh resource: {url}")
+    # A package:// URL resolves to a path whether or not the file is there.
+    if not Path(resource.getFilePath()).is_file():
+        raise ResourceNotFoundError(f"Mesh resource {url} resolves to a missing file")
+    return resource
 
-    # Use file:// URL for local files
-    if not filepath.startswith("package://") and not filepath.startswith("file://"):
-        filepath = f"file://{filepath}"
 
-    meshes = createMeshFromResource(
-        locator.locateResource(filepath),
-        scale,
-        True,  # triangulate
-        True,  # flatten
-    )
+def _scale_vector(scale: ArrayLike | None) -> np.ndarray:
+    """`scale` as a 3-vector; None is the unit scale."""
+    if scale is None:
+        return np.ones(3)
+    vector = np.asarray(scale, dtype=np.float64)
+    if vector.shape != (3,):
+        raise InvalidArrayShapeError(f"Scale must have 3 elements, got {vector.shape}")
+    return vector
 
+
+def meshes_from_file(
+    filepath: str | Path,
+    scale: ArrayLike | None = None,
+    locator: GeneralResourceLocator | None = None,
+) -> list[Mesh]:
+    """Load every mesh a file holds (STL, DAE, OBJ, ...).
+
+    A scene file such as a DAE can hold several meshes; this returns all of them, in file order.
+
+    Args:
+        filepath: Local path, `file://` URL or `package://` URL of the mesh file.
+        scale: Optional scale factors `[sx, sy, sz]`.
+        locator: Resolves `package://` URLs (uses `GeneralResourceLocator` if not provided).
+
+    Returns:
+        One or more meshes.
+
+    Raises:
+        ResourceNotFoundError: the file does not exist or the URL does not resolve.
+        MeshLoadError: the file loaded no mesh.
+        InvalidArrayShapeError: `scale` does not have 3 elements.
+    """
+    locator = locator or GeneralResourceLocator()
+    resource = _locate(filepath, locator)
+    meshes = createMeshFromResource(resource, _scale_vector(scale), TRIANGULATE, FLATTEN)
     if meshes is None or len(meshes) == 0:
-        raise RuntimeError(
-            f"Failed to load mesh from {filepath}. "
-            f"Check file exists and format is supported (STL, DAE, OBJ)."
+        raise MeshLoadError(
+            f"Failed to load a mesh from {filepath}; check the format is supported (STL, DAE, OBJ)."
         )
+    return list(meshes)
 
+
+def mesh_from_file(
+    filepath: str | Path,
+    scale: ArrayLike | None = None,
+    locator: GeneralResourceLocator | None = None,
+) -> Mesh:
+    """Load the single mesh of a file (STL, DAE, OBJ, ...).
+
+    Args:
+        filepath: Local path, `file://` URL or `package://` URL of the mesh file.
+        scale: Optional scale factors `[sx, sy, sz]`.
+        locator: Resolves `package://` URLs (uses `GeneralResourceLocator` if not provided).
+
+    Returns:
+        The mesh.
+
+    Raises:
+        ResourceNotFoundError: the file does not exist or the URL does not resolve.
+        MeshLoadError: the file loaded no mesh.
+        AmbiguousMeshError: the file holds several meshes; use `meshes_from_file`.
+        InvalidArrayShapeError: `scale` does not have 3 elements.
+    """
+    meshes = meshes_from_file(filepath, scale, locator)
+    if len(meshes) > 1:
+        raise AmbiguousMeshError(
+            f"{filepath} holds {len(meshes)} meshes; mesh_from_file returns one. "
+            f"Use meshes_from_file to get all of them."
+        )
     return meshes[0]
 
 
 def convex_mesh_from_file(
     filepath: str | Path,
-    scale: np.ndarray | None = None,
+    scale: ArrayLike | None = None,
     locator: GeneralResourceLocator | None = None,
 ) -> ConvexMesh:
-    """
-    Load convex mesh geometry from file.
+    """Load the single convex mesh of a file.
 
     Creates a convex hull from the loaded mesh, suitable for
     efficient collision checking.
 
     Args:
-        filepath: Path to mesh file or package:// URL
-        scale: Optional scale factors [sx, sy, sz]
-        locator: Resolves package:// URLs (uses GeneralResourceLocator if not provided)
+        filepath: Local path, `file://` URL or `package://` URL of the mesh file.
+        scale: Optional scale factors `[sx, sy, sz]`.
+        locator: Resolves `package://` URLs (uses `GeneralResourceLocator` if not provided).
 
     Returns:
-        ConvexMesh geometry
+        The convex mesh.
+
+    Raises:
+        ResourceNotFoundError: the file does not exist or the URL does not resolve.
+        MeshLoadError: the file loaded no mesh.
+        AmbiguousMeshError: the file holds several meshes.
+        InvalidArrayShapeError: `scale` does not have 3 elements.
     """
-    from tesseract_robotics.common import GeneralResourceLocator
-    from tesseract_robotics.geometry import createConvexMeshFromPath
-
     locator = locator or GeneralResourceLocator()
-    filepath = str(filepath)
-
-    if scale is None:
-        scale = np.array([1.0, 1.0, 1.0])
-    else:
-        scale = np.asarray(scale, dtype=np.float64)
-
-    # Resolve package:// URLs to filesystem paths
-    if filepath.startswith("package://"):
-        filepath = locator.locateResource(filepath).getFilePath()
-    elif not filepath.startswith("file://") and not filepath.startswith("/"):
-        # Relative path - make absolute
-        filepath = str(Path(filepath).resolve())
-
-    meshes = createConvexMeshFromPath(filepath, scale, True, False)
-
+    path = Path(_locate(filepath, locator).getFilePath())
+    meshes = createConvexMeshFromPath(str(path), _scale_vector(scale), TRIANGULATE, FLATTEN_CONVEX)
     if meshes is None or len(meshes) == 0:
-        raise RuntimeError(
-            f"Failed to load convex mesh from {filepath}. "
-            f"Check file exists and format is supported (STL, DAE, OBJ)."
+        raise MeshLoadError(
+            f"Failed to load a convex mesh from {filepath}; "
+            f"check the format is supported (STL, DAE, OBJ)."
         )
-
+    if len(meshes) > 1:
+        raise AmbiguousMeshError(
+            f"{filepath} holds {len(meshes)} meshes; convex_mesh_from_file returns one."
+        )
     return meshes[0]
 
 
@@ -243,7 +314,7 @@ def create_obstacle(
     transform: Pose | None = None,
     parent_link: str = "base_link",
     color: tuple | None = None,
-) -> bool:
+) -> None:
     """
     Add a collision obstacle to the robot environment.
 
@@ -258,8 +329,8 @@ def create_obstacle(
         parent_link: Link to attach obstacle to
         color: Optional RGBA color tuple (0-1 range)
 
-    Returns:
-        True if obstacle was added successfully
+    Raises:
+        EnvironmentCommandError: the environment refused the link (duplicate name, unknown parent).
 
     Example:
         create_obstacle(
@@ -284,7 +355,7 @@ def create_obstacle(
     joint.type = JointType.FIXED
     joint.parent_to_joint_origin_transform = transform
 
-    return robot.add_link(link, joint)
+    robot.add_link(link, joint)
 
 
 def create_link_with_geometry(
@@ -308,7 +379,7 @@ def create_link_with_geometry(
     Returns:
         Configured Link object
     """
-    isometry = origin if origin else Isometry3d.Identity()
+    isometry = origin if origin is not None else Isometry3d.Identity()
 
     link = Link(name)
     _add_visual_and_collision(link, geometry, isometry, name, color)

@@ -7,10 +7,9 @@ composable with all `Isometry3d` operators. The factory classmethods on
 this class are the Python ergonomic layer over Eigen's ctors; nothing
 about `Pose` adds an indirection.
 
-Design rule (per PR #76 reviews): **no parallel numpy state on Pose**.
-The old design kept a `_matrix: np.ndarray` alongside an Isometry3d
-that was kept in sync — that was the anti-pattern. The current design
-is "Pose IS-A Isometry3d, full stop": construction goes through
+Design rule: **no parallel numpy state on Pose**. A numpy matrix kept
+alongside the Isometry3d must be kept in sync with it, and the two drift.
+Pose is an Isometry3d, full stop: construction goes through
 `Translation3d(x, y, z)` + `Quaterniond(...)` directly (no intermediate
 `np.array([x, y, z])` for the Eigen caster to convert back), and the
 single source of truth is the inherited Isometry3d state.
@@ -21,11 +20,13 @@ On-demand getters returning numpy *are* allowed and desirable:
 numpy. They are reads from the canonical state, not a parallel store.
 
 Example:
+    ```python
     from tesseract_robotics.planning import Pose, translation, rotation_z
 
     pose = Pose.from_xyz_rpy([0.5, 0.0, 0.3], [0, 0, 1.57])
     pose = translation(0.5, 0.0, 0.3) @ rotation_z(1.57)
-    iso = pose  # no conversion needed — Pose is an Isometry3d
+    iso = pose  # no conversion needed: Pose is an Isometry3d
+    ```
 """
 
 from __future__ import annotations
@@ -46,6 +47,7 @@ from tesseract_robotics.common import (
     Quaterniond,
     Translation3d,
 )
+from tesseract_robotics.planning.errors import DegenerateRotationError, InvalidArrayShapeError
 
 # Denominator floor for `.normalized()`-style operations. Below this
 # magnitude, float64 division by `.norm()` (Eigen's `.normalized()` or the
@@ -53,9 +55,8 @@ from tesseract_robotics.common import (
 # and unstably-amplified roundoff for sub-epsilon input. We refuse rather
 # than silently corrupt the result.
 #
-# This is a NUMERICAL FLOOR, not a tolerance (per CLAUDE.md): it does not
-# assert anything about input accuracy, only that the input can be safely
-# divided into. Sourced from Eigen's `NumTraits<double>::dummy_precision()`
+# This is a NUMERICAL FLOOR, not a tolerance: it does not assert anything
+# about input accuracy, only that the input can be safely divided into. Sourced from Eigen's `NumTraits<double>::dummy_precision()`
 # (re-exported as `EIGEN_DEFAULT_PREC` from the binding) so the whole
 # stack — this constant, the C++ `kDegenerateGeometryEps`, the test
 # constants — share one anchor.
@@ -73,24 +74,15 @@ class Pose(Isometry3d):
     in-place mutators (`translate`, `rotate`, `pretranslate`, `prerotate`),
     and the `*` operator are **methods**.
 
-    Factory convention: **one name per logical operation; both arraylike-
-    pair and by-component signatures accepted via `@overload` *only when
-    both styles read naturally* at the call site**.
+    Factory convention: one name per logical operation. Every factory whose
+    argument is one logical vector (a position, a quaternion, RPY angles, an
+    axis) accepts both the array form and the scalar form via `@overload`:
+    - `from_xyz(position)` / `from_xyz(x, y, z)`
+    - `from_xyz_quat(position, quaternion)` / `from_xyz_quat(x, y, z, qx, qy, qz, qw)`
+    - `from_xyz_rpy(position, rpy)` / `from_xyz_rpy(x, y, z, roll, pitch, yaw)`
 
-    Where `@overload` is provided:
-    - `from_xyz_quat(pos, quat)` / `from_xyz_quat(x, y, z, qx, qy, qz, qw)`
-    - `from_xyz_rpy(pos, rpy)` / `from_xyz_rpy(x, y, z, roll, pitch, yaw)`
-
-    Where it is NOT (asymmetry by design):
-    - `from_xyz(x, y, z)` — 3 scalars only. `from_xyz([x, y, z])` saves no
-      keystrokes and a literal `[0.5, 0, 0.3]` rarely already exists as a
-      variable; the @overload would be ceremony.
-    - `from_matrix_position(R, pos)` — `R` is always arraylike (9 scalars
-      is absurd). `pos` could grow a scalar overload but the asymmetric
-      `(R, x, y, z)` shape reads worse than the current uniform-arraylike.
-
-    Rule of thumb: add `@overload` when both call shapes show up unprompted
-    at real call sites. Don't add overloads for hypothetical symmetry.
+    `from_matrix_position(R, pos)` takes a 3x3 matrix, which has no natural scalar
+    form; its position is always an array.
 
     The inherited `Pose()` / `Pose(matrix)` / `Pose(iso)` /
     `Pose(Translation3d, Quaterniond)` ctors cover identity, raw-matrix,
@@ -128,14 +120,40 @@ class Pose(Isometry3d):
 
     # ----- Factories ----------------------------------------------------
 
+    @overload
     @classmethod
-    def from_xyz(cls, x: float, y: float, z: float) -> Self:
-        """Pure translation pose from scalar components."""
+    def from_xyz(cls, position: ArrayLike, /) -> Self: ...
+    @overload
+    @classmethod
+    def from_xyz(cls, x: float, y: float, z: float, /) -> Self: ...
+    # Same structural pyright limitation as from_xyz_quat; see the comment there.
+    @classmethod
+    def from_xyz(cls, *args) -> Self:  # pyright: ignore[reportInconsistentOverload]
+        """Pure translation pose.
+
+        Two calling conventions, dispatched on `len(args)`:
+        - **Array**: `from_xyz([x, y, z])`.
+        - **Scalars**: `from_xyz(x, y, z)`.
+
+        Raises:
+            TypeError: neither one array nor three scalars were given.
+            InvalidArrayShapeError: the array does not have 3 elements.
+        """
+        if len(args) == 1:
+            (position,) = args
+        elif len(args) == 3:
+            position = args
+        else:
+            raise TypeError(
+                f"from_xyz takes 1 arraylike arg (position) or 3 scalar args (x, y, z); "
+                f"got {len(args)} args"
+            )
+        x, y, z = _vector3(position, "Position")
         return cls(Translation3d(x, y, z), Quaterniond.Identity())
 
     @overload
     @classmethod
-    def from_xyz_quat(cls, position: ArrayLike, quaternion: ArrayLike) -> Self: ...
+    def from_xyz_quat(cls, position: ArrayLike, quaternion: ArrayLike, /) -> Self: ...
     @overload
     @classmethod
     def from_xyz_quat(
@@ -147,6 +165,7 @@ class Pose(Isometry3d):
         qy: float,
         qz: float,
         qw: float,
+        /,
     ) -> Self: ...
     # pyright wants the impl signature to enumerate named params from every
     # overload (would be 7 params with 5 defaults, narrowed on len(args)
@@ -172,8 +191,12 @@ class Pose(Isometry3d):
         - **Scalars**: `from_xyz_quat(x, y, z, qx, qy, qz, qw)` — useful
           for literal values.
 
-        Quaternion is normalised; zero-magnitude quaternions are rejected
-        with `ValueError`.
+        Quaternion is normalised.
+
+        Raises:
+            TypeError: wrong number of arguments.
+            InvalidArrayShapeError: position or quaternion has the wrong number of elements.
+            DegenerateRotationError: the quaternion is too short to normalise.
         """
         if len(args) == 2:
             position, quaternion = args
@@ -184,20 +207,13 @@ class Pose(Isometry3d):
                 "from_xyz_quat takes 2 arraylike args (pos, quat) "
                 f"or 7 scalar args (x, y, z, qx, qy, qz, qw); got {len(args)} args"
             )
-        pos = np.asarray(position, dtype=np.float64).ravel()
-        quat = np.asarray(quaternion, dtype=np.float64).ravel()
-        if pos.shape != (3,):
-            raise ValueError(f"Position must have 3 elements, got {pos.shape}")
-        if quat.shape != (4,):
-            raise ValueError(f"Quaternion must have 4 elements, got {quat.shape}")
-        return cls(
-            Translation3d(float(pos[0]), float(pos[1]), float(pos[2])),
-            _safe_quaternion(float(quat[0]), float(quat[1]), float(quat[2]), float(quat[3])),
-        )
+        x, y, z = _vector3(position, "Position")
+        qx, qy, qz, qw = _vector(quaternion, 4, "Quaternion")
+        return cls(Translation3d(x, y, z), _safe_quaternion(qx, qy, qz, qw))
 
     @overload
     @classmethod
-    def from_xyz_rpy(cls, position: ArrayLike, rpy: ArrayLike) -> Self: ...
+    def from_xyz_rpy(cls, position: ArrayLike, rpy: ArrayLike, /) -> Self: ...
     @overload
     @classmethod
     def from_xyz_rpy(
@@ -208,17 +224,24 @@ class Pose(Isometry3d):
         roll: float,
         pitch: float,
         yaw: float,
+        /,
     ) -> Self: ...
     # Same structural pyright limitation as from_xyz_quat — see comment there.
     @classmethod
     def from_xyz_rpy(cls, *args) -> Self:  # pyright: ignore[reportInconsistentOverload]
-        """Pose from position `[x, y, z]` and XYZ Tait-Bryan angles `[roll, pitch, yaw]`.
+        """Pose from position `[x, y, z]` and roll-pitch-yaw angles `[roll, pitch, yaw]` (rad).
 
         Two calling conventions:
         - **Pair**: `from_xyz_rpy(position, rpy)`.
         - **Scalars**: `from_xyz_rpy(x, y, z, roll, pitch, yaw)`.
 
-        Composition: `R = Rz(yaw) · Ry(pitch) · Rx(roll)`.
+        Composition: `R = Rz(yaw) · Ry(pitch) · Rx(roll)`, the intrinsic Z-Y-X Tait-Bryan
+        convention (the same rotation as fixed-axis rotations about X, then Y, then Z).
+        `roll`, `pitch` and `yaw` read it back with the same convention.
+
+        Raises:
+            TypeError: wrong number of arguments.
+            InvalidArrayShapeError: position or rpy has the wrong number of elements.
         """
         if len(args) == 2:
             position, rpy = args
@@ -229,16 +252,9 @@ class Pose(Isometry3d):
                 "from_xyz_rpy takes 2 arraylike args (pos, rpy) "
                 f"or 6 scalar args (x, y, z, roll, pitch, yaw); got {len(args)} args"
             )
-        pos = np.asarray(position, dtype=np.float64).ravel()
-        angles = np.asarray(rpy, dtype=np.float64).ravel()
-        if pos.shape != (3,):
-            raise ValueError(f"Position must have 3 elements, got {pos.shape}")
-        if angles.shape != (3,):
-            raise ValueError(f"RPY must have 3 elements, got {angles.shape}")
-        return cls(
-            Translation3d(float(pos[0]), float(pos[1]), float(pos[2])),
-            Quaterniond.from_rpy(angles),
-        )
+        x, y, z = _vector3(position, "Position")
+        angles = np.asarray(_vector3(rpy, "RPY"), dtype=np.float64)
+        return cls(Translation3d(x, y, z), Quaterniond.from_rpy(angles))
 
     @classmethod
     def from_matrix_position(cls, rotation: ArrayLike, position: ArrayLike) -> Self:
@@ -247,25 +263,21 @@ class Pose(Isometry3d):
         The rotation must be orthonormal — `Quaterniond(Matrix3d)` validates
         this at the binding boundary and raises `ValueError` for non-rotation
         input (scaling, shear, or accumulated FP drift beyond ~1e-12).
+
+        Raises:
+            InvalidArrayShapeError: `rotation` is not 3x3 or `position` has no 3 elements.
         """
         R = np.asarray(rotation, dtype=np.float64)
-        pos = np.asarray(position, dtype=np.float64).ravel()
         if R.shape != (3, 3):
-            raise ValueError(f"Rotation must be 3x3, got {R.shape}")
-        if pos.shape != (3,):
-            raise ValueError(f"Position must have 3 elements, got {pos.shape}")
-        return cls(
-            Translation3d(float(pos[0]), float(pos[1]), float(pos[2])),
-            Quaterniond(R),
-        )
+            raise InvalidArrayShapeError(f"Rotation must be 3x3, got {R.shape}")
+        x, y, z = _vector3(position, "Position")
+        return cls(Translation3d(x, y, z), Quaterniond(R))
 
     # ----- Scalar accessors ---------------------------------------------
     #
-    # Ergonomic float-returning shortcuts over the inherited Isometry3d API.
-    # Per Joelkang's PR #76 review: `pose.translation[0]` is clunky; `pose.x`
-    # is the ergonomic spelling. These do NOT reintroduce the numpy facade
-    # @johnwason objected to — they're 1-line scalar extractors, no parallel
-    # state, no numpy roundtrip.
+    # Ergonomic float-returning shortcuts over the inherited Isometry3d API:
+    # `pose.translation[0]` is clunky, `pose.x` reads. They are one-line scalar
+    # extractors with no parallel state and no numpy round trip.
     #
     # Perf note: each `qx/qy/qz/qw` access allocates a fresh `Quaterniond`
     # from `self.linear`; each `roll/pitch/yaw` access additionally runs
@@ -319,7 +331,7 @@ class Pose(Isometry3d):
         """Quaternion w (scalar) component — last in the canonical order."""
         return float(Quaterniond(self.linear).w)
 
-    # ZYX Tait-Bryan decomposition has a singularity (gimbal lock) at
+    # The roll-pitch-yaw decomposition (intrinsic Z-Y-X Tait-Bryan) has a singularity (gimbal lock) at
     # |pitch| = π/2 — at that pose only (yaw ± roll) is well-defined; the
     # individual angles become numerically unstable and depend on Eigen's
     # tie-breaking. The pose itself is unaffected; this is purely a property
@@ -328,17 +340,17 @@ class Pose(Isometry3d):
 
     @property
     def roll(self) -> float:
-        """Roll angle (X rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
+        """Roll angle (X rotation) from the intrinsic Z-Y-X Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
         return float(Quaterniond(self.linear).to_rpy()[0])
 
     @property
     def pitch(self) -> float:
-        """Pitch angle (Y rotation) from ZYX Tait-Bryan decomposition. Singular at ±π/2 (see section comment)."""
+        """Pitch angle (Y rotation) from the intrinsic Z-Y-X Tait-Bryan decomposition. Singular at ±π/2 (see section comment)."""
         return float(Quaterniond(self.linear).to_rpy()[1])
 
     @property
     def yaw(self) -> float:
-        """Yaw angle (Z rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
+        """Yaw angle (Z rotation) from the intrinsic Z-Y-X Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
         return float(Quaterniond(self.linear).to_rpy()[2])
 
     @property
@@ -403,9 +415,13 @@ class Pose(Isometry3d):
 # Convenience factory functions
 
 
-def translation(x: float, y: float, z: float) -> Pose:
-    """Pure translation pose."""
-    return Pose.from_xyz(x, y, z)
+@overload
+def translation(position: ArrayLike, /) -> Pose: ...
+@overload
+def translation(x: float, y: float, z: float, /) -> Pose: ...
+def translation(*args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
+    """Pure translation pose: `translation([x, y, z])` or `translation(x, y, z)`."""
+    return Pose.from_xyz(*args)
 
 
 def rotation_x(angle: float) -> Pose:
@@ -423,35 +439,94 @@ def rotation_z(angle: float) -> Pose:
     return Pose(Isometry3d(AngleAxisd(angle, Z_AXIS)))
 
 
-def rotation_from_quaternion(qx: float, qy: float, qz: float, qw: float) -> Pose:
-    """Pure rotation from scalar-last quaternion (qx, qy, qz, qw)."""
-    return Pose(Isometry3d(_safe_quaternion(qx, qy, qz, qw)))
+@overload
+def rotation_from_quaternion(quaternion: ArrayLike, /) -> Pose: ...
+@overload
+def rotation_from_quaternion(qx: float, qy: float, qz: float, qw: float, /) -> Pose: ...
+def rotation_from_quaternion(*args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
+    """Pure rotation from a scalar-last quaternion.
+
+    Two calling conventions: `rotation_from_quaternion([qx, qy, qz, qw])` or
+    `rotation_from_quaternion(qx, qy, qz, qw)`. The quaternion is normalised.
+
+    Raises:
+        TypeError: neither one array nor four scalars were given.
+        InvalidArrayShapeError: the array does not have 4 elements.
+        DegenerateRotationError: the quaternion is too short to normalise.
+    """
+    if len(args) == 1:
+        (quaternion,) = args
+    elif len(args) == 4:
+        quaternion = args
+    else:
+        raise TypeError(
+            "rotation_from_quaternion takes 1 arraylike arg (quaternion) or 4 scalar args "
+            f"(qx, qy, qz, qw); got {len(args)} args"
+        )
+    return Pose(Isometry3d(_safe_quaternion(*_vector(quaternion, 4, "Quaternion"))))
 
 
-def rotation_from_axis_angle(axis: ArrayLike, angle: float) -> Pose:
-    """Pure rotation from axis-angle. Axis need not be unit length (normalised here)."""
-    axis_arr = np.asarray(axis, dtype=np.float64).ravel()
-    if axis_arr.shape != (3,):
-        raise ValueError(f"Axis must have 3 elements, got {axis_arr.shape}")
-    norm = np.linalg.norm(axis_arr)
+@overload
+def rotation_from_axis_angle(axis: ArrayLike, angle: float, /) -> Pose: ...
+@overload
+def rotation_from_axis_angle(x: float, y: float, z: float, angle: float, /) -> Pose: ...
+def rotation_from_axis_angle(*args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
+    """Pure rotation from axis-angle (radians). The axis need not be unit length.
+
+    Two calling conventions: `rotation_from_axis_angle([x, y, z], angle)` or
+    `rotation_from_axis_angle(x, y, z, angle)`.
+
+    Raises:
+        TypeError: neither (axis, angle) nor (x, y, z, angle) was given.
+        InvalidArrayShapeError: the axis does not have 3 elements.
+        DegenerateRotationError: the axis is too short to normalise.
+    """
+    if len(args) == 2:
+        axis, angle = args
+    elif len(args) == 4:
+        axis, angle = args[:3], args[3]
+    else:
+        raise TypeError(
+            "rotation_from_axis_angle takes (axis, angle) or (x, y, z, angle); "
+            f"got {len(args)} args"
+        )
+    axis_arr = np.asarray(_vector3(axis, "Axis"), dtype=np.float64)
+    norm = float(np.linalg.norm(axis_arr))
     if norm < _NORMALISE_DENOM_FLOOR:
-        raise ValueError(f"Axis magnitude too small for normalisation: {norm}")
+        raise DegenerateRotationError(f"Axis magnitude too small for normalisation: {norm}")
     return Pose(Isometry3d(AngleAxisd(angle, axis_arr / norm)))
+
+
+def _vector(value: ArrayLike, size: int, what: str) -> tuple[float, ...]:
+    """`value` as a flat tuple of `size` floats."""
+    arr = np.asarray(value, dtype=np.float64).ravel()
+    if arr.shape != (size,):
+        raise InvalidArrayShapeError(f"{what} must have {size} elements, got {arr.shape}")
+    return tuple(float(v) for v in arr)
+
+
+def _vector3(value: ArrayLike, what: str) -> tuple[float, float, float]:
+    """`value` as three floats."""
+    x, y, z = _vector(value, 3, what)
+    return x, y, z
 
 
 def _safe_quaternion(qx: float, qy: float, qz: float, qw: float) -> Quaterniond:
     """Build a normalised quaternion from scalar-last (qx, qy, qz, qw).
 
-    Eigen's `.normalized()` divides by `.norm()` unconditionally — for a
+    Eigen's `.normalized()` divides by `.norm()` unconditionally; for a
     zero quaternion that yields NaN, which then propagates silently into
     every subsequent computation. Guard at the source.
 
-    Project convention is scalar-last [qx, qy, qz, qw] (see CLAUDE.md).
+    The project convention is scalar-last [qx, qy, qz, qw] at every Python surface.
     Internally bridges to Eigen's scalar-first ctor via `from_xyzw`.
+
+    Raises:
+        DegenerateRotationError: the quaternion is too short to normalise.
     """
     norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
     if norm < _NORMALISE_DENOM_FLOOR:
-        raise ValueError(
+        raise DegenerateRotationError(
             f"Quaternion magnitude too small for normalisation: "
             f"|(qx={qx}, qy={qy}, qz={qz}, qw={qw})| = {norm}"
         )

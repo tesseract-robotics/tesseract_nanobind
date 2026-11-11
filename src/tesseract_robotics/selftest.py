@@ -1,103 +1,202 @@
-"""CLI selftest runner for tesseract_robotics.
+"""Smoke check of an installed tesseract_robotics: `tesseract_nanobind_selftest`.
 
-Runs tests module-by-module and generates a report with GitHub issue template.
+Needs neither the test suite nor pytest. It imports every module of the installed package, loads
+a robot from the bundled support data, solves forward and inverse kinematics, checks collisions
+and runs a short plan, then writes `tesseract_selftest_report.txt` (environment, per-check
+result, and a GitHub issue template when a check failed).
 
 Usage:
-    tesseract_nanobind_selftest           # normal mode
-    tesseract_nanobind_selftest -v        # verbose - show full pytest output
-    tesseract_nanobind_selftest --verbose # same as -v
+    tesseract_nanobind_selftest
 """
 
-import argparse
-import io
+from __future__ import annotations
+
+import importlib
 import os
+import pkgutil
 import platform
-import re
 import sys
 import time
-from contextlib import redirect_stderr, redirect_stdout
+import traceback
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Final
+
+import numpy as np
+
+import tesseract_robotics
+
+# Subpackages that need optional dependencies or only hold runnable examples.
+SKIPPED_PACKAGES: Final = frozenset({"examples", "viewer", "selftest"})
+
+# Joint configuration of the ABB IRB 2400 the kinematics check starts from (rad): away from the
+# singularities at the zero pose, inside every joint limit.
+FK_JOINTS: Final = (0.1, -0.2, 0.3, 0.1, 0.2, 0.1)
+
+# Largest tip-position error (m) and rotation error (rad) of the IK solution refolded through FK.
+# The solver is analytic (OPW), so these only absorb floating point.
+IK_ROUNDTRIP_POSITION_TOL_M: Final = 1e-6
+IK_ROUNDTRIP_ROTATION_TOL_RAD: Final = 1e-6
+
+# Edge of the box dropped on the tool in the collision check (m).
+OBSTACLE_EDGE_M: Final = 0.2
+
+# Target of the short plan: one joint moved by 0.3 rad from the zero pose.
+PLAN_GOAL: Final = (0.3, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+REPORT_NAME: Final = "tesseract_selftest_report.txt"
+ENVIRONMENT_VARIABLES: Final = (
+    "TESSERACT_TASK_COMPOSER_CONFIG_FILE",
+    "TESSERACT_PYTHON_DLL_PATH",
+    "DYLD_LIBRARY_PATH",
+    "LD_LIBRARY_PATH",
+)
 
 
-def get_test_modules(test_dir: Path) -> list[Path]:
-    """Get all test module directories."""
-    modules = []
-    for p in sorted(test_dir.iterdir()):
-        if p.is_dir() and p.name.startswith("tesseract_"):
-            modules.append(p)
-    examples = test_dir / "examples"
-    if examples.is_dir():
-        modules.append(examples)
-    return modules
+class SelftestCheckError(AssertionError):
+    """A selftest check ran and found the installation wrong."""
 
 
-def parse_failures(output: str) -> list[tuple[str, str]]:
-    """Extract failed test names and error messages from pytest output."""
-    failures = []
-    # match FAILED lines like: FAILED test_foo.py::test_bar - ErrorType: message
-    pattern = r"FAILED\s+([^\s]+)\s+-\s+(.+)"
-    for match in re.finditer(pattern, output):
-        test_id = match.group(1)
-        # shorten test_id to just file::test
-        if "::" in test_id:
-            parts = test_id.split("::")
-            test_id = f"{Path(parts[0]).name}::{parts[-1]}"
-        error_msg = match.group(2)[:80]  # truncate long errors
-        failures.append((test_id, error_msg))
+@dataclass(frozen=True)
+class CheckResult:
+    """Outcome of one check."""
 
-    # also catch ERROR during collection
-    error_pattern = r"ERROR\s+([^\s]+)"
-    for match in re.finditer(error_pattern, output):
-        test_id = match.group(1)
-        if "::" in test_id:
-            parts = test_id.split("::")
-            test_id = f"{Path(parts[0]).name}::{parts[-1]}"
-        else:
-            test_id = Path(test_id).name
-        failures.append((test_id, "collection error"))
-
-    return failures
+    name: str
+    passed: bool
+    seconds: float
+    detail: str
 
 
-def parse_counts(output: str) -> tuple[int, int, int]:
-    """Parse passed/failed/error counts from pytest output."""
-    # patterns like "3 passed", "1 failed", "2 errors"
-    passed = failed = errors = 0
-    m = re.search(r"(\d+) passed", output)
-    if m:
-        passed = int(m.group(1))
-    m = re.search(r"(\d+) failed", output)
-    if m:
-        failed = int(m.group(1))
-    m = re.search(r"(\d+) error", output)
-    if m:
-        errors = int(m.group(1))
-    return passed, failed, errors
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise SelftestCheckError(message)
 
 
-def get_numpy_version() -> str:
-    """Get numpy version if installed."""
+def check_imports() -> str:
+    """Import every module of the installed package."""
+    imported = 0
+    for info in pkgutil.walk_packages(tesseract_robotics.__path__, "tesseract_robotics."):
+        top = info.name.split(".")[1]
+        if top in SKIPPED_PACKAGES:
+            continue
+        importlib.import_module(info.name)
+        imported += 1
+    _require(imported > 0, "no module of tesseract_robotics was found")
+    return f"{imported} modules"
+
+
+def _load_robot():
+    from tesseract_robotics.common import GeneralResourceLocator
+    from tesseract_robotics.planning import Robot
+
+    locator = GeneralResourceLocator(paths=[tesseract_robotics.get_tesseract_resource_path()])
+    return Robot.from_tesseract_support("abb_irb2400", locator)
+
+
+def check_robot_loads() -> str:
+    """Load a robot from the bundled support data."""
+    robot = _load_robot()
+    joints = robot.get_joint_names("manipulator")
+    _require(len(joints) == len(FK_JOINTS), f"expected {len(FK_JOINTS)} joints, got {joints}")
+    return f"{len(robot.get_link_names())} links"
+
+
+def check_kinematics() -> str:
+    """Forward kinematics, then inverse kinematics back to the same tool pose."""
+    robot = _load_robot()
+    q = np.array(FK_JOINTS)
+    pose = robot.fk("manipulator", q, "tool0")
+    solution = robot.ik("manipulator", pose, "tool0", seed=q)
+    again = robot.fk("manipulator", solution, "tool0")
+    position_error = float(np.linalg.norm(np.asarray(again.translation - pose.translation)))
+    relative = np.asarray(pose.linear).T @ np.asarray(again.linear)
+    rotation_error = float(np.arccos(np.clip((np.trace(relative) - 1.0) / 2.0, -1.0, 1.0)))
+    _require(
+        position_error <= IK_ROUNDTRIP_POSITION_TOL_M,
+        f"IK round trip moved the tool by {position_error:.2e} m",
+    )
+    _require(
+        rotation_error <= IK_ROUNDTRIP_ROTATION_TOL_RAD,
+        f"IK round trip rotated the tool by {rotation_error:.2e} rad",
+    )
+    return f"round trip {position_error:.1e} m, {rotation_error:.1e} rad"
+
+
+def check_collision() -> str:
+    """A free trajectory is free; a box on the tool collides."""
+    from tesseract_robotics.collision import CollisionCheckConfig, CollisionEvaluatorType
+    from tesseract_robotics.environment import checkTrajectory
+    from tesseract_robotics.planning import Pose, box, create_obstacle
+
+    robot = _load_robot()
+    q = np.array(FK_JOINTS)
+    trajectory = np.stack([q, q])
+    config = CollisionCheckConfig()
+    config.type = CollisionEvaluatorType.DISCRETE
+
+    def collides() -> bool:
+        results, _ = checkTrajectory(
+            robot.env.getDiscreteContactManager(),
+            robot.env.getJointGroup("manipulator"),
+            trajectory,
+            config,
+        )
+        return bool(results)
+
+    _require(not collides(), "the free configuration reports a collision")
+    tool = robot.fk("manipulator", q, "tool0")
+    create_obstacle(
+        robot,
+        "selftest_box",
+        box(OBSTACLE_EDGE_M, OBSTACLE_EDGE_M, OBSTACLE_EDGE_M),
+        Pose(tool),
+        parent_link="base_link",
+    )
+    _require(collides(), "a box on the tool reports no collision")
+    return "free state clear, box on tool detected"
+
+
+def check_plan() -> str:
+    """Plan a short joint-space motion."""
+    from tesseract_robotics.planning import JointTarget, MotionProgram, TaskComposer
+
+    robot = _load_robot()
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+        .set_joint_names(robot.get_joint_names("manipulator"))
+        .move_to(JointTarget(np.zeros(len(FK_JOINTS))))
+        .move_to(JointTarget(list(PLAN_GOAL)))
+    )
+    result = TaskComposer.from_config().plan_freespace(robot, program)
+    _require(result.successful, f"planning failed: {result.message}")
+    _require(len(result) > 0, "planning succeeded with an empty trajectory")
+    return f"{len(result)} waypoints"
+
+
+CHECKS: Final[tuple[tuple[str, Callable[[], str]], ...]] = (
+    ("import every module", check_imports),
+    ("load a robot", check_robot_loads),
+    ("forward and inverse kinematics", check_kinematics),
+    ("collision check", check_collision),
+    ("short plan", check_plan),
+)
+
+
+def run_check(name: str, check: Callable[[], str]) -> CheckResult:
+    """Run one check; any exception is its failure, reported with its traceback."""
+    start = time.monotonic()
     try:
-        import numpy
+        detail = check()
+    except Exception:  # noqa: BLE001 - a selftest reports every failure instead of stopping at one
+        return CheckResult(name, False, time.monotonic() - start, traceback.format_exc())
+    return CheckResult(name, True, time.monotonic() - start, detail)
 
-        return numpy.__version__
-    except ImportError:
-        return "not installed"
 
-
-def get_env_info() -> dict:
-    """Collect environment information for verbose output."""
-    env_vars = [
-        "TESSERACT_SUPPORT_DIR",
-        "TESSERACT_RESOURCE_PATH",
-        "TESSERACT_TASK_COMPOSER_CONFIG_FILE",
-        "DYLD_LIBRARY_PATH",
-        "LD_LIBRARY_PATH",
-    ]
-    info = {k: os.environ.get(k, "not set") for k in env_vars}
-    import tesseract_robotics
-
+def environment_info() -> dict[str, str]:
+    """The settings the package reads, and where it found its data."""
+    info = {key: os.environ.get(key, "not set") for key in ENVIRONMENT_VARIABLES}
     for name, resolve in (
         ("support data", tesseract_robotics.get_tesseract_resource_path),
         ("task composer config", tesseract_robotics.get_task_composer_config_path),
@@ -109,205 +208,67 @@ def get_env_info() -> dict:
     return info
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Run tesseract_robotics self-tests and generate a report."
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Show detailed pytest output for each module"
-    )
-    args = parser.parse_args()
-    verbose = args.verbose
-
-    import pytest
-
-    import tesseract_robotics
-
-    test_dir = Path(__file__).parent / "tests"
-    if not test_dir.exists():
-        print(f"ERROR: Test directory not found: {test_dir}")
-        print("This may indicate an incomplete installation.")
-        return 1
-    modules = get_test_modules(test_dir)
-
-    report_path = Path.cwd() / "tesseract_selftest_report.txt"
-
-    results = []  # list of (module_name, status, passed, failed, duration, failures, output)
-    overall_exit = 0
-
-    version = tesseract_robotics.__version__
-    py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    plat = platform.platform()
-    numpy_ver = get_numpy_version()
-    env_info = get_env_info()
-
-    print(f"tesseract_robotics selftest v{version}")
-    print(f"Python {py_version} | NumPy {numpy_ver}")
-    print(f"Platform: {plat}")
-
-    if verbose:
-        print("\nEnvironment:")
-        for k, v in env_info.items():
-            # truncate long paths
-            if len(v) > 60:
-                v = f"...{v[-57:]}"
-            print(f"  {k}: {v}")
-
-    print(f"\nRunning {len(modules)} test modules...\n")
-
-    for module in modules:
-        module_name = module.name
-
-        if verbose:
-            print(f"{'=' * 60}")
-            print(f"MODULE: {module_name}")
-            print(f"{'=' * 60}")
-            # run pytest with full output
-            start = time.time()
-            exit_code = pytest.main([str(module), "-v", "--tb=short"])
-            duration = time.time() - start
-            output = ""  # not captured in verbose mode
-        else:
-            print(f"  [{module_name}] ", end="", flush=True)
-            # capture pytest output
-            stdout_capture = io.StringIO()
-            stderr_capture = io.StringIO()
-
-            start = time.time()
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                exit_code = pytest.main([str(module), "-q", "--tb=line"])
-            duration = time.time() - start
-
-            output = stdout_capture.getvalue() + stderr_capture.getvalue()
-
-        passed, failed, errors = parse_counts(output) if output else (0, 0, 0)
-        failures = parse_failures(output) if exit_code != 0 and output else []
-
-        if exit_code == 0:
-            status = "PASS"
-            if not verbose:
-                print(f"PASS ({passed} tests, {duration:.1f}s)")
-        elif exit_code == 5:
-            status = "SKIP"
-            if not verbose:
-                print("SKIP (no tests)")
-        else:
-            status = "FAIL"
-            overall_exit = 1
-            if not verbose:
-                total = passed + failed + errors
-                print(f"FAIL ({failed + errors}/{total} failed, {duration:.1f}s)")
-
-        results.append((module_name, status, passed, failed + errors, duration, failures, output))
-
-    # build report
-    total_passed = sum(r[2] for r in results)
-    total_failed = sum(r[3] for r in results)
-    modules_passed = sum(1 for r in results if r[1] == "PASS")
-    modules_failed = sum(1 for r in results if r[1] == "FAIL")
-    modules_skipped = sum(1 for r in results if r[1] == "SKIP")
-
-    lines = [
-        "=" * 60,
+def build_report(results: list[CheckResult], info: dict[str, str]) -> str:
+    """The report text: header, environment, results, and an issue template on failure."""
+    py = sys.version_info
+    header = [
         "TESSERACT ROBOTICS SELFTEST REPORT",
-        "=" * 60,
         f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"Version: {version}",
-        f"Python: {py_version}",
-        f"Platform: {plat}",
-        f"NumPy: {numpy_ver}",
+        f"Version: {tesseract_robotics.__version__}",
+        f"Python: {py.major}.{py.minor}.{py.micro}",
+        f"Platform: {platform.platform()}",
+        f"NumPy: {np.__version__}",
         "",
         "ENVIRONMENT",
-        "-" * 40,
+        *(f"  {key}: {value}" for key, value in info.items()),
+        "",
+        "RESULTS",
     ]
-    for k, v in env_info.items():
-        lines.append(f"  {k}: {v}")
-
-    lines.extend(
-        [
+    body = [
+        f"  {'PASS' if r.passed else 'FAIL'}  {r.name} ({r.seconds:.1f}s)"
+        + (f": {r.detail}" if r.passed else "")
+        for r in results
+    ]
+    failures = [r for r in results if not r.passed]
+    lines = [*header, *body]
+    if failures:
+        lines += ["", "FAILURES"]
+        for r in failures:
+            lines += [f"--- {r.name}", r.detail.rstrip()]
+        lines += [
             "",
-            "RESULTS",
-            "-" * 40,
+            "GITHUB ISSUE TEMPLATE (copy below this line)",
+            "## Selftest Failure Report",
+            "",
+            f"- tesseract_robotics version: {tesseract_robotics.__version__}",
+            f"- Python: {py.major}.{py.minor}.{py.micro}",
+            f"- Platform: {platform.platform()}",
+            "",
+            "Failed checks: " + ", ".join(r.name for r in failures),
+            "",
+            "```",
+            *(r.detail.rstrip().splitlines()[-1] for r in failures),
+            "```",
         ]
-    )
+    return "\n".join(lines) + "\n"
 
-    all_failures = []
-    for module_name, status, passed, failed, duration, failures, output in results:
-        if status == "PASS":
-            lines.append(f"  {module_name}: PASS ({passed} tests, {duration:.1f}s)")
-        elif status == "SKIP":
-            lines.append(f"  {module_name}: SKIP (no tests)")
-        else:
-            lines.append(f"  {module_name}: FAIL ({failed}/{passed + failed} failed)")
-            for test_id, error_msg in failures:
-                lines.append(f"    - {test_id}: {error_msg}")
-                all_failures.append((module_name, test_id, error_msg))
 
-    lines.extend(
-        [
-            "-" * 40,
-            f"Modules: {modules_passed} passed, {modules_failed} failed, {modules_skipped} skipped",
-            f"Tests: {total_passed} passed, {total_failed} failed",
-            "=" * 60,
-        ]
-    )
-
-    # GitHub issue template (only if failures)
-    if all_failures:
-        failed_modules_summary = []
-        for module_name, status, passed, failed, _, _, _ in results:
-            if status == "FAIL":
-                failed_modules_summary.append(
-                    f"- {module_name} ({failed}/{passed + failed} failed)"
-                )
-
-        error_details = []
-        for module_name, test_id, error_msg in all_failures[:10]:  # limit to 10
-            error_details.append(f"{test_id}\n  {error_msg}")
-
-        lines.extend(
-            [
-                "",
-                "=" * 60,
-                "GITHUB ISSUE TEMPLATE (copy below this line)",
-                "=" * 60,
-                "",
-                "## Selftest Failure Report",
-                "",
-                "**Environment:**",
-                f"- tesseract_robotics version: {version}",
-                f"- Python: {py_version}",
-                f"- Platform: {plat}",
-                f"- NumPy: {numpy_ver}",
-                "",
-                "**Failed modules:**",
-                *failed_modules_summary,
-                "",
-                "**Error details:**",
-                "```",
-                *error_details,
-                "```",
-                "",
-                "**Steps to reproduce:**",
-                "```bash",
-                "pip install tesseract-robotics-nanobind",
-                "tesseract_nanobind_selftest",
-                "```",
-            ]
-        )
-
-    report_content = "\n".join(lines)
-    report_path.write_text(report_content)
-
+def main() -> int:
+    """Run every check, write the report, and return the exit code (1 if any failed)."""
+    print(f"tesseract_robotics selftest v{tesseract_robotics.__version__}")
+    results = []
+    for name, check in CHECKS:
+        print(f"  [{name}] ", end="", flush=True)
+        result = run_check(name, check)
+        print(f"{'PASS' if result.passed else 'FAIL'} ({result.seconds:.1f}s)")
+        results.append(result)
+    report_path = Path.cwd() / REPORT_NAME
+    report_path.write_text(build_report(results, environment_info()))
+    failed = [r for r in results if not r.passed]
     print(f"\nReport saved to: {report_path}")
-    print(
-        f"\nSummary: {modules_passed} modules passed, {modules_failed} failed, {modules_skipped} skipped"
-    )
-    if all_failures:
-        print("         (report contains GitHub issue template)")
-
-    sys.exit(overall_exit)
+    print(f"{len(results) - len(failed)} passed, {len(failed)} failed")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

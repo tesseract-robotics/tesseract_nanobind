@@ -5,6 +5,7 @@ Provides a fluent builder API for constructing motion programs without
 needing to manually wrap waypoints and instructions in poly types.
 
 Example:
+    ```python
     from tesseract_robotics.planning import (
         MotionProgram,
         JointTarget,
@@ -14,13 +15,16 @@ Example:
 
     # Build a program with fluent API
     program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
-        .start_at(JointTarget([0, 0, 0, 0, 0, 0]))
+        .add_target(JointTarget([0, 0, 0, 0, 0, 0]))
         .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
         .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
     )
 
-    # Access underlying CompositeInstruction for low-level API
-    composite = program.to_composite_instruction()
+    # Access underlying CompositeInstruction for low-level API; joint targets without
+    # names take them from here
+    joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
+    composite = program.to_composite_instruction(joint_names)
+    ```
 """
 
 from __future__ import annotations
@@ -29,9 +33,10 @@ import copy
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import Self, overload
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from tesseract_robotics.command_language import (
     DEFAULT_PROFILE_KEY,
@@ -47,7 +52,22 @@ from tesseract_robotics.command_language import (
     StateWaypointPoly,
 )
 from tesseract_robotics.common import Isometry3d, ManipulatorInfo
+from tesseract_robotics.planning.errors import (
+    EmptyProgramError,
+    InvalidTargetError,
+    JointNamesRequiredError,
+)
 from tesseract_robotics.planning.transforms import Pose
+
+
+def _float_array(values: ArrayLike) -> NDArray[np.float64]:
+    """`values` as the float64 array the waypoint constructors take.
+
+    The target dataclasses accept any arraylike and normalise it in `__post_init__`; their
+    field types stay `ArrayLike` for callers, so the conversion is restated here for the
+    type checker. It is a no-op on an array that is already float64.
+    """
+    return np.asarray(values, dtype=np.float64)
 
 
 class MoveType(Enum):
@@ -58,54 +78,102 @@ class MoveType(Enum):
     CIRCULAR = auto()  # Circular interpolation in Cartesian space
 
 
+def _instruction_type(move_type: MoveType) -> MoveInstructionType:
+    """The low-level move instruction type of a `MoveType`."""
+    if move_type == MoveType.LINEAR:
+        return MoveInstructionType.LINEAR
+    if move_type == MoveType.CIRCULAR:
+        return MoveInstructionType.CIRCULAR
+    return MoveInstructionType.FREESPACE
+
+
 @dataclass
 class CartesianTarget:
     """
     Cartesian waypoint target (pose in Cartesian space).
 
     Attributes:
-        pose: Target pose as Pose or position/quaternion
-        move_type: Motion type (FREESPACE or LINEAR)
-        profile: Motion profile name
+        pose: Target pose of the TCP in the program's working frame. An `Isometry3d` is
+            converted to a `Pose`.
+        move_type: Motion type (FREESPACE, LINEAR or CIRCULAR)
+        profile: Motion profile name; None inherits the program's profile
+
+    Raises:
+        InvalidTargetError: `pose` is not an `Isometry3d`.
 
     Example:
-        # From Pose
+        ```python
+        # From a Pose
         target = CartesianTarget(Pose.from_xyz(0.5, 0, 0.5))
 
-        # From position and quaternion
-        target = CartesianTarget(
-            position=[0.5, 0, 0.5],
-            quaternion=[0, 0, 0.707, 0.707],
-        )
+        # From position and scalar-last quaternion [qx, qy, qz, qw]
+        target = CartesianTarget.from_xyz_quat([0.5, 0, 0.5], [0, 0, 0.707, 0.707])
 
-        # Linear motion
+        # Linear motion on a named profile
         target = CartesianTarget(
             Pose.from_xyz(0.5, 0, 0.5),
             move_type=MoveType.LINEAR,
+            profile="CARTESIAN",
         )
+        ```
     """
 
-    pose: Pose | None = None
-    position: ArrayLike | None = None
-    quaternion: ArrayLike | None = None
+    pose: Pose
     move_type: MoveType = MoveType.FREESPACE
-    profile: str = DEFAULT_PROFILE_KEY
+    profile: str | None = None
 
-    def __post_init__(self):
-        # Construct pose from position/quaternion if provided
-        if self.pose is None:
-            if self.position is not None:
-                pos = np.asarray(self.position)
-                if self.quaternion is not None:
-                    quat = np.asarray(self.quaternion)
-                    self.pose = Pose.from_xyz_quat(pos, quat)
-                else:
-                    self.pose = Pose.from_xyz(*pos)
-            else:
-                raise ValueError(
-                    f"CartesianTarget requires 'pose' or 'position'. "
-                    f"Got pose={self.pose}, position={self.position}"
-                )
+    def __post_init__(self) -> None:
+        if not isinstance(self.pose, Isometry3d):
+            raise InvalidTargetError(
+                f"CartesianTarget.pose must be a Pose or Isometry3d, got {type(self.pose).__name__}; "
+                f"build one with CartesianTarget.from_xyz_quat(position, quaternion)"
+            )
+        if not isinstance(self.pose, Pose):
+            self.pose = Pose(self.pose)
+
+    @overload
+    @classmethod
+    def from_xyz_quat(
+        cls,
+        position: ArrayLike,
+        quaternion: ArrayLike,
+        *,
+        move_type: MoveType = MoveType.FREESPACE,
+        profile: str | None = None,
+    ) -> Self: ...
+    @overload
+    @classmethod
+    def from_xyz_quat(
+        cls,
+        x: float,
+        y: float,
+        z: float,
+        qx: float,
+        qy: float,
+        qz: float,
+        qw: float,
+        *,
+        move_type: MoveType = MoveType.FREESPACE,
+        profile: str | None = None,
+    ) -> Self: ...
+    @classmethod
+    def from_xyz_quat(  # pyright: ignore[reportInconsistentOverload]
+        cls,
+        *args,
+        move_type: MoveType = MoveType.FREESPACE,
+        profile: str | None = None,
+    ) -> Self:
+        """Target from position `[x, y, z]` and scalar-last quaternion `[qx, qy, qz, qw]`.
+
+        Two calling conventions, as `Pose.from_xyz_quat`: `(position, quaternion)` or
+        `(x, y, z, qx, qy, qz, qw)`.
+
+        Raises:
+            TypeError: wrong number of arguments.
+            InvalidArrayShapeError: position or quaternion has the wrong number of elements.
+            DegenerateRotationError: the quaternion is too short to normalise.
+        """
+        return cls(Pose.from_xyz_quat(*args), move_type=move_type, profile=profile)
 
     def to_waypoint(self) -> CartesianWaypoint:
         """Convert to low-level CartesianWaypoint."""
@@ -113,11 +181,7 @@ class CartesianTarget:
 
     def _get_move_type(self) -> MoveInstructionType:
         """Get low-level move instruction type."""
-        if self.move_type == MoveType.LINEAR:
-            return MoveInstructionType.LINEAR
-        if self.move_type == MoveType.CIRCULAR:
-            return MoveInstructionType.CIRCULAR
-        return MoveInstructionType.FREESPACE
+        return _instruction_type(self.move_type)
 
 
 @dataclass
@@ -129,7 +193,7 @@ class JointTarget:
         positions: Target joint positions (radians for revolute joints)
         names: Joint names (auto-populated from robot if None)
         move_type: Motion type (FREESPACE or LINEAR)
-        profile: Motion profile name
+        profile: Motion profile name; None inherits the program's profile
 
     Example:
         # Just positions (names from robot)
@@ -145,7 +209,7 @@ class JointTarget:
     positions: ArrayLike
     names: list[str] | None = None
     move_type: MoveType = MoveType.FREESPACE
-    profile: str = DEFAULT_PROFILE_KEY
+    profile: str | None = None
 
     def __post_init__(self):
         self.positions = np.asarray(self.positions, dtype=np.float64)
@@ -159,17 +223,13 @@ class JointTarget:
         """
         names = self.names or joint_names
         if names is None:
-            raise ValueError(
+            raise JointNamesRequiredError(
                 "JointTarget requires joint names. Provide via target.names or program.set_joint_names()"
             )
-        return JointWaypoint(names, self.positions)
+        return JointWaypoint(names, _float_array(self.positions))
 
     def _get_move_type(self) -> MoveInstructionType:
-        if self.move_type == MoveType.LINEAR:
-            return MoveInstructionType.LINEAR
-        if self.move_type == MoveType.CIRCULAR:
-            return MoveInstructionType.CIRCULAR
-        return MoveInstructionType.FREESPACE
+        return _instruction_type(self.move_type)
 
 
 @dataclass
@@ -186,7 +246,7 @@ class StateTarget:
         accelerations: Optional joint accelerations
         time: Optional timestamp
         move_type: Motion type
-        profile: Motion profile name
+        profile: Motion profile name; None inherits the program's profile
     """
 
     positions: ArrayLike
@@ -195,7 +255,7 @@ class StateTarget:
     accelerations: ArrayLike | None = None
     time: float | None = None
     move_type: MoveType = MoveType.FREESPACE
-    profile: str = DEFAULT_PROFILE_KEY
+    profile: str | None = None
 
     def __post_init__(self):
         self.positions = np.asarray(self.positions, dtype=np.float64)
@@ -208,25 +268,21 @@ class StateTarget:
         """Convert to low-level StateWaypoint."""
         names = self.names or joint_names
         if names is None:
-            raise ValueError(
+            raise JointNamesRequiredError(
                 "StateTarget requires joint names. Provide via target.names or program.set_joint_names()"
             )
 
-        wp = StateWaypoint(names, self.positions)
+        wp = StateWaypoint(names, _float_array(self.positions))
         if self.velocities is not None:
-            wp.setVelocity(self.velocities)
+            wp.setVelocity(_float_array(self.velocities))
         if self.accelerations is not None:
-            wp.setAcceleration(self.accelerations)
+            wp.setAcceleration(_float_array(self.accelerations))
         if self.time is not None:
             wp.setTime(self.time)
         return wp
 
     def _get_move_type(self) -> MoveInstructionType:
-        if self.move_type == MoveType.LINEAR:
-            return MoveInstructionType.LINEAR
-        if self.move_type == MoveType.CIRCULAR:
-            return MoveInstructionType.CIRCULAR
-        return MoveInstructionType.FREESPACE
+        return _instruction_type(self.move_type)
 
 
 # Any target type
@@ -245,13 +301,14 @@ class MotionProgram:
         tcp_frame: Link the TCP is attached to
         working_frame: Link Cartesian targets are relative to
         tcp_offset: Offset from `tcp_frame` (named TCP or Isometry3d), or None for identity
-        profile: Default motion profile
+        profile: Profile of every target that sets none
         targets: List of motion targets
 
     Example:
+        ```python
         # Build program with chained calls
         program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
-            .start_at(JointTarget([0, 0, 0, 0, 0, 0]))
+            .add_target(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
             .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
@@ -261,6 +318,7 @@ class MotionProgram:
         program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         program.add_target(JointTarget([0, 0, 0, 0, 0, 0]))
         program.add_target(CartesianTarget(pose))
+        ```
     """
 
     def __init__(
@@ -276,13 +334,13 @@ class MotionProgram:
         Initialize motion program builder.
 
         The TCP is `tcp_frame * tcp_offset`; see
-        [TCP offsets](../api/tesseract_environment.md#tcp-offsets).
+        how a named offset resolves: `Environment.findTCPOffset`.
 
         Args:
             group_name: Kinematic group name
             tcp_frame: Link the TCP is attached to (e.g. "tool0")
             working_frame: Link Cartesian targets are relative to (e.g. "base_link")
-            profile: Default motion profile name
+            profile: Profile name of every target that sets none
             tcp_offset: Offset from `tcp_frame`: a named TCP (SRDF `group_tcps` of this group,
                 or a find-TCP callback), resolved by the environment at plan time, or an
                 `Isometry3d`. None leaves upstream's default, identity.
@@ -309,18 +367,6 @@ class MotionProgram:
         """
         self._joint_names = names
         return self
-
-    def start_at(self, target: Target) -> MotionProgram:
-        """
-        Set the starting position (alias for add_target).
-
-        Args:
-            target: Starting position target
-
-        Returns:
-            Self for chaining
-        """
-        return self.add_target(target)
 
     def move_to(self, target: Target) -> MotionProgram:
         """
@@ -420,9 +466,13 @@ class MotionProgram:
 
         Returns:
             CompositeInstruction ready for planning
+
+        Raises:
+            EmptyProgramError: The program has no targets.
+            JointNamesRequiredError: A joint or state target has no names and none are given.
         """
         if not self._targets:
-            raise ValueError("Program has no targets")
+            raise EmptyProgramError("Program has no targets")
 
         joint_names = joint_names or self._joint_names
 
@@ -448,7 +498,7 @@ class MotionProgram:
         joint_names: list[str] | None,
     ) -> MoveInstruction:
         """Convert a target to a MoveInstruction with wrapped waypoint."""
-        profile = target.profile or self.profile
+        profile = target.profile if target.profile is not None else self.profile
         move_type = target._get_move_type()
 
         if isinstance(target, CartesianTarget):

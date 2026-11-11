@@ -1,5 +1,6 @@
 """Tests for the Pythonic planning API."""
 
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +32,13 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
+from tesseract_robotics.planning.errors import (
+    ConflictingProfileArgumentsError,
+    JointNotFoundError,
+    UnknownPipelineError,
+)
+
+from ..planning_validity import CartesianGoal, JointGoal, assert_trajectory_valid
 
 # Tolerance constants for the equality / isApprox tests below. EIGEN_DEFAULT_PREC
 # is the project-wide anchor: Eigen's NumTraits<double>::dummy_precision()
@@ -39,6 +47,28 @@ from tesseract_robotics.planning import (
 # relationship rather than ad-hoc numerology.
 DRIFT_ABOVE_DEFAULT_PREC = 100 * EIGEN_DEFAULT_PREC  # 1e-10 — defeats default isApprox
 LOOSE_TEST_PREC = 100 * DRIFT_ABOVE_DEFAULT_PREC  # 1e-8 — comfortably admits the drift
+
+# Components of the unit quaternion for a 90 degree rotation about Z, scalar-last [qx, qy, qz, qw]:
+# sin(45 deg) = cos(45 deg) = 1/sqrt(2), exact to the double.
+HALF_TURN_SQRT_HALF = float(np.sqrt(0.5))
+QUAT_Z_90 = [0.0, 0.0, HALF_TURN_SQRT_HALF, HALF_TURN_SQRT_HALF]
+
+# Tool pointing down, scalar-last [qx, qy, qz, qw]: reachable at (0.8, +-0.2, 0.8) on the ABB
+# IRB 2400 (the poses of tests/tesseract_motion_planners/test_descartes_planner.py).
+TOOL_DOWN = [0.0, -1.0, 0.0, 0.0]
+
+# Agreement of quantities computed from exact inputs: a few ulps of double arithmetic.
+EXACT_DECIMAL = 12
+
+# Agreement of an IK solution refolded through FK with the pose it solved for: the shipped
+# robots use an analytic (OPW) solver, so the error is floating point, far below 1e-6 m / rad.
+IK_POSE_DECIMAL = 6
+
+
+def assert_pose_close(actual, expected, decimal=IK_POSE_DECIMAL):
+    """Full pose equality: translation and rotation matrix."""
+    np.testing.assert_array_almost_equal(actual.translation, expected.translation, decimal=decimal)
+    np.testing.assert_array_almost_equal(actual.linear, expected.linear, decimal=decimal)
 
 
 @pytest.fixture(scope="module")
@@ -91,10 +121,10 @@ class TestPose:
 
     def test_from_xyz_quat_literal(self):
         # 90 degree rotation around Z
-        t = Pose.from_xyz_quat([1, 2, 3], [0, 0, 0.707, 0.707])
-        np.testing.assert_array_almost_equal(t.translation, [1, 2, 3])
+        t = Pose.from_xyz_quat([1, 2, 3], QUAT_Z_90)
+        np.testing.assert_array_almost_equal(t.translation, [1, 2, 3], decimal=EXACT_DECIMAL)
         np.testing.assert_array_almost_equal(
-            Quaterniond(t.linear).coeffs(), [0, 0, 0.707, 0.707], decimal=3
+            Quaterniond(t.linear).coeffs(), QUAT_Z_90, decimal=EXACT_DECIMAL
         )
 
     def test_from_xyz_rpy(self):
@@ -102,7 +132,7 @@ class TestPose:
         t = Pose.from_xyz_rpy([1, 2, 3], [0, 0, np.pi / 2])
         np.testing.assert_array_almost_equal(t.translation, [1, 2, 3])
         _yaw, _pitch, _roll = Quaterniond(t.linear).eulerAngles("ZYX")
-        np.testing.assert_almost_equal(float(_yaw), np.pi / 2, decimal=5)
+        np.testing.assert_almost_equal(float(_yaw), np.pi / 2, decimal=EXACT_DECIMAL)
 
     def test_translation_helper(self):
         t = translation(1, 2, 3)
@@ -121,7 +151,7 @@ class TestPose:
         """Test 90-degree rotation around each axis."""
         t = rotation_func(np.pi / 2)
         rotated = t.rotation @ np.array(input_vec)
-        np.testing.assert_array_almost_equal(rotated, expected, decimal=5)
+        np.testing.assert_array_almost_equal(rotated, expected, decimal=EXACT_DECIMAL)
 
     def test_pose_chaining(self):
         t1 = translation(1, 0, 0)
@@ -133,7 +163,7 @@ class TestPose:
         t = Pose.from_xyz(1, 2, 3)
         inv = t.inverse()
         combined = t @ inv
-        np.testing.assert_array_almost_equal(combined.translation, [0, 0, 0], decimal=5)
+        np.testing.assert_array_almost_equal(combined.translation, [0, 0, 0], decimal=EXACT_DECIMAL)
 
     def test_pose_repr(self):
         """Test Pose string representation."""
@@ -184,19 +214,16 @@ class TestPose:
         """Test rotation_from_quaternion factory function."""
         from tesseract_robotics.planning import rotation_from_quaternion
 
-        # 90 degree rotation around Z axis
-        t = rotation_from_quaternion(0, 0, 0.707, 0.707)
-        assert t is not None
-        # Should rotate X to Y
-        x_vec = np.array([1, 0, 0])
-        rotated = t.rotation @ x_vec
-        np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=2)
+        # 90 degree rotation around Z axis, in both calling conventions
+        for t in (rotation_from_quaternion(*QUAT_Z_90), rotation_from_quaternion(QUAT_Z_90)):
+            # Should rotate X to Y
+            rotated = t.rotation @ np.array([1, 0, 0])
+            np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=EXACT_DECIMAL)
 
     def test_scalar_translation_accessors(self):
-        # Per Joelkang's review: pose.translation[0] is clunky; pose.x is
-        # the ergonomic accessor. These return Python float (not numpy
-        # scalar) and don't introduce any numpy facade — they're a 1-line
-        # adapter over the inherited Isometry3d.translation property.
+        # pose.translation[0] is clunky; pose.x is the ergonomic accessor. These
+        # return Python float (not numpy scalar) and keep no numpy state: they are
+        # a one-line adapter over the inherited Isometry3d.translation property.
         p = Pose.from_xyz(1.25, -2.5, 3.75)
         assert p.x == 1.25 and isinstance(p.x, float)
         assert p.y == -2.5 and isinstance(p.y, float)
@@ -213,7 +240,7 @@ class TestPose:
             assert isinstance(v, float)
 
     def test_scalar_rpy_accessors(self):
-        # Tait-Bryan ZYX decomposition (yaw·pitch·roll); roll/pitch/yaw
+        # Intrinsic Z-Y-X Tait-Bryan decomposition (yaw·pitch·roll); roll/pitch/yaw
         # individually accessible as Python floats.
         p = Pose.from_xyz_rpy(0, 0, 0, 0.1, 0.2, 0.3)
         np.testing.assert_almost_equal(p.roll, 0.1)
@@ -235,9 +262,9 @@ class TestPose:
         assert p.rotation_matrix[0, 0] != 999.0
 
     def test_quaternion_accessor_returns_typed_quaterniond(self):
-        # Per Joelkang's review: pose.quaternion should return Quaterniond
-        # (typed), not a numpy array — so the Eigen API (.x property, .coeffs(),
-        # slerp, etc.) is available without an extra wrapping step.
+        # pose.quaternion returns Quaterniond (typed), not a numpy array, so the
+        # Eigen API (.x property, .coeffs(), slerp, etc.) is available without an
+        # extra wrapping step.
         p = Pose.from_xyz_quat(0, 0, 0, 0.0, 0.0, 0.7071067811865475, 0.7071067811865476)
         q = p.quaternion
         assert isinstance(q, Quaterniond)
@@ -251,20 +278,22 @@ class TestPose:
         from tesseract_robotics.planning import rotation_from_axis_angle
 
         # 90 degree rotation around Z axis
-        t = rotation_from_axis_angle([0, 0, 1], np.pi / 2)
-        assert t is not None
-        # Should rotate X to Y
-        x_vec = np.array([1, 0, 0])
-        rotated = t.rotation @ x_vec
-        np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=5)
+        for t in (
+            rotation_from_axis_angle([0, 0, 1], np.pi / 2),
+            rotation_from_axis_angle(0, 0, 1, np.pi / 2),
+        ):
+            # Should rotate X to Y
+            rotated = t.rotation @ np.array([1, 0, 0])
+            np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=EXACT_DECIMAL)
 
     def test_from_xyz_quat(self):
         """Test Pose.from_xyz_quat factory method."""
         pos = [1, 2, 3]
-        quat = [0, 0, 0.707, 0.707]  # 90 deg around Z
-        t = Pose.from_xyz_quat(pos, quat)
-        np.testing.assert_array_almost_equal(t.translation, [1, 2, 3])
-        np.testing.assert_array_almost_equal(Quaterniond(t.linear).coeffs(), quat, decimal=2)
+        t = Pose.from_xyz_quat(pos, QUAT_Z_90)  # 90 deg around Z
+        np.testing.assert_array_almost_equal(t.translation, [1, 2, 3], decimal=EXACT_DECIMAL)
+        np.testing.assert_array_almost_equal(
+            Quaterniond(t.linear).coeffs(), QUAT_Z_90, decimal=EXACT_DECIMAL
+        )
 
     def test_from_matrix_ctor(self):
         """Test Pose(matrix) inherited 4x4 matrix ctor."""
@@ -341,7 +370,7 @@ class TestRobot:
         """Test RobotState bracket access raises KeyError for missing joint."""
         state = robot.get_state(["joint_1"])
 
-        with pytest.raises(KeyError, match="not found"):
+        with pytest.raises(JointNotFoundError, match="not found"):
             _ = state["nonexistent_joint"]
 
     def test_robot_state_repr(self, robot):
@@ -426,14 +455,11 @@ class TestRobot:
         # Now solve IK for that pose
         result = robot.ik("manipulator", target_pose, "tool0", seed=zero_joints)
 
-        assert result is not None
-        assert len(result) == 6
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (6,)
 
         # Verify FK of result matches target
-        result_pose = robot.fk("manipulator", result, "tool0")
-        np.testing.assert_array_almost_equal(
-            result_pose.translation, target_pose.translation, decimal=4
-        )
+        assert_pose_close(robot.fk("manipulator", result, "tool0"), target_pose)
 
     def test_ik_with_seed(self, robot):
         """Test IK with different seed configurations."""
@@ -444,23 +470,20 @@ class TestRobot:
         # Solve IK starting from the known solution
         result = robot.ik("manipulator", target_pose, "tool0", seed=seed_joints)
 
-        assert result is not None
-
         # Result should produce same end-effector pose
-        result_pose = robot.fk("manipulator", result, "tool0")
-        np.testing.assert_array_almost_equal(
-            result_pose.translation, target_pose.translation, decimal=4
-        )
+        assert_pose_close(robot.fk("manipulator", result, "tool0"), target_pose)
 
     def test_ik_unreachable_pose(self, robot):
-        """Test IK returns None for unreachable poses."""
+        """Test IK raises IKNoSolutionError for unreachable poses."""
+        from tesseract_robotics.planning.errors import IKNoSolutionError
+
         # Create a pose far outside robot workspace
         unreachable_pose = Pose.from_xyz(10.0, 10.0, 10.0)
 
-        result = robot.ik("manipulator", unreachable_pose, "tool0")
-
-        # Should return None for unreachable pose
-        assert result is None
+        with pytest.raises(IKNoSolutionError, match="tool0"):
+            robot.ik("manipulator", unreachable_pose, "tool0")
+        with pytest.raises(IKNoSolutionError):
+            robot.ik("manipulator", unreachable_pose, "tool0", all_solutions=True)
 
     def test_ik_no_seed_uses_current_state(self, robot):
         """Test IK uses current robot state when no seed provided."""
@@ -475,13 +498,8 @@ class TestRobot:
         # Solve IK without seed - should use current state
         result = robot.ik("manipulator", target_pose, "tool0")
 
-        assert result is not None
-
         # Verify solution is valid
-        result_pose = robot.fk("manipulator", result, "tool0")
-        np.testing.assert_array_almost_equal(
-            result_pose.translation, target_pose.translation, decimal=4
-        )
+        assert_pose_close(robot.fk("manipulator", result, "tool0"), target_pose)
 
     def test_ik_all_solutions(self, robot):
         """Test IK returns multiple solutions for OPW solver (ABB IRB2400)."""
@@ -496,15 +514,12 @@ class TestRobot:
         )
 
         # OPW typically returns multiple solutions for 6-DOF industrial robots
-        assert solutions is not None
+        assert isinstance(solutions, list)
         assert len(solutions) >= 1  # at least one solution
 
         # Verify each solution produces correct end-effector pose
         for sol in solutions:
-            result_pose = robot.fk("manipulator", sol, "tool0")
-            np.testing.assert_array_almost_equal(
-                result_pose.translation, target_pose.translation, decimal=3
-            )
+            assert_pose_close(robot.fk("manipulator", sol, "tool0"), target_pose)
 
 
 class TestMotionProgram:
@@ -592,18 +607,57 @@ class TestTargets:
         assert target.pose.translation[1] == 2
         assert target.pose.translation[2] == 3
 
-    def test_cartesian_target_from_position(self):
-        target = CartesianTarget(position=[1, 2, 3])
-        assert target.pose.translation[0] == 1
-        assert target.pose.translation[1] == 2
-        assert target.pose.translation[2] == 3
-
     def test_cartesian_target_from_xyz_quat(self):
-        target = CartesianTarget(
-            position=[1, 2, 3],
-            quaternion=[0, 0, 0.707, 0.707],
+        for target in (
+            CartesianTarget.from_xyz_quat([1, 2, 3], QUAT_Z_90),
+            CartesianTarget.from_xyz_quat(1, 2, 3, *QUAT_Z_90),
+        ):
+            assert isinstance(target.pose, Pose)
+            np.testing.assert_array_almost_equal(
+                target.pose.translation, [1, 2, 3], decimal=EXACT_DECIMAL
+            )
+            np.testing.assert_array_almost_equal(
+                Quaterniond(target.pose.linear).coeffs(), QUAT_Z_90, decimal=EXACT_DECIMAL
+            )
+
+    def test_cartesian_target_requires_a_pose(self):
+        from tesseract_robotics.planning.errors import InvalidTargetError
+
+        with pytest.raises(TypeError):
+            CartesianTarget()  # pyright: ignore[reportCallIssue]
+        with pytest.raises(InvalidTargetError, match="Pose or Isometry3d"):
+            CartesianTarget([1, 2, 3])  # pyright: ignore[reportArgumentType]
+
+    def test_cartesian_target_converts_isometry_to_pose(self):
+        target = CartesianTarget(Isometry3d.Identity())
+        assert isinstance(target.pose, Pose)
+
+    def test_target_profile_inherits_program_profile(self):
+        """A target without a profile takes the program's; one with a profile keeps its own."""
+        names = ["j1", "j2"]
+        program = MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="RASTER"
         )
-        np.testing.assert_array_almost_equal(target.pose.translation, [1, 2, 3])
+        program.move_to(JointTarget([0, 0], names=names))
+        program.move_to(JointTarget([1, 1], names=names, profile="FREESPACE"))
+        composite = program.to_composite_instruction()
+        profiles = [instr.asMoveInstruction().getProfile() for instr in composite]
+        assert profiles == ["RASTER", "FREESPACE"]
+
+    def test_empty_program_raises(self):
+        from tesseract_robotics.planning import EmptyProgramError
+
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+        with pytest.raises(EmptyProgramError):
+            program.to_composite_instruction()
+
+    def test_joint_target_without_names_raises(self):
+        from tesseract_robotics.planning.errors import JointNamesRequiredError
+
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+        program.move_to(JointTarget([0, 0]))
+        with pytest.raises(JointNamesRequiredError):
+            program.to_composite_instruction()
 
     def test_state_target(self):
         target = StateTarget(
@@ -692,24 +746,28 @@ class TestCreateObstacle:
         )
 
     def test_create_box_obstacle(self, robot):
-        result = create_obstacle(
-            robot,
-            name="test_box",
-            geometry=box(0.5, 0.5, 0.5),
-            transform=Pose.from_xyz(0.5, 0, 0.3),
+        assert (
+            create_obstacle(
+                robot,
+                name="test_box",
+                geometry=box(0.5, 0.5, 0.5),
+                transform=Pose.from_xyz(0.5, 0, 0.3),
+            )
+            is None
         )
-        assert result is True
         assert "test_box" in robot.get_link_names()
 
     def test_create_sphere_obstacle(self, robot):
-        result = create_obstacle(
-            robot,
-            name="test_sphere",
-            geometry=sphere(0.1),
-            transform=Pose.from_xyz(0.3, 0.2, 0.6),
-            color=(1.0, 0, 0, 1.0),
+        assert (
+            create_obstacle(
+                robot,
+                name="test_sphere",
+                geometry=sphere(0.1),
+                transform=Pose.from_xyz(0.3, 0.2, 0.6),
+                color=(1.0, 0, 0, 1.0),
+            )
+            is None
         )
-        assert result is True
         assert "test_sphere" in robot.get_link_names()
 
 
@@ -754,8 +812,7 @@ class TestRobotLinkManagement:
         assert "test_obstacle" not in robot.get_link_names()
 
         # Add link
-        result = robot.add_link(link, joint)
-        assert result is True
+        assert robot.add_link(link, joint) is None
         assert "test_obstacle" in robot.get_link_names()
 
     def test_add_link_using_create_fixed_joint(self, robot):
@@ -781,43 +838,49 @@ class TestRobotLinkManagement:
             child_link="sphere_obstacle",
         )
 
-        result = robot.add_link(link, joint)
-        assert result is True
+        assert robot.add_link(link, joint) is None
         assert "sphere_obstacle" in robot.get_link_names()
 
     def test_remove_link(self, robot):
         """Test removing a link from the environment."""
         # First add a link
-        result = create_obstacle(
+        create_obstacle(
             robot,
             name="removable_box",
             geometry=box(0.1, 0.1, 0.1),
             transform=Pose.from_xyz(0.5, 0, 0.3),
         )
-        assert result is True
         assert "removable_box" in robot.get_link_names()
 
         # Remove it
-        result = robot.remove_link("removable_box")
-        assert result is True
+        assert robot.remove_link("removable_box") is None
         assert "removable_box" not in robot.get_link_names()
 
     def test_remove_nonexistent_link(self, robot):
-        """Test removing a link that doesn't exist returns False."""
-        result = robot.remove_link("nonexistent_link_xyz")
-        assert result is False
+        """Removing a link that doesn't exist raises EnvironmentCommandError."""
+        from tesseract_robotics.planning.errors import EnvironmentCommandError
+
+        with pytest.raises(EnvironmentCommandError, match="nonexistent_link_xyz"):
+            robot.remove_link("nonexistent_link_xyz")
+
+    def test_add_duplicate_link_raises(self, robot):
+        """Adding a link whose name exists raises EnvironmentCommandError."""
+        from tesseract_robotics.planning.errors import EnvironmentCommandError
+
+        create_obstacle(robot, "dup_box", box(0.1, 0.1, 0.1))
+        with pytest.raises(EnvironmentCommandError, match="dup_box"):
+            create_obstacle(robot, "dup_box", box(0.1, 0.1, 0.1))
 
     def test_add_remove_multiple_links(self, robot):
         """Test adding and removing multiple links."""
         # Add multiple obstacles
         for i in range(3):
-            result = create_obstacle(
+            create_obstacle(
                 robot,
                 name=f"multi_box_{i}",
                 geometry=box(0.05, 0.05, 0.05),
                 transform=Pose.from_xyz(0.3 + i * 0.1, 0, 0.5),
             )
-            assert result is True
 
         # Verify all added
         for i in range(3):
@@ -825,8 +888,7 @@ class TestRobotLinkManagement:
 
         # Remove in reverse order
         for i in range(2, -1, -1):
-            result = robot.remove_link(f"multi_box_{i}")
-            assert result is True
+            robot.remove_link(f"multi_box_{i}")
             assert f"multi_box_{i}" not in robot.get_link_names()
 
     def test_add_allowed_collision(self, robot):
@@ -840,8 +902,7 @@ class TestRobotLinkManagement:
         )
 
         # Add allowed collision between link6 and the new obstacle
-        result = robot.add_allowed_collision("link_6", "collision_box", "TestReason")
-        assert result is True
+        assert robot.add_allowed_collision("link_6", "collision_box", "TestReason") is None
 
     def test_add_allowed_collision_with_default_reason(self, robot):
         """Test add_allowed_collision uses default 'Adjacent' reason."""
@@ -853,14 +914,12 @@ class TestRobotLinkManagement:
         )
 
         # Should work with default reason
-        result = robot.add_allowed_collision("link_5", "acm_test_box")
-        assert result is True
+        assert robot.add_allowed_collision("link_5", "acm_test_box") is None
 
     def test_add_allowed_collision_between_robot_links(self, robot):
         """Test adding allowed collision between existing robot links."""
         # Add allowed collision between two robot links
-        result = robot.add_allowed_collision("link_3", "link_6", "UserDefined")
-        assert result is True
+        assert robot.add_allowed_collision("link_3", "link_6", "UserDefined") is None
 
     def test_move_link(self, robot):
         """Test relocating a link to different parent."""
@@ -897,8 +956,7 @@ class TestRobotLinkManagement:
         new_joint.child_link_id = "moveable_box"
         new_joint.type = JointType.FIXED
 
-        result = robot.move_link(new_joint)
-        assert result is True
+        assert robot.move_link(new_joint) is None
 
     def test_scene_graph_property(self, robot):
         """Test direct scene graph access."""
@@ -910,8 +968,7 @@ class TestRobotLinkManagement:
 
     def test_set_collision_margin(self, robot):
         """Test collision margin configuration."""
-        result = robot.set_collision_margin(0.01)
-        assert result is True
+        assert robot.set_collision_margin(0.01) is None
 
 
 class TestPlanningIntegration:
@@ -937,9 +994,7 @@ class TestPlanningIntegration:
 
         result = plan_freespace(robot, program, composer=composer)
 
-        assert result.successful
-        assert len(result) > 0
-        assert result.trajectory[0].positions is not None
+        assert_trajectory_valid(robot, result, JointGoal.build([0.5, 0, 0, 0, 0, 0]))
 
     def test_plan_freespace_with_pipeline(self, robot, composer):
         """Test freespace planning with explicit pipeline."""
@@ -955,7 +1010,7 @@ class TestPlanningIntegration:
 
         result = plan_freespace(robot, program, pipeline="TrajOptPipeline", composer=composer)
 
-        assert result.successful
+        assert_trajectory_valid(robot, result, JointGoal.build([0.3, 0, 0, 0, 0, 0]))
 
     def test_assign_current_state_as_seed(self, robot):
         """Test assign_current_state_as_seed function."""
@@ -1113,12 +1168,15 @@ class TestTaskComposer:
         unexpected = set(pipelines) - set(EXPECTED_PIPELINES)
         assert not unexpected, f"Unexpected pipelines: {unexpected}"
 
-    def test_warmup_skips_unknown_pipeline(self):
-        """An unknown name is not reported as loaded (gh-203: create* used to return None)."""
+    def test_warmup_raises_for_unknown_pipeline(self):
+        """Warming up a pipeline that does not load is an error, not a shorter result (gh-203)."""
         from tesseract_robotics.planning import TaskComposer
+        from tesseract_robotics.planning.errors import PipelineWarmupError
 
         composer = TaskComposer.from_config()
-        assert composer.warmup(["NoSuchPipeline", "TrajOptTask"]) == ["TrajOptTask"]
+        with pytest.raises(PipelineWarmupError, match="NoSuchPipeline"):
+            composer.warmup(["NoSuchPipeline", "TrajOptTask"])
+        assert composer.warmup(["TrajOptTask"]) == ["TrajOptTask"]
 
     def test_plan_invalid_pipeline_names_configured_pipelines(self, robot, composer):
         """The failure message carries the factory's error, listing the configured names (gh-203)."""
@@ -1128,13 +1186,13 @@ class TestTaskComposer:
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
         )
-        result = composer.plan(robot, program, pipeline="NonexistentPipeline")
-        assert not result.successful
-        assert "NonexistentPipeline" in result.message
-        assert "TrajOptPipeline" in result.message
+        with pytest.raises(UnknownPipelineError) as excinfo:
+            composer.plan(robot, program, pipeline="NonexistentPipeline")
+        assert "NonexistentPipeline" in str(excinfo.value)
+        assert "TrajOptPipeline" in str(excinfo.value)
 
     def test_plan_invalid_pipeline(self, robot, composer):
-        """Test plan returns failure for invalid pipeline."""
+        """An unknown pipeline is a configuration error: it raises, it is not an infeasible plan."""
         joint_names = robot.get_joint_names("manipulator")
         program = (
             MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
@@ -1143,10 +1201,8 @@ class TestTaskComposer:
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
         )
 
-        result = composer.plan(robot, program, pipeline="NonexistentPipeline")
-
-        assert not result.successful
-        assert "not found" in result.message.lower() or "error" in result.message.lower()
+        with pytest.raises(UnknownPipelineError):
+            composer.plan(robot, program, pipeline="NonexistentPipeline")
 
     def test_plan_ompl(self, robot, composer):
         """Test plan_ompl convenience method."""
@@ -1162,8 +1218,7 @@ class TestTaskComposer:
 
         result = plan_ompl(robot, program, composer=composer)
 
-        assert result.successful
-        assert len(result) > 0
+        assert_trajectory_valid(robot, result, JointGoal.build([0.3, 0, 0, 0, 0, 0]))
         assert all(type(n) is str for n in result.trajectory[0].joint_names)
 
     def test_plan_result_keeps_node_infos_and_data_storage(self, robot, composer):
@@ -1187,19 +1242,27 @@ class TestTaskComposer:
         assert result.data_storage is not None
         assert result.data_storage.hasKey("environment")
 
-    def test_plan_result_without_a_run_has_no_infos(self, robot, composer):
+    def test_programming_error_in_plan_propagates(self, robot, composer):
+        """A malformed program is not an infeasible plan: the error reaches the caller."""
+        from tesseract_robotics.planning import EmptyProgramError
+
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+        with pytest.raises(EmptyProgramError):
+            composer.plan(robot, program, pipeline="TrajOptPipeline")
+
+    def test_auto_seed_leaves_the_callers_program_alone(self, robot, composer):
+        """auto_seed seeds a copy: the caller's CompositeInstruction is not mutated."""
         joint_names = robot.get_joint_names("manipulator")
         program = (
             MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 0.8], TOOL_DOWN)))
         )
-
-        result = composer.plan(robot, program, pipeline="NonexistentPipeline")
-
-        assert not result.successful
-        assert result.task_infos == []
-        assert result.data_storage is None
+        composite = program.to_composite_instruction(joint_names)
+        before = copy.deepcopy(composite)
+        composer.plan(robot, composite, pipeline="TrajOptPipeline")
+        assert composite == before
 
     def test_ompl_pipeline_with_cartesian_targets(self, robot, composer):
         """Test OMPLPipeline execution with Cartesian targets.
@@ -1212,22 +1275,20 @@ class TestTaskComposer:
         start_joints = [0, 0.3, -0.3, 0, 0.5, 0]
         robot.set_joints(start_joints, joint_names=joint_names)
 
+        goal = Pose.from_xyz_quat([0.8, 0.2, 0.8], TOOL_DOWN)
         program = (
             MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
-            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 1.2], [0.707, 0.0, 0.707, 0.0])))
-            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 1.2], [0.707, 0.0, 0.707, 0.0])))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 0.8], TOOL_DOWN)))
+            .move_to(CartesianTarget(goal))
         )
 
         result = composer.plan(robot, program, pipeline="OMPLPipeline")
 
-        # Pipeline loading must work - no workarounds
-        assert result.successful or "not found" not in result.message.lower(), (
-            f"OMPLPipeline plugin loading broken: {result.message}"
-        )
+        assert_trajectory_valid(robot, result, CartesianGoal(goal, "tool0"))
 
     def test_freespace_pipeline_with_cartesian_targets(self, robot, composer):
-        """Test FreespaceMotionPipeline execution with Cartesian targets.
+        """Test FreespacePipeline execution with Cartesian targets.
 
         Coverage for tesseract_qt_py test_freespace_pipeline_execution.
         Uses FreespacePipeline which combines OMPL (global) + TrajOpt (smoothing).
@@ -1238,20 +1299,17 @@ class TestTaskComposer:
         start_joints = [0, 0.3, -0.3, 0, 0.5, 0]
         robot.set_joints(start_joints, joint_names=joint_names)
 
+        goal = Pose.from_xyz_quat([0.8, 0.2, 0.8], TOOL_DOWN)
         program = (
             MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
-            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 1.2], [0.707, 0.0, 0.707, 0.0])))
-            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 1.2], [0.707, 0.0, 0.707, 0.0])))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 0.8], TOOL_DOWN)))
+            .move_to(CartesianTarget(goal))
         )
 
-        # FreespacePipeline is the actual pipeline name in the YAML config
         result = composer.plan(robot, program, pipeline="FreespacePipeline")
 
-        # Pipeline loading must work - no workarounds
-        assert result.successful or "not found" not in result.message.lower(), (
-            f"FreespacePipeline plugin loading broken: {result.message}"
-        )
+        assert_trajectory_valid(robot, result, CartesianGoal(goal, "tool0"))
 
     def test_plan_cartesian(self, robot, composer):
         """Test plan_cartesian with TrajOpt (Descartes not in default config)."""
@@ -1315,9 +1373,9 @@ class TestDescartesPipeline:
 
     def test_descartes_pipeline_plan(self, robot, composer):
         """DescartesFPipeline solves a Cartesian program through the high-level API."""
-        from tesseract_robotics.planning import create_descartes_pipeline_profiles
+        from tesseract_robotics.planning import create_descartes_default_profiles
 
-        profiles = create_descartes_pipeline_profiles()
+        profiles = create_descartes_default_profiles()
         result = composer.plan(
             robot, self._raster_program(robot), pipeline="DescartesFPipeline", profiles=profiles
         )
@@ -1326,9 +1384,9 @@ class TestDescartesPipeline:
 
     def test_descartes_pipeline_axis_sampling(self, robot, composer):
         """Rotation sampling about the tool axis (axis-symmetric process) plans."""
-        from tesseract_robotics.planning import create_descartes_pipeline_profiles
+        from tesseract_robotics.planning import create_descartes_default_profiles
 
-        profiles = create_descartes_pipeline_profiles(
+        profiles = create_descartes_default_profiles(
             sample_axis=(0, 0, 1),
             sample_resolution=np.radians(30),
         )
@@ -1342,12 +1400,12 @@ class TestDescartesPipeline:
         from tesseract_robotics.motion_planners_descartes import (
             DescartesDefaultMoveProfileD,
         )
-        from tesseract_robotics.planning import create_descartes_pipeline_profiles
+        from tesseract_robotics.planning import create_descartes_default_profiles
 
         custom = DescartesDefaultMoveProfileD()
         custom.use_redundant_joint_solutions = True
 
-        profiles = create_descartes_pipeline_profiles(move_profile=custom)
+        profiles = create_descartes_default_profiles(move_profile=custom)
         result = composer.plan(
             robot, self._raster_program(robot), pipeline="DescartesFPipeline", profiles=profiles
         )
@@ -1381,10 +1439,10 @@ class TestDescartesPipeline:
         from tesseract_robotics.motion_planners_descartes import (
             DescartesDefaultMoveProfileD,
         )
-        from tesseract_robotics.planning import create_descartes_pipeline_profiles
+        from tesseract_robotics.planning import create_descartes_default_profiles
 
-        with pytest.raises(ValueError, match="move_profile"):
-            create_descartes_pipeline_profiles(
+        with pytest.raises(ConflictingProfileArgumentsError, match="move_profile"):
+            create_descartes_default_profiles(
                 move_profile=DescartesDefaultMoveProfileD(), ik_solver="OPWInvKin"
             )
 
@@ -1476,7 +1534,14 @@ class TestConvenienceWrapperComposer:
 
     @staticmethod
     def _recorder():
-        class Recorder:
+        from tesseract_robotics.planning import TaskComposer
+
+        class Recorder(TaskComposer):
+            """A real composer whose `plan` records the call: the plan_* methods run unchanged."""
+
+            def __init__(self):
+                pass
+
             def plan(self, robot, program, pipeline, profiles):
                 self.pipeline = pipeline
                 self.profiles = profiles
@@ -1588,9 +1653,9 @@ class TestProfileCreation:
         collection. Porting the buffer without the margin left the cost inert, and TrajOpt then
         parked paths on the zero-distance boundary that DiscreteContactCheckTask rejects (#103).
         """
-        from tesseract_robotics.planning.profiles import _create_trajopt_profiles
+        from tesseract_robotics.planning.profiles import create_trajopt_profile_pair
 
-        composite, _ = _create_trajopt_profiles()
+        composite, _ = create_trajopt_profile_pair()
         constraint = composite.collision_constraint_config
         cost = composite.collision_cost_config
         assert constraint.contact_manager_config.default_margin == 0.0
@@ -1739,11 +1804,6 @@ class TestProfileCreation:
 
 class TestProgramErrors:
     """Tests for error cases in program building."""
-
-    def test_cartesian_target_requires_pose_or_position(self):
-        """Test CartesianTarget raises ValueError when neither pose nor position given."""
-        with pytest.raises(ValueError, match="requires 'pose' or 'position'"):
-            CartesianTarget()
 
     def test_joint_target_requires_names(self):
         """Test JointTarget.to_waypoint raises ValueError without joint names."""

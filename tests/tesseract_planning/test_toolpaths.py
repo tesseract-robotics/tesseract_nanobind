@@ -57,3 +57,17 @@ def test_circle_on_radius_tool_down(n_waypoints: int) -> None:
 def test_circle_rejects_degenerate_waypoint_count(bad: int) -> None:
     with pytest.raises(DegenerateToolpathError, match="n_waypoints"):
         circle(0.25, bad)
+
+
+def test_default_zigzag_square_is_reachable_tool_down_on_the_irb2400() -> None:
+    """The default placement is a usable reference: the IRB 2400 solves IK for every pose.
+
+    Being inside the arm's reach envelope is not enough; with the tool pointing down, poses
+    close to the base or far out at low height have no IK solution, so the default square
+    sits where every one of its poses solves.
+    """
+    from tests.emitters.programs import IRB2400_REFERENCE_SEED, irb2400_ik
+
+    near = IRB2400_REFERENCE_SEED
+    for pose in zigzag_square():
+        near = irb2400_ik(pose, near=near)

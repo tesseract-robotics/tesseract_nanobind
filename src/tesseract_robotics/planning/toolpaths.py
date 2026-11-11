@@ -10,7 +10,7 @@ Example:
     from tesseract_robotics.planning import CartesianTarget, MotionProgram
     from tesseract_robotics.planning.toolpaths import circle
 
-    program = MotionProgram("manipulator", tcp_frame="tool0")
+    program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     for pose in circle(0.25, 84, center=(0.8, 0.0), z_m=0.6):
         program.linear_to(CartesianTarget(pose))
     ```
@@ -26,26 +26,28 @@ import numpy as np
 from tesseract_robotics.planning.transforms import Pose
 
 #: Workpiece-plane height of the zigzag square above the robot base (m). The
-#: whole 1 m x 1 m square then sits inside the ABB IRB 2400's ~1.55 m reach.
-Z_HEIGHT_M: Final[float] = 0.5
+#: default 0.8 m x 0.8 m square is placed where the ABB IRB 2400 solves IK for
+#: every pose with the tool pointing down; being inside the ~1.55 m reach
+#: envelope is not enough (closer in, or higher up, some tool-down poses have no
+#: solution).
+Z_HEIGHT_M: Final[float] = 0.4
 
 #: X extent of the zigzag square (m).
-X_RANGE_M: Final[tuple[float, float]] = (0.3, 1.3)
+X_RANGE_M: Final[tuple[float, float]] = (0.6, 1.4)
 
 #: Y extent of the zigzag square (m).
-Y_RANGE_M: Final[tuple[float, float]] = (-0.5, 0.5)
+Y_RANGE_M: Final[tuple[float, float]] = (-0.4, 0.4)
 
-#: Zigzag scan lines: Y width / 0.1 m spacing + 1.
+#: Zigzag scan lines: Y width / 0.08 m spacing + 1.
 ZIGZAG_LINE_COUNT: Final[int] = 11
 
 #: Square outline poses: 4 corners plus the closing return to the first.
 OUTLINE_POSE_COUNT: Final[int] = 5
 
 #: Orientation of every zigzag pose, scalar-last [qx, qy, qz, qw]: 180 degrees
-#: about world Z. This leaves the TCP z-axis on world +Z; it is not the tool-down
-#: orientation `circle` uses. Kept as is because the RAPID golden
-#: (`tests/emitters/rapid/golden/abb_irb2400_zigzag_square.mod`) locks it.
-ZIGZAG_QUAT_XYZW: Final[tuple[float, float, float, float]] = (0.0, 0.0, 1.0, 0.0)
+#: about world Y, so the TCP z-axis points along world -Z, into the workpiece
+#: (tool down), with the TCP x-axis along world -X.
+ZIGZAG_QUAT_XYZW: Final[tuple[float, float, float, float]] = (0.0, 1.0, 0.0, 0.0)
 
 #: Tool down, scalar-last [qx, qy, qz, qw]: 180 degrees about world X, so the
 #: TCP z-axis points along world -Z, into the workpiece.
