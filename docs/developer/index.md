@@ -144,7 +144,7 @@ pixi install
 pixi list
 ```
 
-Critical pins: `tesseract-robotics ==0.36.0.dev20261103`, `tesseract-robotics-planning ==0.36.0.dev20261014` and `trajopt ==0.36.0.dev20261013`, from the `tesseract-robotics/label/dev` channel, plus `taskflow 3.11.*` (header-only, matched to the planning build). Everything else (eigen, boost, …) follows from those packages' `run_exports`; pinning more deadlocks the solve.
+The C++ stack is not pinned here: `dependencies.rosinstall` and `scripts/native_stack.toml` declare it (see [The native stack build](native-stack.md)).
 
 ### CONDA_PREFIX and Worktrees
 
@@ -249,7 +249,7 @@ graph LR
     root --> tests["tests/"]
     root --> scripts["scripts/ (stubs, GIL audit, upstream build)"]
     root --> up["upstream/ (tesseract, trajopt, tesseract_planning submodules)"]
-    root --> pk["packaging/ (forked feedstock submodules)"]
+    root --> pk["packaging/ (the support-data wheel)"]
     src --> pkg["tesseract_robotics/ (Python package, .pyi stubs, direct-install modules land here)"]
     src --> bind["bindings/ (one <module>.cpp per extension)"]
     src --> hdr["tesseract_nb.h (shared precompiled header)"]
