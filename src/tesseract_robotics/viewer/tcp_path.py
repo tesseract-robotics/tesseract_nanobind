@@ -121,8 +121,10 @@ def tcp_path(env: Environment, trajectory: Trajectory, manip_info: ManipulatorIn
     offset = _tcp_offset(manip_info)
     _check_move_types(trajectory, kin, manip_info)
 
+    tcp_frame = manip_info.tcp_frame.name()
+
     def tcp(q: NDArray[np.float64]) -> Isometry3d:
-        return kin.calcFwdKin(q)[manip_info.tcp_frame] * offset
+        return kin.calcFwdKin(q)[tcp_frame] * offset
 
     columns = [trajectory.joint_names.index(name) for name in group_joints]
     waypoints = trajectory.positions[:, columns]

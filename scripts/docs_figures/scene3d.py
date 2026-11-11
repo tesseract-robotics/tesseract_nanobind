@@ -61,7 +61,7 @@ class View:
 
 def link_poses(env: Environment) -> dict[str, NDArray[np.float64]]:
     """Link name to 4x4 world transform, from the environment's current state."""
-    return {link.name(): pose.matrix for link, pose in env.getState().link_transforms.items()}
+    return {link: pose.matrix for link, pose in env.getState().link_transforms.items()}
 
 
 def link_triangles(

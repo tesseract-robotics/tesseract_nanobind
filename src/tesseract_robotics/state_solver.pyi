@@ -14,29 +14,29 @@ class SceneState:
     def __init__(self) -> None: ...
 
     @property
-    def joints(self) -> dict[tesseract_robotics.common.JointId, float]:
-        """Joint values: joint id -> value [rad or m]."""
+    def joints(self) -> dict[str, float]:
+        """Joint values: joint name -> value [rad or m]."""
 
     @joints.setter
     def joints(self, arg: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float], /) -> None: ...
 
     @property
-    def floating_joints(self) -> dict[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d]:
-        """Floating-joint transforms: joint id -> Isometry3d."""
+    def floating_joints(self) -> dict[str, tesseract_robotics.common.Isometry3d]:
+        """Floating-joint transforms: joint name -> Isometry3d."""
 
     @floating_joints.setter
     def floating_joints(self, arg: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d], /) -> None: ...
 
     @property
-    def link_transforms(self) -> dict[tesseract_robotics.common.LinkId, tesseract_robotics.common.Isometry3d]:
-        """World transform of every link: link id -> Isometry3d (a copy)."""
+    def link_transforms(self) -> dict[str, tesseract_robotics.common.Isometry3d]:
+        """World transform of every link: link name -> Isometry3d (a copy)."""
 
     @link_transforms.setter
     def link_transforms(self, arg: Mapping[tesseract_robotics.common.LinkId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d], /) -> None: ...
 
     @property
-    def joint_transforms(self) -> dict[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d]:
-        """World transform of every joint: joint id -> Isometry3d (a copy)."""
+    def joint_transforms(self) -> dict[str, tesseract_robotics.common.Isometry3d]:
+        """World transform of every joint: joint name -> Isometry3d (a copy)."""
 
     @joint_transforms.setter
     def joint_transforms(self, arg: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d], /) -> None: ...
@@ -46,7 +46,7 @@ class SceneState:
         The values of `joint_ids`, in that order; an unknown id raises KeyError.
         """
 
-    def getFloatingJointValues(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str]) -> dict[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d]: ...
+    def getFloatingJointValues(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str]) -> dict[str, tesseract_robotics.common.Isometry3d]: ...
 
     def __eq__(self, other: object, /) -> bool: ...
 
@@ -98,7 +98,7 @@ class StateSolver:
         """
 
     @overload
-    def getLinkTransforms(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> dict[tesseract_robotics.common.LinkId, tesseract_robotics.common.Isometry3d]: ...
+    def getLinkTransforms(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> dict[str, tesseract_robotics.common.Isometry3d]: ...
 
     def getRandomState(self) -> SceneState:
         """A state at uniformly random joint values within the joint limits."""

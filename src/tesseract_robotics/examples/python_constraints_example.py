@@ -62,6 +62,7 @@ from tesseract_robotics.geometry import (
 )
 from tesseract_robotics.kinematics import JointGroup, calcManipulability
 from tesseract_robotics.planning import Robot
+from tesseract_robotics.planning.errors import ResourceNotFoundError
 from tesseract_robotics.scene_graph import (
     Collision,
     Joint,
@@ -448,7 +449,7 @@ def _finished(vertices: np.ndarray, triangles: np.ndarray, finish: Finish) -> Me
         .ravel()
     )
     material = MeshMaterial(np.array(finish.rgba), finish.metallic, finish.roughness, np.zeros(4))
-    return Mesh(np.asarray(vertices, dtype=np.float64), faces, mesh_material=material)
+    return Mesh(list(np.asarray(vertices, dtype=np.float64)), faces, mesh_material=material)
 
 
 def _box(x: float, y: float, z: float, finish: Finish) -> Mesh:
@@ -539,9 +540,10 @@ def build_cell() -> Robot:
 
     # The tool: an adapter plate, then the grinder with its base on the plate and its axis
     # along the flange normal. `tcp` is its tip.
-    grinder = createMeshFromResource(
-        locator.locateResource(GRINDER_MESH), np.full(3, GRINDER_SCALE), True, True
-    )
+    grinder_resource = locator.locateResource(GRINDER_MESH)
+    if grinder_resource is None:
+        raise ResourceNotFoundError(f"Could not locate the grinder mesh: {GRINDER_MESH}")
+    grinder = createMeshFromResource(grinder_resource, np.full(3, GRINDER_SCALE), True, True)
     _add_link(
         robot,
         "adapter",
@@ -762,9 +764,9 @@ def measure(cell: JointGroup, q: np.ndarray, target: np.ndarray, clearance_m: fl
     to_tip = tcp.translation - camera.translation
     return {
         "hold_mm": float(np.linalg.norm(tcp.translation - target) * MM_PER_M),
-        "tilt_deg": _angle_deg(tcp.rotation[:, 2] @ DOWN),
+        "tilt_deg": _angle_deg(float(tcp.rotation[:, 2] @ DOWN)),
         "elbow_m": float(poses[ELBOW].translation[2]),
-        "view_deg": _angle_deg(camera.rotation[:, 2] @ to_tip / np.linalg.norm(to_tip)),
+        "view_deg": _angle_deg(float(camera.rotation[:, 2] @ to_tip / np.linalg.norm(to_tip))),
         "dexterity": float(calcManipulability(cell.calcJacobian(q, TCP)).m.volume),
         "clearance_m": clearance_m,
         # How far the tip leads the carriage along the rail [m]; no gauge shows it.

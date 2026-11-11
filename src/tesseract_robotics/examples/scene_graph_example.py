@@ -252,8 +252,8 @@ def run(pipeline=None, num_planners=None, *, composer: TaskComposer | None = Non
     print(f"Root link: {robot.env.getRootLinkId()}")
 
     # Get all link and joint names
-    link_names = list(robot.env.getLinkIds())
-    joint_names = list(robot.env.getJointIds())
+    link_names = [link.name() for link in robot.env.getLinkIds()]
+    joint_names = [joint.name() for joint in robot.env.getJointIds()]
     print(f"Links ({len(link_names)}): {link_names}")
     print(f"Joints ({len(joint_names)}): {joint_names}")
 

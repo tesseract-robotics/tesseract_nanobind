@@ -97,8 +97,6 @@ This example directly uses the C++ API bindings for kinematics operations:
 - pick_and_place_example.py: FK/IK for grasp pose computation
 """
 
-from pathlib import Path
-
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
@@ -109,7 +107,7 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import Environment
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
 from tesseract_robotics.kinematics import KinGroupIKInput, KinGroupIKInputs
 
 # Initialize Environment with a robot from URDF file
@@ -149,16 +147,9 @@ def main():
 
     # ABB IRB2400 uses OPW (analytical) kinematics solver
     # Solver is configured in abb_irb2400_plugins.yaml referenced by SRDF
-    urdf_path_str = locator.locateResource(
-        "package://tesseract/support/urdf/abb_irb2400.urdf"
-    ).getFilePath()
-    srdf_path_str = locator.locateResource(
-        "package://tesseract/support/urdf/abb_irb2400.srdf"
-    ).getFilePath()
-
-    # A pathlib.Path selects the file overload of init(); a str would be URDF content
-    urdf_path = Path(urdf_path_str)
-    srdf_path = Path(srdf_path_str)
+    # locate_file returns a pathlib.Path, which selects the file overload of init()
+    urdf_path = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.urdf")
+    srdf_path = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.srdf")
 
     # init() parses URDF/SRDF and loads configured kinematic plugins
     if not env.init(urdf_path, srdf_path, locator):

@@ -12,7 +12,6 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.common import LinkId
 
 from .scenes import Iiwa
 
@@ -38,7 +37,7 @@ def kin(iiwa: Iiwa) -> ti.CartAxisKinematics:
 
 def test_calc_axis_matches_forward_kinematics(iiwa: Iiwa, kin: ti.CartAxisKinematics):
     poses = iiwa.manip.calcFwdKin(CONFIG)
-    expected = poses[LinkId("base_link")].rotation.T @ poses[LinkId("tool0")].rotation @ TOOL_Z
+    expected = poses["base_link"].rotation.T @ poses["tool0"].rotation @ TOOL_Z
     np.testing.assert_allclose(kin.calcAxis(CONFIG), expected, atol=AXIS_ATOL)
     assert kin.numJoints() == len(iiwa.joint_names)
     np.testing.assert_array_equal(kin.getSourceAxis(), TOOL_Z)

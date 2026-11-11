@@ -22,6 +22,8 @@
 
 // ResourceLocator (require_located_file)
 #include <tesseract/common/resource_locator.h>
+// NameId, LinkTag, JointTag (name-keyed map caster)
+#include <tesseract/common/types.h>
 #include <cerrno>
 
 // Eigen
@@ -152,6 +154,86 @@ NAMESPACE_BEGIN(detail)
 template <typename Key, typename T, typename Hash, typename KeyEqual>
 struct type_caster<std::unordered_map<Key, T, Hash, KeyEqual, Eigen::aligned_allocator<std::pair<const Key, T>>>>
   : dict_caster<std::unordered_map<Key, T, Hash, KeyEqual, Eigen::aligned_allocator<std::pair<const Key, T>>>, Key, T>
+{
+};
+NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)
+
+// Maps keyed by a link or joint id leave C++ as dict[str, V]: each key is the id's name.
+//
+// Python code indexes these maps by name (`calcFwdKin(q)["tool0"]`); with LinkId keys that
+// worked at runtime (a LinkId hashes and compares like its name) but no type checker can
+// model it, since dict[LinkId, V].__getitem__ takes a LinkId. Inputs are unchanged: a key
+// may be a str or an id (implicit str -> LinkId), so any returned map round-trips into a
+// setter. The stub reads `Mapping[LinkId, V]` for a parameter (widened to `| Mapping[str, V]`
+// by scripts/widen_implicit_id_stubs.py) and `dict[str, V]` for a return. The id's Python
+// name is spelled out because an io_name section is raw text (nb_func.cpp renders `%` type
+// placeholders only outside it). One caster serves every map type: std::unordered_map with
+// the default allocator and with Eigen::aligned_allocator (AlignedUnorderedMap).
+NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+template <typename Tag>
+struct name_id_python_name;
+template <>
+struct name_id_python_name<tesseract::common::LinkTag>
+{
+  static constexpr char value[] = "tesseract_robotics.common._common.LinkId";
+};
+template <>
+struct name_id_python_name<tesseract::common::JointTag>
+{
+  static constexpr char value[] = "tesseract_robotics.common._common.JointId";
+};
+
+template <typename Map, typename Tag, typename Val>
+struct name_keyed_dict_caster : dict_caster<Map, tesseract::common::NameId<Tag>, Val>
+{
+  using ValCaster = make_caster<Val>;
+  static constexpr auto Name = io_name("collections.abc.Mapping", "dict") + const_name("[") +
+                               io_name(name_id_python_name<Tag>::value, "str") + const_name(", ") +
+                               ValCaster::Name + const_name("]");
+
+  template <typename T, std::enable_if_t<!std::is_pointer_v<std::remove_reference_t<T>>, int> = 0>
+  static handle from_cpp(T&& src, rv_policy policy, cleanup_list* cleanup)
+  {
+    dict ret;
+    for (auto& item : src)
+    {
+      const std::string& name = item.first.name();
+      object key = steal(PyUnicode_FromStringAndSize(name.data(), static_cast<Py_ssize_t>(name.size())));
+      object val = steal(ValCaster::from_cpp(forward_like_<T>(item.second), policy, cleanup));
+      if (!key.is_valid() || !val.is_valid() || PyDict_SetItem(ret.ptr(), key.ptr(), val.ptr()) != 0)
+        return handle();
+    }
+    return ret.release();
+  }
+
+  // NB_TYPE_CASTER's pointer overload calls the base from_cpp; route it here instead.
+  static handle from_cpp(const Map* src, rv_policy policy, cleanup_list* cleanup)
+  {
+    if (src == nullptr)
+      return none().release();
+    return from_cpp(*src, policy, cleanup);
+  }
+};
+
+template <typename Tag, typename Val, typename Hash, typename KeyEqual>
+struct type_caster<std::unordered_map<tesseract::common::NameId<Tag>, Val, Hash, KeyEqual,
+                                      std::allocator<std::pair<const tesseract::common::NameId<Tag>, Val>>>>
+  : name_keyed_dict_caster<std::unordered_map<tesseract::common::NameId<Tag>, Val, Hash, KeyEqual,
+                                              std::allocator<std::pair<const tesseract::common::NameId<Tag>, Val>>>,
+                           Tag, Val>
+{
+};
+
+template <typename Tag, typename Val, typename Hash, typename KeyEqual>
+struct type_caster<
+    std::unordered_map<tesseract::common::NameId<Tag>, Val, Hash, KeyEqual,
+                       Eigen::aligned_allocator<std::pair<const tesseract::common::NameId<Tag>, Val>>>>
+  : name_keyed_dict_caster<
+        std::unordered_map<tesseract::common::NameId<Tag>, Val, Hash, KeyEqual,
+                           Eigen::aligned_allocator<std::pair<const tesseract::common::NameId<Tag>, Val>>>,
+        Tag, Val>
 {
 };
 NAMESPACE_END(detail)

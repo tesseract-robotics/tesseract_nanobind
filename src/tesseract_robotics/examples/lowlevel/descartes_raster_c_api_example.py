@@ -28,7 +28,6 @@ Related Examples:
 """
 
 import sys
-from pathlib import Path
 
 import numpy as np
 
@@ -55,7 +54,7 @@ from tesseract_robotics.common import (
 )
 from tesseract_robotics.environment import Environment
 from tesseract_robotics.examples.failures import require_success
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
 from tesseract_robotics.motion_planners import PlannerRequest
 from tesseract_robotics.motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
@@ -168,12 +167,8 @@ def run():
     # every waypoint, so an analytic solver is what makes the ladder graph fast.
     locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = Environment()
-    urdf_path = Path(
-        locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
-    )
-    srdf_path = Path(
-        locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
-    )
+    urdf_path = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.urdf")
+    srdf_path = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.srdf")
     if not env.init(urdf_path, srdf_path, locator):
         raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 

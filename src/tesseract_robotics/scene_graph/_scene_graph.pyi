@@ -782,7 +782,7 @@ class SceneGraph:
     def getShortestPath(self, root: tesseract_robotics.common.LinkId | str, tip: tesseract_robotics.common.LinkId | str) -> ShortestPath:
         """The links and joints from `root` to `tip`."""
 
-    def getAdjacencyMap(self, link_ids: Sequence[tesseract_robotics.common.LinkId | str]) -> dict[tesseract_robotics.common.LinkId, tesseract_robotics.common.LinkId]:
+    def getAdjacencyMap(self, link_ids: Sequence[tesseract_robotics.common.LinkId | str]) -> dict[str, tesseract_robotics.common.LinkId]:
         """
         Map each link that moves with one of `link_ids` to that link's id (graph.h:499). Each listed link maps itself and every link below it, stopping at another listed link. An unknown id raises KeyError.
         """

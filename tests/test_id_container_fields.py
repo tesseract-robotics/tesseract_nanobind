@@ -1,10 +1,10 @@
 """Id-container fields read as copies: the ids outlive a later edit of the owner.
 
-0.36 made the keys and elements of these fields bound `JointId` / `LinkId` objects
-(they were `str`). A `def_rw` getter casts with `rv_policy::reference_internal`,
-which nanobind forwards to every element (`nanobind/stl/detail/nb_dict.h:77`), so
-without `rv_policy::copy` each id wrapped a node of the C++ container and dangled
-once the owner cleared or replaced it.
+0.36 made the elements of these fields bound `JointId` / `LinkId` objects (they were
+`str`); the keys of the id-keyed maps among them read as names (`str`). A `def_rw` getter
+casts with `rv_policy::reference_internal`, which nanobind forwards to every element
+(`nanobind/stl/detail/nb_dict.h:77`), so without `rv_policy::copy` each id or value wrapped
+a node of the C++ container and dangled once the owner cleared or replaced it.
 """
 
 import sys
@@ -28,8 +28,8 @@ NUM_IDS = 64
 
 
 def _ids(value) -> list[str]:
-    """Every JointId / LinkId in a nested read of a field, as names, in a stable order."""
-    if isinstance(value, (JointId, LinkId)):
+    """Every name (JointId, LinkId or str) in a nested read of a field, in a stable order."""
+    if isinstance(value, (JointId, LinkId, str)):
         return [str(value)]
     if isinstance(value, dict):
         items = sorted(value.items(), key=lambda item: str(item[0]))

@@ -19,8 +19,9 @@ from pathlib import Path
 _QUAL = r"(?:tesseract_robotics\.common\._common\.)?"
 # An id type name not already widened (`LinkId | str`) and not part of a longer name.
 # Mapping/dict keys are left to `_widen_mappings`: keys are invariant, so
-# `Mapping[LinkId | str, X]` would reject the `dict[LinkId, X]` the bindings hand out
-# (SceneState.link_transforms); a parameter becomes `Mapping[LinkId, X] | Mapping[str, X]`.
+# `Mapping[LinkId | str, X]` would reject both a `dict[str, X]` (what the bindings hand out,
+# src/tesseract_nb.h name_keyed_dict_caster) and a `dict[LinkId, X]`; a parameter becomes
+# `Mapping[LinkId, X] | Mapping[str, X]`.
 _NOT_KEY = r"(?<!Mapping\[)(?<!dict\[)"
 _ID = re.compile(rf"{_NOT_KEY}(?<![\w.])({_QUAL}(?:LinkId|JointId))(?![\w]| \| str)")
 _PAIR = re.compile(rf"{_NOT_KEY}(?<![\w.])({_QUAL}LinkIdPair)(?![\w]| \| tuple)")

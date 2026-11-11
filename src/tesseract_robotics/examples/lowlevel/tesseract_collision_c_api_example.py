@@ -82,8 +82,6 @@ This example directly uses the C++ API bindings for maximum control:
 - scene_graph_example.py: Direct scene graph manipulation
 """
 
-from pathlib import Path
-
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
@@ -100,7 +98,7 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import AddLinkCommand, Environment
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
 from tesseract_robotics.geometry import Sphere
 from tesseract_robotics.scene_graph import (
     Collision,
@@ -146,16 +144,9 @@ def main():
     env = Environment()
 
     # Locate URDF (robot geometry) and SRDF (semantic info: groups, ACM, plugins)
-    urdf_path_str = locator.locateResource(
-        "package://tesseract/support/urdf/abb_irb2400.urdf"
-    ).getFilePath()
-    srdf_path_str = locator.locateResource(
-        "package://tesseract/support/urdf/abb_irb2400.srdf"
-    ).getFilePath()
-
-    # A pathlib.Path selects the file overload of init(); a str would be URDF content
-    urdf_path = Path(urdf_path_str)
-    srdf_path = Path(srdf_path_str)
+    # locate_file returns a pathlib.Path, which selects the file overload of init()
+    urdf_path = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.urdf")
+    srdf_path = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.srdf")
 
     # init() parses URDF/SRDF and loads configured plugins (collision, kinematics)
     # Returns False if parsing fails - always check return value

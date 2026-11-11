@@ -15,6 +15,7 @@ import math
 import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
@@ -173,11 +174,27 @@ ANIMATION_FPS = 30.0
 BASE_FREQ_HZ = 0.2
 FREQ_STEP_HZ = 0.05
 
-WORKCELLS = {
-    "positioner": {
-        "urdf": "urdf/workcell_positioner.urdf",
-        "srdf": "config/workcell_positioner.srdf",
-        "joints": {
+
+@dataclass(frozen=True)
+class Workcell:
+    """One twc_support workcell.
+
+    Attributes:
+        urdf: URDF path, relative to twc_support.
+        srdf: SRDF path, relative to twc_support.
+        joints: The joints the animation sweeps: name -> (lower, upper) [rad or m].
+    """
+
+    urdf: str
+    srdf: str
+    joints: dict[str, tuple[float, float]]
+
+
+WORKCELLS: dict[str, Workcell] = {
+    "positioner": Workcell(
+        urdf="urdf/workcell_positioner.urdf",
+        srdf="config/workcell_positioner.srdf",
+        joints={
             "positioner_joint_1": (-math.pi, math.pi),
             "positioner_base_joint": (-math.pi / 2, math.pi / 2),
             "robot_joint_1": (-math.pi / 2, math.pi / 2),
@@ -187,11 +204,11 @@ WORKCELLS = {
             "robot_joint_5": (-math.pi / 4, math.pi / 4),
             "robot_joint_6": (-math.pi, math.pi),
         },
-    },
-    "rail": {
-        "urdf": "urdf/workcell_rail.urdf",
-        "srdf": "config/workcell_rail.srdf",
-        "joints": {
+    ),
+    "rail": Workcell(
+        urdf="urdf/workcell_rail.urdf",
+        srdf="config/workcell_rail.srdf",
+        joints={
             "rail_joint_1": (0.0, 8.0),  # Linear rail; the joint allows 10 m
             "positioner_joint_1": (-math.pi, math.pi),  # Has positioner too
             "robot_joint_1": (-math.pi / 2, math.pi / 2),
@@ -201,7 +218,7 @@ WORKCELLS = {
             "robot_joint_5": (-math.pi / 4, math.pi / 4),
             "robot_joint_6": (-math.pi, math.pi),
         },
-    },
+    ),
 }
 
 
@@ -213,7 +230,7 @@ def animation_rows(
     Returns:
         `(joint_names, rows)`.
     """
-    animated_joints = WORKCELLS[workcell]["joints"]
+    animated_joints = WORKCELLS[workcell].joints
     names = list(animated_joints)
     rows = []
     for t in np.arange(0.0, duration, 1.0 / fps):
@@ -242,8 +259,8 @@ def run(workcell: str = "rail", twc_support: Path | None = None):
     support_path = find_twc_support(twc_support)
 
     # --8<-- [start:load_workcell]
-    urdf_path = support_path / config["urdf"]
-    srdf_path = support_path / config["srdf"]
+    urdf_path = support_path / config.urdf
+    srdf_path = support_path / config.srdf
 
     print(f"Using twc_support from: {support_path}")
     print(f"Workcell: {workcell}")
