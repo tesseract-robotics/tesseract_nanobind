@@ -133,6 +133,26 @@ class TestGeometryLoading:
         assert mesh_from_file(path, locator=locator) is not None
         assert mesh_from_file(path.as_uri(), locator=locator) is not None
 
+    def test_a_local_mesh_does_not_go_through_the_locator(self, locator):
+        """A local path or file:// URL becomes a resource from its filesystem path.
+
+        The locator is not asked: tesseract's GeneralResourceLocator turns an RFC 8089 Windows URI
+        (`file:///C:/...`) into `/C:/...` and cannot resolve it, so routing local files through it
+        breaks every local mesh on Windows.
+        """
+        from tesseract_robotics.common import ResourceLocator
+        from tesseract_robotics.planning import convex_mesh_from_file, mesh_from_file
+
+        class ResolvesNothing(ResourceLocator):
+            def locateResource(self, url):  # noqa: N802 - the C++ virtual's name
+                return None
+
+        path = Path(locator.locateResource(self.MESH).getFilePath())
+        nothing = ResolvesNothing()
+        assert mesh_from_file(path, locator=nothing) is not None
+        assert mesh_from_file(path.as_uri(), locator=nothing) is not None
+        assert convex_mesh_from_file(path, locator=nothing) is not None
+
     def test_mesh_from_a_relative_path(self, locator, monkeypatch):
         from tesseract_robotics.planning import convex_mesh_from_file, mesh_from_file
 
