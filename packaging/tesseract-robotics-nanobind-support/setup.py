@@ -12,20 +12,16 @@ from setuptools.command.build_py import build_py
 
 def _tesseract_share() -> Path:
     """`<prefix>/share/tesseract` of the tesseract install the wheel is built against."""
-    prefixes = [os.environ.get(var) for var in ("TESSERACT_CPP_PREFIX", "CONDA_PREFIX")]
-    tried = []
-    for prefix in filter(None, prefixes):
-        # conda on Windows installs data under the Library/ prefix
-        for share in (Path(prefix) / "share", Path(prefix) / "Library" / "share"):
-            candidate = share / "tesseract"
-            tried.append(str(candidate))
-            if (candidate / "package.xml").is_file() and (candidate / "support").is_dir():
-                return candidate
-    raise RuntimeError(
-        "tesseract support data not found: set TESSERACT_CPP_PREFIX (or activate a conda env) to a "
-        "tesseract install with share/tesseract/package.xml and share/tesseract/support/"
-        + (f"; tried {', '.join(tried)}" if tried else "")
-    )
+    prefix = os.environ.get("TESSERACT_CPP_PREFIX")
+    if not prefix:
+        raise RuntimeError(
+            "tesseract support data not found: set TESSERACT_CPP_PREFIX to the native stack's "
+            "install (share/tesseract/package.xml and share/tesseract/support/)"
+        )
+    candidate = Path(prefix) / "share" / "tesseract"
+    if not ((candidate / "package.xml").is_file() and (candidate / "support").is_dir()):
+        raise RuntimeError(f"tesseract support data not found under {candidate}")
+    return candidate
 
 
 class BuildPyWithSupportData(build_py):

@@ -105,19 +105,16 @@ pixi install
 
 ## C++ Dependencies
 
-The tesseract C++ stack arrives as two conda packages (pinned `==0.36.0.dev20261103`
-and `==0.36.0.dev20261014`, from the channel's `dev` label), built by the
-[tesseract-robotics channel](https://anaconda.org/tesseract-robotics):
+The tesseract C++ stack (tesseract, trajopt, tesseract_planning, descartes_light, opw_kinematics,
+ruckig, boost_plugin_loader) is built from the sources in `dependencies.rosinstall`, against vcpkg's
+third-party libraries, by the same script the wheel workflow runs:
 
-| Package | What it provides |
-| ------- | ---------------- |
-| tesseract-robotics | Environment, collision detection, kinematics, scene graph, srdf/urdf |
-| tesseract-robotics-planning | Task composer, motion planning pipelines (OMPL, TrajOpt, Descartes, Ruckig) |
+```bash
+pixi run native-build   # into .native/<triplet>; the first build takes ~35 min, reruns skip unchanged stages
+pixi run build          # then compile the bindings against it
+```
 
-Everything else (trajopt, descartes-light, opw-kinematics, boost-plugin-loader,
-eigen, boost, ompl, bullet, fcl, …) arrives transitively, matched to how those
-feedstocks were built. Don't pin the transitive C++ deps in `pyproject.toml` —
-let the tesseract packages drive the resolution so the ABI stays coherent.
+The pixi env supplies the toolchain only. See [The native stack build](../developer/native-stack.md).
 
 ### Submodule (Optional)
 
@@ -130,7 +127,7 @@ git submodule update --init ws/src/tesseract_ros_workcell
 It fetches about 50 MB of URDF/mesh assets for a multi-robot workcell with
 positioner and rail, used by `src/tesseract_robotics/examples/twc_workcell_positioner_viewer.py`.
 Name the path: a bare `git submodule update --init` also clones the `upstream/`
-sources and `packaging/` feedstocks, which only the 0.36 build loops need.
+sources, which only the 0.36 inner loop needs.
 
 ---
 

@@ -46,12 +46,6 @@ docs/superpowers/
 docs/plans/
 AGENTS.md
 
-# upstream-main feedstock builds (pixi run build-feedstock)
-packaging/output/
-packaging/output-*/
-packaging/linux-aarch64-out/
-packaging/SDKs/
-packaging/logs/
 upstream/build/
 
 # Demo recordings, posters and player snippets: generated, and pinned by scripts/demos/demos.lock.json
