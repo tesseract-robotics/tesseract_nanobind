@@ -1565,7 +1565,7 @@ class TestFailureMessage:
         return SimpleNamespace(name=name, status_code=status_code, status_message=status_message)
 
     def _failed_run(self):
-        from tesseract_robotics.planning.composer import ABORT_PROPAGATION_MESSAGE
+        ABORT_PROPAGATION_MESSAGE = "Error (Abort Triggered)"
 
         return [
             self._info(
@@ -1600,14 +1600,36 @@ class TestFailureMessage:
             "TrajOptMotionPlannerTask: Failed to find valid solution: OPT_SCO_ITERATION_LIMIT"
         )
 
+    def test_a_planner_that_threw_is_reported_over_the_aborts(self):
+        """The infos a real FreespacePipeline failure produces (IRB 2400, unreachable goal).
+
+        The OMPL task threw (status code -1) and the nodes the abort passed through report
+        "Aborted", not "Error (Abort Triggered)".
+        """
+        from tesseract_robotics.planning.composer import _failure_message
+
+        thrown = self._info(
+            "OMPLMotionPlannerTask",
+            -1,
+            "Exception thrown: In OMPLRealVectorMoveProfile: All goal states are either in "
+            "collision or outside limits (Abort Triggered)",
+        )
+        infos = [
+            self._info("ErrorTask", 0, "Aborted"),
+            self._info("FormatInputTask", 1, "Successful"),
+            self._info("FreespacePipeline", 0, "Aborted"),
+            self._info("MotionPlanningTask", 0, "Aborted"),
+            thrown,
+        ]
+        assert _failure_message(infos, thrown) == f"OMPLMotionPlannerTask: {thrown.status_message}"
+
     def test_the_aborting_node_is_the_fallback(self):
         from tesseract_robotics.planning.composer import (
-            ABORT_PROPAGATION_MESSAGE,
             _failure_message,
         )
 
-        aborting = self._info("ErrorTask", 0, ABORT_PROPAGATION_MESSAGE)
-        assert _failure_message([aborting], aborting) == f"ErrorTask: {ABORT_PROPAGATION_MESSAGE}"
+        aborting = self._info("ErrorTask", 0, "Error (Abort Triggered)")
+        assert _failure_message([aborting], aborting) == "ErrorTask: Error (Abort Triggered)"
 
     def test_planning_failed_when_nothing_says_why(self):
         from tesseract_robotics.planning.composer import _failure_message
