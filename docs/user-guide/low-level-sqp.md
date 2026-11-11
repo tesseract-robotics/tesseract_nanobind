@@ -209,7 +209,8 @@ Ranges split into two one-sided rows by default, as above. A length-1 `coeffs` w
 ## Warm-starting
 
 `problem.setVariables(x)` writes the variables, updates every term and recounts the dynamic rows;
-`NodesVariables.setVariables` only writes them. A wrong length raises `VariablesSizeError`:
+`NodesVariables.setVariables` only writes them, and does not check the length. A wrong length
+raises `VariablesSizeError` from `problem.setVariables` only:
 
 ```python
 problem.setVariables(trajectory.flatten())
@@ -220,18 +221,13 @@ solver.stepSQPSolver()
 A built problem does not see the environment change. Each collision evaluator keeps its own
 contact manager, and fixes the pose of every link outside the manipulator when it is built:
 `env.setState(...)` afterwards moves the obstacle in the environment, not in the problem.
-Measured on the example's scene with the obstacle moved onto the planned path (summed constraint
-violation, discrete and LVS continuous alike):
-
-| Problem | Before the move | After the move |
-|---|---|---|
-| Held from before the move | 0.0 | 0.0 |
-| Rebuilt after the move | — | 1.92 |
-
-Perturbing the variables after the move leaves the held problem at 0.002, the start-position
-constraint alone, so this is not the evaluator's cache. The example therefore rebuilds the
-problem every tick, as upstream's `online_planning_example.cpp` (0.35.0, lines 351–357) does.
-Hold one problem only when nothing outside the manipulator moves.
+On the online planning scene (the person walking a lap, start at zero, 12 steps, solved once
+with the person at tick 0), the held problem's summed constraint violation stays near zero
+(about 3e-5) however the person moves, while a problem rebuilt at the worst tick of the lap
+reads about 5 (discrete) and 6 (LVS continuous). The held problem does not see the move, so this
+is not the evaluator's cache. The example therefore rebuilds the problem every tick, as
+upstream's `online_planning_example.cpp` does (the rebuild block is lines 349-357, under a
+TODO comment). Hold one problem only when nothing outside the manipulator moves.
 
 The example's coefficients are upstream's, a starting point for that scene rather than tuned
 guidance:
@@ -247,13 +243,13 @@ guidance:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `SQPStatus.ITERATION_LIMIT` | `params.max_iter` reached | more iterations, or a better seed |
+| `SQPStatus.ITERATION_LIMIT` | `params.max_iter` reached; only `TrustRegionSQPSolver.solve()` enforces it, `stepSQPSolver()` does not check it | more iterations, or a better seed |
 | `SQPStatus.PENALTY_ITERATION_LIMIT` | constraints still violated after `max_merit_coeff_increases` penalty increases: the constraints conflict, or the seed is far from feasible | check `problem.getExactConstraintViolations()` for the term; loosen it or make it a cost |
-| `SQPStatus.TIME_LIMIT` | `params.max_time` reached | a larger budget, or fewer steps per tick |
+| `SQPStatus.TIME_LIMIT` | `params.max_time` reached; only `TrustRegionSQPSolver.solve()` enforces it, `stepSQPSolver()` does not check it, so a per-tick step loop bounds its own time | a larger budget, or fewer steps per tick |
 | `SQPStatus.QP_SOLVE_FAILED` | OSQP failed `max_qp_solver_failures` times (default 3) | `solver.verbose = True` logs the iterations |
 | `SQPStatus.STOPPED_BY_CALLBACK` | a callback returned `False` | intended |
 | `rows must have equality or one-sided bounds!` | a `KEEP_AS_IS` range row went to `addConstraintSet` / `addCostSet` | use the default split |
-| `VariablesSizeError` | `setVariables` got the wrong length | one value per joint per waypoint |
+| `VariablesSizeError` | `problem.setVariables` got the wrong length (`NodesVariables.setVariables` does not check) | one value per joint per waypoint |
 | a collision evaluator's constructor raises | the config's check type does not match the evaluator | see the evaluator table |
 | the plan ignores a moved obstacle | the problem was built before the move | rebuild it ([Warm-starting](#warm-starting)) |
 | `ModuleNotFoundError: scipy` in a sparse Jacobian | `scipy` is missing; nanobind converts Eigen sparse matrices through `scipy.sparse` | install the package's dependencies |
@@ -408,7 +404,9 @@ The module ships rules built on it, from what Tesseract already computes:
 | `WorldHold` | tool position in the world, given the base's pose | forward kinematics, analytic Jacobian |
 
 `PointsDown` and `HoldAxis` have C++ counterparts, `CartAxisConeConstraint` and
-`CartAxisAlignConstraint`: use those in production, and read the Python ones as worked examples
+`CartAxisAlignConstraint`: `CartAxisAlignConstraint` matches `HoldAxis` only at zero tolerance
+(an equality), and `CartAxisConeConstraint` works on the angle, not the cosine. Use those in
+production, and read the Python ones as worked examples
 of an analytic Jacobian. `scripts/bench_python_constraints.py` measures what a Python rule costs
 in the online SQP loop against the C++ constraint. The
 [Python constraints example](../examples/python-constraints.md) runs all seven in one live loop,

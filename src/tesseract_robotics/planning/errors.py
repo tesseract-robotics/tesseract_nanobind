@@ -68,7 +68,7 @@ class ConflictingExecutorError(ValueError):
 
 
 class InvalidThreadCountError(ValueError):
-    """A thread count is not positive or exceeds the available cores."""
+    """A thread count is fewer than 1 thread."""
 
 
 class UnknownPipelineError(ValueError):

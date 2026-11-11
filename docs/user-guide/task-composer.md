@@ -113,8 +113,9 @@ output) or to read intermediate data. `PlanningResult` is described under
 The task composer loads its tasks as plugins (`boost_plugin_loader`, `dlopen`). Building a
 `TaskComposer` loads the factory, and the first plan through a pipeline creates its nodes; later
 plans through the same composer reuse them. Measured on an Apple M1 Max (10 cores):
-`TaskComposer.from_config()` takes 0.3 to 1.0 s, and the first `basic_cartesian_example` plan
-1.9 s against 1.5 s for the next ones.
+`TaskComposer.from_config()` takes 0.3 to 1.0 s (0.6 s on a re-measurement here), and the first
+plan through a pipeline is slower than later ones through the same composer (a
+`basic_cartesian_example` `TrajOptPipeline` plan: 1.02 s first, 0.95 s after, on the same machine).
 
 `warmup` moves the node creation to startup, where it does not land on the first plan:
 
@@ -174,7 +175,7 @@ The pipelines differ in the planner tasks between `MinLengthTask` and the contac
 | `CartesianPipeline` | Descartes (`float`), then TrajOpt | |
 | `DescartesDPipeline` / `DescartesFPipeline` | Descartes on `double` / `float` states | `plan_cartesian` (`D`) |
 | `DescartesDNPCPipeline` / `DescartesFNPCPipeline` | as above, without the contact check | |
-| `Raster{Ft,Ct}{,Only}{,Global}Pipeline` | a raster program: simple planner seed, then a planning task per raster and transition | |
+| `Raster{Ft,Ct}{,Only}{,Global}Pipeline` | a raster program: a `SimpleMotionPlannerTask` seed, then (`Global`: a whole-program `DescartesFMotionPlannerTask`), then `RasterMotionTask`: a `CartesianTask` per raster, a `FreespaceTask` (`Ft`) or `CartesianTask` (`Ct`) per transition, plus freespace approach and return unless `Only` (`RasterOnlyMotionTask`). Min-length, contact check and time parameterization run inside the sub-tasks | |
 
 Each `Pipeline` has a `Task` twin (`TrajOptTask`, …) without the two formatting tasks, which a
 custom graph can embed. [The DOT graphs](#visualizing-pipelines) show every node.
@@ -495,8 +496,10 @@ error.toString()                            # 'inputs.bogus_port: undeclared por
 
 ## What goes wrong
 
-`plan` raises on a configuration or programming error and returns `successful=False` when a
-planner ran and found no solution.
+`plan` raises on a configuration or programming error it detects before running, and returns
+`successful=False` when a planner ran and found no solution. An exception thrown inside a task
+comes back as `successful=False` with `<task>: Exception thrown: ...` (for example Descartes
+without a collision checker when collisions are disabled).
 
 | Symptom | Cause | Fix |
 |---|---|---|
