@@ -1,5 +1,55 @@
 # Breaking API changes
 
+<!-- snippet: ambient
+import copy
+from pathlib import Path
+
+from tesseract_robotics.command_language import (
+    CartesianWaypoint, CartesianWaypointPoly, MoveInstruction, MoveInstructionPoly,
+    MoveInstructionType,
+)
+from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.planning import JointTarget, Pose
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link
+from tests.docs.doc_assets import enter_scratch_dir, sqp_scene
+
+enter_scratch_dir()
+x = JointTarget(np.zeros(6))
+target = Isometry3d.Identity()
+mi = MoveInstruction(
+    CartesianWaypointPoly(CartesianWaypoint(Isometry3d.Identity())),
+    MoveInstructionType.LINEAR, "DEFAULT",
+)
+
+# the SQP scene of the low-level page: a set-up problem, its terms and its variables
+globals().update(sqp_scene(robot))
+x = JointTarget(np.zeros(6))
+package_path = Path("package")
+package_path.mkdir()
+
+# a scene graph of primitive geometry: upstream's URDF writer has no convex-mesh branch
+from tesseract_robotics.scene_graph import SceneGraph, Visual
+
+scene_graph = SceneGraph()
+scene_graph.setName("example")
+_base = Link("base_link")
+_visual, _base_collision = Visual(), Collision()
+_visual.geometry = _base_collision.geometry = Box(0.1, 0.1, 0.1)
+_base.addVisual(_visual)
+_base.addCollision(_base_collision)
+scene_graph.addLink(_base)
+pose = Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.0, -1.0, 0.0, 0.0)
+link = Link("obstacle")
+_collision = Collision()
+_collision.geometry = Box(0.1, 0.1, 0.1)
+link.addCollision(_collision)
+joint = Joint("obstacle_joint")
+joint.type = JointType.FIXED
+joint.parent_link_id = "base_link"
+joint.child_link_id = "obstacle"
+-->
+
 The migration table for Python code, newest first: each breaking change with what replaces it. 0.36 is
 a breaking release and removes names outright, with no aliases and no deprecation warnings. The
 [changelog](CHANGELOG.md) is the release log, [0.35 → 0.36](changes-0.36.md) the narrative
@@ -100,11 +150,14 @@ The `tesseract_` prefix is gone from 20 Python module names (issue #42). It repe
 
 `trajopt_ifopt`, `trajopt_sqp`, `planning`, `viewer` and `emitters` keep their names.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # before
 from tesseract_robotics.tesseract_collision import ContactRequest
 from tesseract_robotics.tesseract_common import Isometry3d
+```
 
+```python
 # after
 from tesseract_robotics.collision import ContactRequest
 from tesseract_robotics.common import Isometry3d
@@ -164,6 +217,8 @@ pip picks that release by itself on those Pythons, because later ones declare th
 `planning.program.Target` and `emitters.core.events.Event` use the `type` statement. Annotations are unaffected; `isinstance(x, Target)` raises `TypeError`.
 
 ```python
+from tesseract_robotics.planning import CartesianTarget, JointTarget, StateTarget
+
 isinstance(x, (CartesianTarget, JointTarget, StateTarget))
 ```
 
@@ -448,6 +503,8 @@ calling `appendMoveInstruction` raises `AttributeError`.
 waypoint, and so the program that holds it:
 
 ```python
+import copy
+
 mi.getWaypoint().asCartesianWaypoint().setTransform(target)  # edits mi
 snapshot = copy.copy(mi.getWaypoint().asCartesianWaypoint())  # an independent copy
 ```
@@ -735,8 +792,9 @@ reading one as an attribute raises `AttributeError`.
 | `ContactTestType_ALL` (also `_FIRST`, `_CLOSEST`, `_LIMITED`) | `ContactTestType.ALL` (`.FIRST`, `.CLOSEST`, `.LIMITED`) |
 | `Events_COMMAND_APPLIED`, `Events_SCENE_STATE_CHANGED` | `Events.COMMAND_APPLIED`, `Events.SCENE_STATE_CHANGED` |
 | `ModifyAllowedCollisionsType_ADD` (also `_REMOVE`, `_REPLACE`) | `ModifyAllowedCollisionsType.ADD` (`.REMOVE`, `.REPLACE`) |
-| `CONSOLE_BRIDGE_LOG_DEBUG` (also `_INFO`, `_WARN`, `_ERROR`, `_NONE`) | `LogLevel.CONSOLE_BRIDGE_LOG_DEBUG` (…) |
+| `CONSOLE_BRIDGE_LOG_DEBUG` (also `_INFO`, `_WARN`, `_ERROR`, `_NONE`) | `LogLevel.debug` (`.info`, `.warn`, `.err`, `.off`): spdlog's levels, see [logging](changes-0.36.md#logging-console_bridge-spdlog) |
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # before
 from tesseract_robotics.collision import ContactRequest, ContactTestType_ALL
@@ -744,17 +802,19 @@ from tesseract_robotics.common import CONSOLE_BRIDGE_LOG_WARN, setLogLevel
 
 request = ContactRequest(ContactTestType_ALL)
 setLogLevel(CONSOLE_BRIDGE_LOG_WARN)
-
-# after
-from tesseract_robotics.collision import ContactRequest, ContactTestType
-from tesseract_robotics.common import LogLevel, setLogLevel
-
-request = ContactRequest(ContactTestType.ALL)
-setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_WARN)
 ```
 
-The `CONSOLE_BRIDGE_LOG_*` names keep their prefix because they are the C++ enumerator names of
-console_bridge's unscoped `LogLevel`; only the module-level copies are gone.
+```python
+# after
+from tesseract_robotics.collision import ContactRequest, ContactTestType
+from tesseract_robotics.common import LogLevel, getLogger
+
+request = ContactRequest(ContactTestType.ALL)
+getLogger().set_level(LogLevel.warn)
+```
+
+The module-level `CONSOLE_BRIDGE_LOG_*` copies went in 0.35.0.x; 0.36 then removed console_bridge's
+`LogLevel` itself, so the enum is spdlog's and the level is set on the logger.
 
 ### `AnyPoly` helpers only in `task_composer`
 
@@ -826,6 +886,9 @@ and no hinge or absolute cost. Each constraint row adds one or two slack variabl
 the right values. Append zeros for the slack variables:
 
 ```python
+import numpy as np
+
+x = np.zeros(problem.getNumNLPVars())          # an NLP-sized point
 problem.convexify()
 n_slack = problem.getNumQPVars() - problem.getNumNLPVars()
 model_costs = problem.evaluateConvexCosts(np.concatenate([x, np.zeros(n_slack)]))
@@ -863,6 +926,7 @@ construct it. Code that uses either now fails with
 (or `'IfoptProblem'`). Build a `TrajOptQPProblem` over the same variables, and add every set to
 it, each cost with a penalty type (#148):
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # before
 nlp = tsqp.IfoptProblem(nodes_variables)
@@ -871,8 +935,12 @@ nlp.addCostSet(vel_cost)                        # no penalty type
 problem = tsqp.IfoptQPProblem(nlp)
 problem.addConstraintSet(collision_constraint)
 problem.setup()
+```
 
+```python
 # after
+from tesseract_robotics import trajopt_sqp as tsqp
+
 problem = tsqp.TrajOptQPProblem(nodes_variables)
 problem.addConstraintSet(joint_constraint)
 problem.addConstraintSet(collision_constraint)
@@ -991,16 +1059,23 @@ Functions that returned these containers return lists.
 
 ### Serialization and URDF writes raise, and bytes are `bytes`
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 ok = serialization.environment_to_file(env, "env.xml")   # False on failure
 blob = serialization.environment_to_binary(env)          # list[int]
 urdf.writeURDFFile(env, package_path, "robot")           # None, failures silent
+```
 
+```python
 # 0.36
+from pathlib import Path
+
+from tesseract_robotics import serialization, urdf
+
 serialization.environment_to_file(env, Path("env.xml"))  # None; OSError on failure
 blob = serialization.environment_to_binary(env)          # bytes
-path = urdf.writeURDFFile(env, package_path, "robot")    # package_path/urdf/robot.urdf
+path = urdf.writeURDFFile(scene_graph, str(package_path), "robot")  # package_path/urdf/robot.urdf
 ```
 
 Files are written and read exactly at `path` (`str` or `os.PathLike`, no suffix appended).
@@ -1021,6 +1096,7 @@ Files are written and read exactly at `path` (`str` or `os.PathLike`, no suffix 
 
 ### The planning API raises instead of returning flags
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 q = robot.ik("tool0", pose)
@@ -1028,10 +1104,14 @@ if q is None:
     ...
 if not robot.add_link(link, joint):
     ...
+```
 
+```python
 # 0.36
+from tesseract_robotics.planning.errors import IKNoSolutionError
+
 try:
-    q = robot.ik("tool0", pose)           # ndarray
+    q = robot.ik("manipulator", pose, "tool0")  # ndarray
 except IKNoSolutionError:
     ...
 robot.add_link(link, joint)               # None; EnvironmentCommandError on refusal

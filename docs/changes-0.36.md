@@ -1,5 +1,83 @@
 # API changes: 0.35 → 0.36
 
+<!-- snippet: ambient
+from pathlib import Path
+
+import tesseract_robotics
+from tesseract_robotics.collision import ContactResult, ContactResultMap
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.common import Isometry3d, JointState
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.planning import Pose
+from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link
+from tesseract_robotics.task_composer import (
+    AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_EnvironmentConst,
+    AnyPoly_wrap_ProfileDictionary, TaskComposerContext, TaskComposerDataStorage,
+    TaskComposerGraph, TaskComposerLog, TaskComposerPluginFactory, TaskComposerPortMap,
+)
+from tests.docs.doc_assets import (
+    emitter_scene, enter_scratch_dir, ifopt_contact_scene, joint_program,
+)
+
+enter_scratch_dir()
+globals().update(ifopt_contact_scene())
+globals().update(emitter_scene(robot))
+
+# the state solver, a joint state, a contact map and the scene graph of the IRB2400
+solver = env.getStateSolver()
+values = np.zeros(6)
+state = JointState(["joint_1"], np.zeros(1))
+contacts = ContactResultMap()
+result = ContactResult()
+graph = env.getSceneGraph()
+
+# the task composer: two pipeline nodes, an executor and storage holding a program to plan
+factory = TaskComposerPluginFactory(tesseract_robotics.get_task_composer_config_path(), locator)
+node = factory.createTaskComposerNode("FreespacePipeline")
+first = factory.createTaskComposerNode("FreespacePipeline")
+second = factory.createTaskComposerNode("FreespacePipeline")
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+storage = TaskComposerDataStorage()
+for _port in ("planning_input", "k"):
+    storage.setData(_port, AnyPoly_wrap_CompositeInstruction(joint_program(robot)))
+storage.setData("environment", AnyPoly_wrap_EnvironmentConst(env))
+storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(ProfileDictionary()))
+overrides = TaskComposerPortMap()
+overrides.set("planning_input", "k")
+
+# a log whose data storage holds the planners' default profiles
+profiles = create_trajopt_default_profiles()
+log = TaskComposerLog("failing plan")
+log.initial_data = TaskComposerDataStorage("profiles only")
+log.context = TaskComposerContext("ctx")
+
+records = []
+events = []
+on_event = events.append
+x, y, z, w = 0.0, 0.0, 0.0, 1.0
+pose = Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.0, -1.0, 0.0, 0.0)
+link = Link("obstacle")
+_collision = Collision()
+_collision.geometry = Box(0.1, 0.1, 0.1)
+link.addCollision(_collision)
+joint = Joint("obstacle_joint")
+joint.type = JointType.FIXED
+joint.parent_link_id = "base_link"
+joint.child_link_id = "obstacle"
+
+# the planning example's entry point, failing as an example does when planning fails
+from tesseract_robotics.examples.failures import PlanningFailedError
+
+
+def main():
+    raise PlanningFailedError("planning failed")
+
+
+manager = env.getDiscreteContactManager()
+objects = [("box", [Box(0.1, 0.1, 0.1)], [Isometry3d.Identity()])]
+-->
+
 !!! info "0.36.0.0rc1"
     `0.36.0.0rc1` is a pre-release (`pip install --pre tesseract-robotics-nanobind`). Its wheels
     build tesseract, trajopt and tesseract_planning from `nanobind-0.36` branches on the
@@ -74,15 +152,18 @@ and its name find the same `dict` or `set` entry in either direction. Code that 
 compares, looks up or prints keeps working; code that concatenates, serialises or
 formats needs `.name()`.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 names = env.getLinkNames()                     # list[str]
-parent = env.getJoint("joint_a1").parent_link_name
+parent = env.getJoint("joint_1").parent_link_name
 label = "link_" + names[0]
+```
 
+```python
 # 0.36
 ids = env.getLinkIds()                         # list[LinkId]
-parent = env.getJoint("joint_a1").parent_link_id
+parent = env.getJoint("joint_1").parent_link_id
 label = "link_" + ids[0].name()                # a LinkId is not a str
 assert "base_link" in ids                      # a str equals its id
 ```
@@ -98,12 +179,15 @@ follow: `joint_names=` → `joint_ids=`, `link_name=` → `link_id=`. `SceneStat
 `getJacobian` lost its `{name: value}` overload; upstream 0.36 has none. Pass the
 values in solver order, or the ids next to the values.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
-jac = solver.getJacobian({"joint_a1": 0.0, "joint_a2": 0.5}, "tool0")
+jac = solver.getJacobian({"joint_1": 0.0, "joint_2": 0.5}, "tool0")
+```
 
+```python
 # 0.36
-jac = solver.getJacobian(["joint_a1", "joint_a2"], [0.0, 0.5], "tool0")
+jac = solver.getJacobian(["joint_1", "joint_2"], [0.0, 0.5], "tool0")
 jac = solver.getJacobian(values, "tool0")      # values in getJointIds() order
 ```
 
@@ -114,12 +198,15 @@ unordered by construction, so `LinkIdPair("b", "a") == LinkIdPair("a", "b")` and
 unordered key is left to reject. `orderedNameView()` returns the two names sorted, as
 a `tuple[str, str]`, for output or for a tuple-keyed structure of your own.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 from tesseract_robotics.tesseract_common import makeOrderedLinkPair
 key = makeOrderedLinkPair("b", "a")            # ("a", "b")
 contacts.addContactResult(key, result)         # ("b", "a") raised UnorderedLinkPairError
+```
 
+```python
 # 0.36
 from tesseract_robotics.common import LinkIdPair
 key = LinkIdPair("b", "a")                     # the same pair as LinkIdPair("a", "b")
@@ -148,14 +235,20 @@ headers do, and their keyword arguments are renamed to match: `joint_name=` →
 `joint_id=`, `link_name=` → `link_id=`. `MoveJointCommand` keeps `parent_link=`,
 `ChangeLinkVisibilityCommand` keeps `visible=`.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 RemoveLinkCommand(link_name="tool0")
-MoveJointCommand(joint_name="joint_a6", parent_link="base_link")
+MoveJointCommand(joint_name="joint_6", parent_link="base_link")
+```
 
+```python
 # 0.36
+from tesseract_robotics.common import LinkId
+from tesseract_robotics.environment import MoveJointCommand, RemoveLinkCommand
+
 RemoveLinkCommand(link_id="tool0")             # or RemoveLinkCommand(LinkId("tool0"))
-MoveJointCommand(joint_id="joint_a6", parent_link="base_link")
+MoveJointCommand(joint_id="joint_6", parent_link="base_link")
 ```
 
 The getters were renamed with them: `getLinkName()` → `getLinkId()`,
@@ -170,13 +263,16 @@ A list or dict of ids read from a data member is a copy: `JointState.joint_ids`,
 `KinematicsInformation.chain_groups` / `joint_groups` / `link_groups` / `group_states`.
 Editing the copy in place does not change the owner; assign the field instead.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
-state.joint_names.append("joint_a7")
+state.joint_names.append("joint_7")
+```
 
+```python
 # 0.36
 ids = state.joint_ids                          # a copy
-ids.append("joint_a7")
+ids.append("joint_7")
 state.joint_ids = ids
 ```
 
@@ -191,12 +287,17 @@ overloads can return the same links in a different order), iteration over a
 `ContactResultMap` (yields `(LinkIdPair, ContactResultVector)`), its `getContainer()`,
 and `getPairsWithZeroCoeff()`. Compare them as sets, or sort them first.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
-assert graph.getJointChildrenNames(["joint_1"]) == ["link_2", "link_3"]
+assert graph.getJointChildrenNames(["joint_1"]) == ["link_1", "link_2", "link_3"]
+```
 
+```python
 # 0.36
-assert sorted(graph.getJointChildrenIds(["joint_1"])) == ["link_2", "link_3"]
+assert sorted(graph.getJointChildrenIds(["joint_1"])) == [
+    "link_1", "link_2", "link_3", "link_4", "link_5", "link_6", "tool0",
+]
 pairs = {pair.orderedNameView() for pair, _ in contacts}
 ```
 
@@ -209,11 +310,14 @@ collision, `SignedDistanceField` a volumetric grid of signed distances (see
 [Collision](user-guide/collision.md)). Build one from a distance function, a
 precomputed grid or OpenVDB / NanoVDB bytes.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 from tesseract_robotics.tesseract_geometry import createSDFMeshFromPath
 geom = createSDFMeshFromPath("part.stl")
+```
 
+```python
 # 0.36: a field, sampled from a distance function (negative inside)
 from tesseract_robotics.geometry import createDiscreteSignedDistanceField
 geom = createDiscreteSignedDistanceField(
@@ -242,15 +346,18 @@ Node ports map to storage keys through `TaskComposerPortMap` (upstream #760):
 | `graph.setOverrideInputKeys(keys)` / `setOverrideOutputKeys(keys)` | `graph.setOverrideInputPortMappings(ports)` / `setOverrideOutputPortMappings(ports)` |
 | `TaskComposerNodeInfo.input_keys` / `output_keys` | `input_port_mappings` / `output_port_mappings` |
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 keys = node.getInputKeys()
 program_key = keys.get("program")
 node.validatePorts()
+```
 
+```python
 # 0.36
 ports = node.getInputPortMappings()
-program_key = ports.single("program")
+program_key = ports.single("planning_input")
 contract = node.getPortContract()              # None for a graph or pipeline
 if contract is not None:
     contract.validateOrThrow(
@@ -268,6 +375,7 @@ declare. A graph built in Python is valid, and can run, only once `setPortMappin
 supplies its children's inputs and outputs, and an override is accepted only for a
 port those mappings declare. Call `setPortMappings` first.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 graph = TaskComposerGraph("g")
@@ -275,7 +383,9 @@ a, b = graph.addNode(first), graph.addNode(second)
 graph.addEdges(a, [b])
 graph.setTerminals([b])
 executor.run(graph, storage)
+```
 
+```python
 # 0.36
 graph = TaskComposerGraph("g")
 a, b = graph.addNode(first), graph.addNode(second)
@@ -301,6 +411,7 @@ tesseract's output and is removed: `setLogLevel`, `getLogLevel`, `log`,
 | `useOutputHandler(handler)` / `restorePreviousOutputHandler()` | `addLogRecordHandler(fn)` / `removeLogRecordHandler(id)` |
 | `flushOutputHandlers()`, `OutputHandlerFlushForbiddenError` | none needed: handlers run synchronously |
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 from tesseract_robotics.tesseract_common import (
@@ -313,7 +424,9 @@ class Collect(OutputHandler):
 
 setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_ERROR)
 useOutputHandler(Collect())
+```
 
+```python
 # 0.36
 from tesseract_robotics.common import (
     LogLevel, addLogRecordHandler, getLogger, removeLogRecordHandler,
@@ -364,11 +477,14 @@ margin, margin buffer and joint group the evaluator used to supply; the two-time
 overload replaces `calcGradientData`. `calcCollisions` / `calcCollisionData` also fill
 `CollisionCacheData.gradient_results_sets`.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 gradient = evaluator.getGradient(dof_vals, contact)
 gradient = lvs_evaluator.calcGradientData(dof_vals0, dof_vals1, contact)
+```
 
+```python
 # 0.36
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics.common import LinkIdPair
@@ -389,11 +505,17 @@ planner's library in it could not load the result. Now it round-trips on every p
 process: `serialization` links the planner libraries and registers their types, so
 importing it loads OMPL, Descartes and TrajOpt too.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35: store an empty dictionary and rebuild the profiles on replay
 storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(ProfileDictionary()))
+```
 
+```python
 # 0.36: the profiles are in the archive
+from tesseract_robotics.serialization import task_composer_log_to_file
+from tesseract_robotics.task_composer import AnyPoly_wrap_ProfileDictionary
+
 storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
 task_composer_log_to_file(log, "failing_plan.tclx")
 ```
@@ -411,21 +533,29 @@ list is in [breaking changes](breaking-changes.md).
 
 The four-scalar constructor was scalar-first, unlike every other quaternion surface.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 q = Quaterniond(w, x, y, z)
+```
 
+```python
 # 0.36
+from tesseract_robotics.common import Quaterniond
+
 q = Quaterniond.from_xyzw(x, y, z, w)          # or Quaterniond([x, y, z, w])
 ```
 
 ### Event callbacks return their key
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 env.addEventCallback(7, EventCallbackFn(on_event))
 env.removeEventCallback(hash=7)
+```
 
+```python
 # 0.36
 key = env.addEventCallback(on_event)           # a plain callable
 env.removeEventCallback(key)
@@ -435,17 +565,23 @@ The event a callback receives owns its data, so a callback may keep it.
 
 ### Cartesian targets take a pose
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 target = CartesianTarget(position=[0.6, 0.1, 0.8], quaternion=[0, 0, 0, 1])
+```
 
+```python
 # 0.36
+from tesseract_robotics.planning import CartesianTarget, Pose
+
 target = CartesianTarget(Pose.from_xyz_quat(0.6, 0.1, 0.8, 0, 0, 0, 1))
 target = CartesianTarget.from_xyz_quat([0.6, 0.1, 0.8], [0, 0, 0, 1])   # same target
 ```
 
 ### `Robot.ik` and the `Robot` mutators raise
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 q = robot.ik("tool0", pose)
@@ -453,24 +589,35 @@ if q is None:
     return
 if not robot.add_link(link, joint):
     return
+```
 
+```python
 # 0.36
+from tesseract_robotics.planning.errors import IKNoSolutionError
+
 try:
-    q = robot.ik("tool0", pose)                # ndarray
+    q = robot.ik("manipulator", pose, "tool0")  # ndarray
 except IKNoSolutionError:
-    return
+    q = None                                   # handle the unreachable pose here
 robot.add_link(link, joint)                    # None; EnvironmentCommandError if refused
 ```
 
 ### Serialization and URDF writes
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 if not serialization.environment_to_file(env, "env.xml"):
     ...
 blob = serialization.environment_to_binary(env)    # list[int]
+```
 
+```python
 # 0.36
+from pathlib import Path
+
+from tesseract_robotics import serialization
+
 try:
     serialization.environment_to_file(env, Path("env.xml"))
 except OSError:
@@ -480,10 +627,13 @@ blob = serialization.environment_to_binary(env)    # bytes
 
 ### Examples raise `PlanningFailedError`
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 ok = main()          # printed "planning failed", returned a failed result
+```
 
+```python
 # 0.36
 from tesseract_robotics.examples.failures import PlanningFailedError
 
@@ -500,12 +650,19 @@ emitter takes a binding from those names to the controller's data and raises `Un
 for an unbound name. RAPID confdata needs an arm-posture solver and the seed joints; JBI needs
 the pulse calibration, since its positions are encoder pulses.
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35
 module = emit_rapid(composite, {"weld": RapidProfile(tool="tool0", wobj="wobj0")})
 jbi = emit_jbi(composite, {"weld": JbiProfile(tool=1)})
+```
 
+```python
 # 0.36
+from tesseract_robotics.emitters import OpwPostureSolver
+from tesseract_robotics.emitters.jbi import JbiPulseCalibration, JbiProfile, emit_jbi, jbi_frames
+from tesseract_robotics.emitters.rapid import RapidProfile, emit_rapid, rapid_frames
+
 result = emit_rapid(
     composite,
     {"weld": RapidProfile.build(speed="v100", zone="fine")},
@@ -514,10 +671,11 @@ result = emit_rapid(
 )
 module = result.text                           # an EmittedProgram, with its identity header
 result = emit_jbi(
-    composite,
+    joint_composite,                           # JBI emits joint moves only
     {"weld": JbiProfile.build()},
     frames=jbi_frames(tools={"tool0": 1}),
-    calibration=JbiPulseCalibration(pulses_per_rad=pulses_per_rad, zero_pulses=zero_pulses),
+    program_name="WELD_01",
+    calibration=JbiPulseCalibration.build(pulses_per_rad=pulses_per_rad, zero_pulses=zero_pulses),
 )
 ```
 
@@ -536,12 +694,17 @@ Additions, not changes: 0.35 code keeps working. Each was a 0.36 API with no bin
 | `trajopt_ifopt` | `CartAxisKinematics`; `calcJacobianBlock` on the CartAxis constraints; `CollisionCoeffData.hasZeroCoeff` |
 | planners | `==`, `!=` and `from_yaml` on the PIQP solver profiles; `checkPIQPSettings`; `==` / `!=` on `trajopt_sqp.PIQPSettings` (#393) |
 
+<!-- snippet: skip (0.35 API, removed in 0.36) -->
 ```python
 # 0.35: one call, one broadphase update, per object
 for name, shapes, poses in objects:
     manager.addCollisionObject(name, 0, shapes, poses)
+```
 
+```python
 # 0.36: one batch
+from tesseract_robotics.collision import CollisionObjectSpec
+
 manager.addCollisionObjects([CollisionObjectSpec(n, 0, s, p) for n, s, p in objects])
 ```
 

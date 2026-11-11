@@ -204,3 +204,101 @@ def sqp_scene(robot) -> dict:  # noqa: ANN001 - the SQP types are imported lazil
         "qp_solver": qp_solver,
         "solver": solver,
     }
+
+
+# Slider position (m) of the two-box scene's first and second node: both overlap the fixed box.
+CONTACT_FIRST_X_M = 0.1
+CONTACT_SECOND_X_M = 0.15
+# Contacts per link pair the evaluator keeps.
+CONTACT_MAX_PER_PAIR = 3
+
+
+def ifopt_contact_scene() -> dict:
+    """The names the `trajopt_ifopt.getGradient` snippet uses, from two overlapping boxes.
+
+    Returns:
+        `evaluator` (an LVS-discrete evaluator), `contact` (a real contact of the overlap),
+        `dof_vals`, `dof_vals0` and `dof_vals1`, and `scene`, which owns the environment the
+        evaluator borrows from and must outlive it.
+    """
+    import numpy as np
+
+    from tesseract_robotics.common import LinkIdPair
+    from tests.trajopt_ifopt.scenes import two_boxes_at
+
+    scene = two_boxes_at(CONTACT_FIRST_X_M, CONTACT_SECOND_X_M)
+    evaluator = scene.lvs_discrete_evaluator()
+    dof_vals0 = np.array([CONTACT_FIRST_X_M])
+    dof_vals1 = np.array([CONTACT_SECOND_X_M])
+    data = evaluator.calcCollisionData(dof_vals0, dof_vals1, False, False, CONTACT_MAX_PER_PAIR)
+    contact = data.contact_results_map.getContainer()[LinkIdPair("base_link", "slider_link")][0]
+    return {
+        "scene": scene,
+        "evaluator": evaluator,
+        "contact": contact,
+        "dof_vals": dof_vals0,
+        "dof_vals0": dof_vals0,
+        "dof_vals1": dof_vals1,
+    }
+
+
+# Joint angles (deg) of the emitter programs' approach waypoint, and the Cartesian weld target (m).
+EMITTER_APPROACH_DEG = (0, -20, 30, 0, 50, 0)
+EMITTER_WELD_XYZ_M = (0.6, -0.1, 0.8)
+# OPW parameters of the IRB 2400, as in tesseract_support's abb_irb2400_plugins.yaml.
+IRB2400_OPW = {
+    "a1": 0.100, "a2": -0.135, "b": 0.0, "c1": 0.615, "c2": 0.705, "c3": 0.755, "c4": 0.085,
+    "offsets": [0, 0, -1.57079632679, 0, 0, 0], "sign_corrections": [1, 1, 1, 1, 1, 1],
+}  # fmt: skip
+# Encoder calibration of a six-axis arm: pulses per rad, and the pulse count at joint angle 0.
+EMITTER_PULSES_PER_RAD = (10000.0,) * 6
+EMITTER_ZERO_PULSES = (0,) * 6
+
+
+def emitter_scene(robot) -> dict:  # noqa: ANN001 - the planning types are imported lazily
+    """The names the emitter snippets use, for the IRB2400 `robot`.
+
+    Returns:
+        `composite` (a joint move then a Cartesian weld move, seeded for RAPID's confdata),
+        `joint_composite` (the same program in joint moves only, which JBI emits),
+        `opw_parameters`, `pulses_per_rad` and `zero_pulses`.
+    """
+    import numpy as np
+
+    from tesseract_robotics.common import JointState
+    from tesseract_robotics.emitters import OpwParameters
+    from tesseract_robotics.planning import CartesianTarget, JointTarget, MotionProgram, Pose
+
+    names = robot.get_joint_names("manipulator")
+
+    def program() -> MotionProgram:
+        return MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="weld"
+        ).set_joint_names(names)
+
+    approach = np.deg2rad(EMITTER_APPROACH_DEG)
+    composite = (
+        program()
+        .move_to(JointTarget(approach, profile="weld"))
+        .linear_to(
+            CartesianTarget(
+                Pose.from_xyz_rpy(list(EMITTER_WELD_XYZ_M), [np.pi, 0, 0]), profile="weld"
+            )
+        )
+        .to_composite_instruction(joint_names=names)
+    )
+    weld = composite[1].asMoveInstruction().getWaypoint().asCartesianWaypoint()
+    weld.setSeed(JointState(names, robot.ik("manipulator", weld.getTransform(), "tool0")))
+    joint_composite = (
+        program()
+        .move_to(JointTarget(approach, profile="weld"))
+        .move_to(JointTarget(np.zeros(len(names)), profile="weld"))
+        .to_composite_instruction(joint_names=names)
+    )
+    return {
+        "composite": composite,
+        "joint_composite": joint_composite,
+        "opw_parameters": OpwParameters.build(**IRB2400_OPW),
+        "pulses_per_rad": EMITTER_PULSES_PER_RAD,
+        "zero_pulses": EMITTER_ZERO_PULSES,
+    }

@@ -1,7 +1,7 @@
 """Execute the ```python blocks of the user-facing pages, so a broken doc snippet fails CI.
 
-Covers the README, the docs home, and every page of getting-started, concepts, user-guide, api
-and examples. Each page's blocks run in order in one shared namespace, as a reader pasting them top
+Covers the README, the docs home, every page of getting-started, concepts, user-guide, api
+and examples, and the two release pages `changes-0.36.md` and `breaking-changes.md`. Each page's blocks run in order in one shared namespace, as a reader pasting them top
 to bottom would, and every failing block is reported, not just the first. Blocks inside tabs and
 admonitions are dedented by their fence's indentation.
 
@@ -46,6 +46,8 @@ PAGES = sorted(
         *(DOCS / "user-guide").glob("*.md"),
         *(DOCS / "api").glob("*.md"),
         *(DOCS / "examples").glob("*.md"),
+        DOCS / "changes-0.36.md",
+        DOCS / "breaking-changes.md",
     ]
 )
 
@@ -60,6 +62,9 @@ INCLUDE = re.compile(r"^\s*--8<--")
 # Every other import stays in the snippets. The README, docs home, getting-started and concepts
 # pages run bare.
 AMBIENT_PAGES = frozenset(("user-guide", "api", "examples"))
+# The release pages sit in `docs/` itself and show calls on the same robot. Each "before" block
+# shows the removed 0.35 API and carries a skip marker; every "after" block runs.
+AMBIENT_FILES = frozenset((DOCS / "changes-0.36.md", DOCS / "breaking-changes.md"))
 AMBIENT_ROBOT = """
 import numpy as np
 from tesseract_robotics import get_tesseract_resource_path
@@ -158,7 +163,7 @@ def run_page(page: Path) -> subprocess.CompletedProcess[str]:
         for b in extract_blocks(page)
         if not b.skipped
     ]
-    if page.parent.name in AMBIENT_PAGES:
+    if page.parent.name in AMBIENT_PAGES or page in AMBIENT_FILES:
         ambient = AMBIENT_COMMENT.search(page.read_text(encoding="utf-8"))
         if ambient is not None:
             payload.insert(0, (f"{name} ambient names", ambient["code"] + "\n"))
