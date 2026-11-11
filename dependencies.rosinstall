@@ -1,24 +1,28 @@
 # Upstream sources for the wheel build (.github/workflows/wheels.yml). tesseract,
-# tesseract_planning and trajopt are the commits the tesseract-robotics `dev` conda packages
-# pinned in pyproject.toml were built from (the upstream/ submodules); keep them in step.
+# tesseract_planning and trajopt are the `nanobind-0.36` integration branches on the jf---
+# forks: upstream master plus our open upstream PRs, so a release does not wait on review.
+# src/tesseract_robotics/build_identity.py records these SHAs; keep them in step
+# (tests/test_build_identity.py checks).
 - git:
     local-name: ros_industrial_cmake_boilerplate
     uri: https://github.com/ros-industrial/ros_industrial_cmake_boilerplate.git
     version: 0.7.4
 - git:
     local-name: tesseract
-    uri: https://github.com/tesseract-robotics/tesseract.git
-    version: 2b79e91c8097579b01d66cca74015ad127abb339
+    # master a9c22066 + tesseract-robotics/tesseract#1396
+    uri: https://github.com/jf---/tesseract.git
+    version: 4cf644d704bd8961c7cdaf193f72488fa501f5c0
 - git:
     local-name: tesseract_planning
-    uri: https://github.com/tesseract-robotics/tesseract_planning.git
-    version: a6483823830c8cf145370bc79f1ac260cac1f807
+    # master a6483823 + tesseract-robotics/tesseract_planning#789, #792, #794
+    uri: https://github.com/jf---/tesseract_planning.git
+    version: 4e27d94b160f757e064dbad2a5277657cd33bbf8
 - git:
     local-name: trajopt
-    # tesseract-robotics/trajopt#628 (a504b22 + 4 commits) until it merges: the bindings call the
-    # constructors and calcJacobianBlock it defines. The dev conda trajopt carries it as patches.
+    # master 963baf7d + tesseract-robotics/trajopt#628 (the bindings call the constructors and
+    # calcJacobianBlock it defines) and #629
     uri: https://github.com/jf---/trajopt.git
-    version: 3fd89a814c5b2abc66a795476aae2b94c4cd2fac
+    version: 98b85d559e9fc7cb60a4dbfeb6d3baa177c94df5
 - git:
     local-name: descartes_light
     uri: https://github.com/swri-robotics/descartes_light.git

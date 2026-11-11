@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.36.0.0rc1] - 2026-11-11 — pre-release on upstream master plus our open PRs
+
+Pre-release: `pip install --pre tesseract-robotics-nanobind`. The wheels build tesseract, trajopt and tesseract_planning from `nanobind-0.36` branches on the jf--- forks, each upstream `master` plus the open upstream PRs we filed, so the release does not wait on upstream review. `tesseract_robotics.build_identity.UPSTREAM_SOURCES` records the SHAs and PRs, and `dependencies.rosinstall` pins them:
+
+| repository | master | carried PRs | fork SHA |
+| --- | --- | --- | --- |
+| tesseract | `a9c22066` | #1396 | `4cf644d7` |
+| tesseract_planning | `a6483823` | #789, #792, #794 | `4e27d94b` |
+| trajopt | `963baf7d` | #628, #629 | `98b85d55` |
+
+The tag regex and the wheels workflow's tag filter accept an `rcN` suffix. `docs/changes-0.36.md` explains the release.
+
+- **`isValidState` bound** — `isValidState(joint_group, base_link, tcp_frame, joint_values, limits)` is true when the values are within `limits` and the arm's configuration, read with sign correction `(-1, 1)`, is `FUT` or `NUT`. It needs tesseract_planning#792, which makes `isWithinLimits<FloatType>` deduce; before it the double instance did not compile ([#333]).
+
 Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its release: the `tesseract-robotics/label/dev` packages `tesseract-robotics` `0.36.0.dev20261103`, `trajopt` `0.36.0.dev20261013` and `tesseract-robotics-planning` `0.36.0.dev20261014`, built from `master` (tesseract `2b79e91`, trajopt `a504b22`, tesseract_planning `a648382`) by the feedstocks' CI on linux-64, linux-aarch64, osx-arm64 and win-64. The `trajopt` package (build 1) also carries the four commits of trajopt#628 as patches until it merges. The `default` env pins them. `docs/changes-0.36.md` has the 0.35 → 0.36 migration, with a before/after example per change ([#141], [#161]).
 
 ### Breaking changes
@@ -589,7 +603,8 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 - Non-benchmark tests fail loud instead of being silently skipped ([a1d7607]).
 - Python 3.9 compatibility for example modules via `from __future__ import annotations` ([87ce68e]).
 
-[Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.8...HEAD
+[Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.36.0.0rc1...HEAD
+[0.36.0.0rc1]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.8...0.36.0.0rc1
 [0.35.0.8]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.7...0.35.0.8
 [0.35.0.7]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.6...0.35.0.7
 [0.35.0.6]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.5...0.35.0.6

@@ -474,8 +474,7 @@
     "PlannerResponse.succeeded_instructions": {
       "wont_fix": "Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty."
     },
-    "isValidState": {
-      "issue": "#333"
+XXMARK
     }
   },
   "motion_planners_ompl": {

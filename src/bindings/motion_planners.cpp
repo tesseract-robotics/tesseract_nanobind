@@ -195,8 +195,16 @@ NB_MODULE(_motion_planners, m) {
           "Raise RuntimeError, naming `profile_name`, unless `settings` has a KKT solver of PIQP's sparse "
           "backend and passes piqp::Settings::verify_settings().");
 
-    // isValidState<double> is not bound: upstream planner_utils.h:85 calls isWithinLimits without
-    // its template argument, and the call does not deduce for an Eigen::Matrix limits argument,
-    // so the double instance does not compile (tesseract_planning a6483823;
-    // tesseract-robotics/tesseract_planning#791).
+    // planner_utils.h. Needs tesseract_planning#792 (isWithinLimits<FloatType>): without it the
+    // double instance does not compile (#791).
+    m.def("isValidState",
+          [](const tk::JointGroup& joint_group, const tc::LinkId& base_link, const tc::LinkId& tcp_frame,
+             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+             const Eigen::Matrix<double, Eigen::Dynamic, 2>& limits) {
+              return tp::isValidState<double>(joint_group, base_link, tcp_frame, joint_values, limits);
+          },
+          "joint_group"_a, "base_link"_a, "tcp_frame"_a, "joint_values"_a, "limits"_a,
+          "True if `joint_values` are within `limits` and the arm's configuration, read with sign "
+          "correction (-1, 1), is FUT or NUT; any other configuration is invalid. The last six joint "
+          "values are the arm's.");
 }

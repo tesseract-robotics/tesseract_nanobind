@@ -44,6 +44,7 @@ from tesseract_robotics.motion_planners import (
     formatProgram,
     getJointTurns,
     getRobotConfig,
+    isValidState,
     isWithinJointLimits,
     toToolpath,
 )
@@ -559,3 +560,17 @@ class TestRobotConfig:
         q = np.array([0.0, 0.0, 0.0, 0.2, 0.0, 0.2])
         assert isWithinJointLimits(q, limits, np.array([-0.1, 0.1])) is False
         assert isWithinJointLimits(limits[:, 1] + 0.1, limits, wide_coupling) is False
+
+
+class TestIsValidState:
+    """`isValidState<double>` needs tesseract_planning#792 (it did not compile before)."""
+
+    def test_home_is_valid(self, abb_irb2400_environment):
+        manip = abb_irb2400_environment.getKinematicGroup("manipulator")
+        limits = manip.getLimits().joint_limits
+        assert isValidState(manip, "base_link", "tool0", np.zeros(6), limits) is True
+
+    def test_joint_beyond_limit_is_invalid(self, abb_irb2400_environment):
+        manip = abb_irb2400_environment.getKinematicGroup("manipulator")
+        limits = manip.getLimits().joint_limits
+        assert isValidState(manip, "base_link", "tool0", limits[:, 1] + 0.1, limits) is False
