@@ -49,17 +49,17 @@ import trimesh
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
-from tesseract_robotics.tesseract_geometry import (
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.geometry import (
     Geometry,
     Mesh,
     MeshMaterial,
     Sphere,
     createMeshFromResource,
 )
-from tesseract_robotics.tesseract_kinematics import JointGroup, calcManipulability
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.kinematics import JointGroup, calcManipulability
+from tesseract_robotics.planning import Robot
+from tesseract_robotics.scene_graph import (
     Collision,
     Joint,
     JointLimits,

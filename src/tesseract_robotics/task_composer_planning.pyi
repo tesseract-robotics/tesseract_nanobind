@@ -7,7 +7,7 @@ from typing import overload
 import tesseract_robotics.collision
 import tesseract_robotics.command_language
 import tesseract_robotics.motion_planners_trajopt
-import tesseract_robotics.trajopt_ifopt
+import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 
 
 class ContactCheckProfile(tesseract_robotics.command_language.Profile):
@@ -181,18 +181,18 @@ class FixStateCollisionProfile(tesseract_robotics.command_language.Profile):
     def trajopt_joint_cost_config(self, arg: tesseract_robotics.motion_planners_trajopt.TrajOptJointWaypointConfig, /) -> None: ...
 
     @property
-    def collision_constraint_coeff(self) -> tesseract_robotics.trajopt_ifopt.CollisionCoeffData:
+    def collision_constraint_coeff(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData:
         """Collision constraint coefficients of the TrajOpt correction solve"""
 
     @collision_constraint_coeff.setter
-    def collision_constraint_coeff(self, arg: tesseract_robotics.trajopt_ifopt.CollisionCoeffData, /) -> None: ...
+    def collision_constraint_coeff(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData, /) -> None: ...
 
     @property
-    def collision_cost_coeff(self) -> tesseract_robotics.trajopt_ifopt.CollisionCoeffData:
+    def collision_cost_coeff(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData:
         """Collision cost coefficients of the TrajOpt correction solve"""
 
     @collision_cost_coeff.setter
-    def collision_cost_coeff(self, arg: tesseract_robotics.trajopt_ifopt.CollisionCoeffData, /) -> None: ...
+    def collision_cost_coeff(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData, /) -> None: ...
 
     @property
     def opt_params(self) -> tesseract_robotics.motion_planners_trajopt.BasicTrustRegionSQPParameters:

@@ -266,7 +266,7 @@ NB_MODULE(_motion_planners_trajopt_ifopt, m) {
         .def_rw("term_infos", &tp::TrajOptIfoptWaypointInfo::term_infos)
         .def_prop_ro("node", [](tp::TrajOptIfoptWaypointInfo& self) { return self.node.get(); },
             nb::rv_policy::reference_internal,
-            nb::for_getter(nb::sig("def node(self, /) -> tesseract_robotics.trajopt_ifopt.Node | None")),
+            nb::for_getter(nb::sig("def node(self, /) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node | None")),
             "The waypoint's variable node (owned by this object), or None")
         .def_rw("fixed", &tp::TrajOptIfoptWaypointInfo::fixed,
             "Whether the waypoint is fixed (no collision terms at this step)");
