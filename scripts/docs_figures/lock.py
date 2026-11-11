@@ -47,8 +47,18 @@ class FiguresLockError(RuntimeError):
 
 
 def sha256(path: Path) -> str:
-    """Hex sha256 of a file's bytes."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hex sha256 of a file's content, independent of the checkout's line endings.
+
+    Git on Windows checks text out with CRLF, so the bytes of a `.py`, URDF or YAML input differ
+    from the LF commit that the lock was written from. UTF-8 text is hashed with CRLF folded to
+    LF; anything else (a binary mesh) is hashed byte for byte. An LF file hashes as its bytes.
+    """
+    data = path.read_bytes()
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return hashlib.sha256(data).hexdigest()
+    return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def support_root() -> Path:

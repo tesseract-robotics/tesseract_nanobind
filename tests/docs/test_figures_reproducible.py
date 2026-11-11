@@ -175,3 +175,21 @@ def test_svg_problems_flags_broken_output(content, reason):
 def test_committed_svgs_are_well_formed():
     for path in FIGURES_DIR.glob("*.svg"):
         assert lock.svg_problems(path) == []
+
+
+def test_a_crlf_checkout_hashes_like_the_lf_one(tmp_path):
+    """Git on Windows checks text out with CRLF; an input's content address must not change."""
+    lf = tmp_path / "lf.py"
+    crlf = tmp_path / "crlf.py"
+    lf.write_bytes(b"import math\nprint(math.pi)\n")
+    crlf.write_bytes(b"import math\r\nprint(math.pi)\r\n")
+    assert lock.sha256(crlf) == lock.sha256(lf)
+
+
+def test_binary_inputs_hash_their_exact_bytes(tmp_path):
+    """A file that is not UTF-8 text (a binary mesh) is hashed byte for byte."""
+    a = tmp_path / "a.stl"
+    b = tmp_path / "b.stl"
+    a.write_bytes(b"\x80\x81\r\n\x00")
+    b.write_bytes(b"\x80\x81\n\x00")
+    assert lock.sha256(a) != lock.sha256(b)
