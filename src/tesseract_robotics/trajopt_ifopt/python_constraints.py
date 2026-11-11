@@ -27,16 +27,15 @@ from typing import TYPE_CHECKING, override
 
 import numpy as np
 import scipy.sparse
-from tesseract_robotics.trajopt_ifopt._trajopt_ifopt import Bounds, ConstraintSet, calcForwardNumJac
 
 from tesseract_robotics.kinematics import calcManipulability
+from tesseract_robotics.trajopt_ifopt._trajopt_ifopt import Bounds, ConstraintSet, calcForwardNumJac
 
 if TYPE_CHECKING:
-    from tesseract_robotics.trajopt_ifopt._trajopt_ifopt import Var
-
     from tesseract_robotics.common import Isometry3d
     from tesseract_robotics.environment import Environment
     from tesseract_robotics.kinematics import JointGroup
+    from tesseract_robotics.trajopt_ifopt._trajopt_ifopt import Var
 
 __all__ = [
     "PyConstraint",

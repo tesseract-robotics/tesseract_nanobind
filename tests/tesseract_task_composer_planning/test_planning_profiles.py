@@ -242,10 +242,8 @@ class TestFixStateCollisionProfileTrajOptFields:
         assert p.osqp_settings.max_iter == 123
 
     def test_stub_names_imported_types(self):
-        stub = (
-            Path(tcp_module.__file__).parent / "_tesseract_task_composer_planning.pyi"
-        ).read_text()
-        assert "tesseract_motion_planners_trajopt" in stub
+        stub = (Path(tcp_module.__file__).parent / "task_composer_planning.pyi").read_text()
+        assert "tesseract_robotics.motion_planners_trajopt" in stub
         assert '"sco::' not in stub
         assert '"trajopt_common::' not in stub
         assert '"tesseract::motion_planners::' not in stub

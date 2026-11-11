@@ -119,6 +119,7 @@ set(TESSERACT_NB_WRAPPED_MODULES
   motion_planners_simple
   motion_planners_descartes
   motion_planners_trajopt_ifopt
+  trajopt_ifopt
 )
 
 # Define reusable function for nanobind extensions
