@@ -17,6 +17,7 @@ flowchart LR
     bound["bound classes<br/>audit_bound<br/>nb::class_ → C++ class"] --> match
     stub --> match
     rules["rules<br/>audit_rules<br/>ACCEPTED + tables"] --> match
+    anchor["anchor headers<br/>audit_anchor<br/>content check"] --> match
     match --> report["report<br/>audit_report<br/>binding-api-audit.md, --json"]
     ledger["scripts/audit_ledger.json"] --> report
     report --> verify["ledger verify<br/>test_audit_ledger"]
@@ -128,6 +129,7 @@ The scripts import in one direction, top to bottom. Each file has one job.
 | `scripts/audit_cache_prune.py` | thin CLI (`pixi run -e audit audit-cache-prune`): drop the entries a run did not use |
 | `scripts/audit_stub.py` | `.pyi` → `PySymbol`/`PyOverload`; deviations and quoted names |
 | `scripts/audit_rules.py` | `ACCEPTED` rule texts and every rule table; checks at import that each table entry names a rule |
+| `scripts/audit_anchor.py` | holds each `PLUGIN_ANCHOR_INCLUDES` header to its claim: raises when one declares more than its plugin anchor and plugin factory classes, or when its binding no longer includes it |
 | `scripts/audit_match.py` | the comparison: cover, accept, gap, deviation; base rows; header rows |
 | `scripts/audit_report.py` | Markdown and JSON output; the ledger loader and the `issue` column |
 | `scripts/audit_bindings.py` | thin CLI (`pixi run -e audit audit-bindings`) |
@@ -142,6 +144,7 @@ A module's audited API is every header it owns:
 - A header that the module owns but its binding never includes is parsed in a synthetic TU (the binding plus that header) and shows as one `header` row. If the header does not compile on its own, it shows as an `unparseable header` row at its first error, and its API is not checked. Headers that compile alone but not together (two definitions of one name) fail the run with the combined error, and no rows are reported for them.
 - A header that the module owns and another module's binding includes is audited with that other module (`header_auditor`). The owner's section lists it under "Headers audited with another module".
 - `UNAUDITED_HEADERS` (not API) and `THIRD_PARTY_HEADERS` (vendored libraries) are skipped. Each pattern is printed with its reason in the report.
+- `PLUGIN_ANCHOR_INCLUDES` lists headers a binding `#include`s only to call the plugin anchor they declare (`PLUGIN_ANCHOR_DECL`), which puts the plugin library linked into the module on the plugin search path. They are skipped although the binding includes them directly, and printed with their reason. `audit_anchor.check_anchor_headers` checks each one at class granularity: a function must have the anchor signature `const void* f()`, and a class must derive only from plugin factory interfaces (the `plugin-author-factory-interface` classes); a class's members are not inspected. Any other declaration fails the run, so the list cannot hide a new function or class. Entries are exact include spellings, never patterns. The content check runs for the owning module's binding include; a listed header reached only through another module's include path is skipped without the content check.
 
 Every other declaration in the TU is used only to resolve Python names.
 
@@ -343,6 +346,8 @@ A rule exists only when a real row needs it. Leaving the row as a gap or deviati
 | `MalformedPrefixError` | a prefix does not end with `/` | import of `audit_ownership`, `owner_prefixes` |
 | `UnknownPrefixError` | an `UNAUDITED_HEADERS` key is no module's prefix | `check_unaudited_keys` |
 | `PrefixMismatchError` | `audit_tu` gets a prefix that disagrees with the module's entry | `audit_tu` |
+| `AnchorHeaderApiError` | a `PLUGIN_ANCHOR_INCLUDES` header declares more than its anchor and plugin factories | `check_anchor_headers`, from `audit_tu` |
+| `StaleAnchorIncludeError` | a `PLUGIN_ANCHOR_INCLUDES` header that its owning module's binding does not `#include` | `check_anchor_includes_current`, from `audit_tu` |
 | `HeaderParseError` | a binding TU does not compile, or unincluded headers conflict | `parse_tu`, `unincluded_header_gaps` |
 | `SkippedBodiesError` | `bound_classes` gets a TU parsed without function bodies | `audit_bound.bound_classes` |
 | `IncludeDirError` | `include/ompl-<version>` is missing or ambiguous | import of `audit_parse` |

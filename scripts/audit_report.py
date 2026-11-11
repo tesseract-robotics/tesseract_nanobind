@@ -15,6 +15,7 @@ import clang.cindex as ci
 from audit_match import Gap, ModuleReport
 from audit_ownership import (
     ANY_PREFIX,
+    PLUGIN_ANCHOR_INCLUDES,
     REPO_ROOT,
     THIRD_PARTY_HEADERS,
     UNAUDITED_HEADERS,
@@ -246,6 +247,11 @@ def render_markdown(
         "",
         '!!! note "Third-party headers (never audited, even when #included directly)"',
         *(f"    - `{k}`: {v}" for k, v in THIRD_PARTY_HEADERS.items()),
+        "",
+        '!!! note "Plugin anchor includes (not audited, although #included directly)"',
+        *(f"    - `{k}`: {v}" for k, v in sorted(PLUGIN_ANCHOR_INCLUDES.items())),
+        "    - The audit checks that each declares only its `PLUGIN_ANCHOR_DECL` anchor and "
+        "concrete subclasses of the plugin factory interfaces; anything else fails the audit.",
         "",
         f'!!! warning "Limitations"\n    {LIMITATION}',
         "",
