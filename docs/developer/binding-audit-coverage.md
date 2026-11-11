@@ -71,7 +71,16 @@ The report is the source of these numbers. This table is copied from it once per
 
 ## Fact cache
 
-Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **under verification**. The tests pass locally without libclang. The run time on CI is not measured yet.
+Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the remaining cost is the uncached declarations parse (see the end of this section).
+
+| step | main, no cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42889787253)) | cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42937052432)) | warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42946926141)) |
+|---|---|---|---|
+| contract tests | 26:12 | 12:52 | 10:40 |
+| GIL list | 11:03 | 8:26 | < 0:01 |
+| audit | 12:35 | 3:36 | 3:55 |
+| job | ~50 min | ~25 min | ~15 min |
+
+The cold run gains because the per-entry lock lets one xdist worker parse each binding with bodies while the others wait for its entry, and the audit step then reads what the contract tests computed. The warm run's regenerated report differs from the committed one in exactly the 28 rows that main's uncached run reported (2026-11-11): the cached path changes no row.
 
 The audit's cost is libclang: two parses of each binding (one with function bodies), a third for the GIL list, and whole-TU walks from Python (std, Eigen and boost included). The 2026-11-10 run on main took 50 min: contract tests 26 min, GIL list 11 min, audit 12.5 min. In the contract tests, each xdist worker parsed every binding with bodies on its first real-module test: the four workers stalled together for 9 min.
 
@@ -100,7 +109,7 @@ Rejected alternatives:
 - **Caching whole module reports.** Contract tests patch the rule tables (`ACCEPTED`, `UNAUDITED_HEADERS`, …) and then audit, so a report keyed on files would return stale rows. Every module's report also reads every other binding through `bound_index`, so any binding edit would invalidate all of them.
 - **Caching libclang ASTs** (`TranslationUnit.save` / `from_ast_file`). This removes the parse but not the Python walks. Loading also validates every input file's mtime, and a fresh checkout changes every mtime.
 
-Still parsed on every audit: the declarations parse of each audited module for `cpp_api`, and the synthetic TUs of headers that a binding does not include. `cpp_api` takes a callback over every module's bound classes, so it is not yet a function of one TU's inputs.
+Still parsed on every audit: the declarations parse of each audited module for `cpp_api`, and the synthetic TUs of headers that a binding does not include. `cpp_api` takes a callback over every module's bound classes, so it is not yet a function of one TU's inputs. This is the remaining cost: warm, the audit step takes as long as cold (3:55 against 3:36), so caching the three whole-TU walks saved nothing measurable, and the 10:40 of warm contract tests is these parses repeated per worker. Splitting `cpp_api` into a per-TU extraction and a cross-module pass is the next step.
 
 Tests: `tests/audit/test_audit_cache.py` covers hit and miss, edits that keep size and mtime, removed files, the key parts, concurrent workers, pruning and corrupt entries, without libclang. `tests/audit/test_audit_facts.py` checks that a cached fact equals the fresh extraction and that a hit does not parse, and that an edit to an included fixture header re-parses.
 
