@@ -13,6 +13,7 @@ sys.path.insert(0, str(REPO / "scripts/demos"))
 import manifest  # noqa: E402
 from scenes import SCENES  # noqa: E402
 
+from tesseract_robotics.planning import Pose, TaskComposer  # noqa: E402
 from tesseract_robotics.viewer import Trajectory  # noqa: E402
 
 STATIC = [
@@ -67,17 +68,46 @@ def test_the_python_constraints_scene_plays_one_phase_per_act_in_one_environment
     assert {f"caption_{index}" for index in range(len(example.ACTS))} <= link_names
 
 
-def test_the_sqp_rows_are_the_final_solve_with_a_timestamp_last():
-    example = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
-    joints = ["a", "b"]
-    steps = 3
-    first = np.zeros(steps * len(joints))
-    final = np.arange(steps * len(joints), dtype=float)
+@pytest.fixture(scope="module")
+def composer():
+    """One composer for the planned scenes: each from_config() reloads the plugins."""
+    return TaskComposer.from_config()
 
-    rows = example.final_rows({"joint_names": joints, "trajectories": [first, final]}, steps=steps)
 
-    assert rows == [
-        [0.0, 1.0, 0.0 * example.VIEWER_STEP_S],
-        [2.0, 3.0, 1.0 * example.VIEWER_STEP_S],
-        [4.0, 5.0, 2.0 * example.VIEWER_STEP_S],
+def _collision_boxes(env, link: str):
+    """(edges, world pose) of each collision box of `link`."""
+    pose = env.getState().link_transforms[link]
+    shapes = env.getSceneGraph().getLink(link).collision
+    return [
+        (
+            np.array([c.geometry.getX(), c.geometry.getY(), c.geometry.getZ()]),
+            np.asarray((pose * c.origin).matrix),
+        )
+        for c in shapes
     ]
+
+
+@pytest.mark.planning
+def test_the_clearance_recording_holds_the_examples_cubes(composer):
+    """The recorder builds no scene of its own: the recorded obstacles are the example's."""
+    example = importlib.import_module(
+        "tesseract_robotics.examples.freespace_clearance_objective_example"
+    )
+
+    scene = SCENES["freespace_clearance_objective_example"](composer)
+
+    for index, (edge_m, centre_m, rpy_rad) in enumerate(example.CUBES):
+        ((edges, pose),) = _collision_boxes(scene.env, f"cube_{index}")
+        assert edges == pytest.approx([edge_m] * 3)
+        assert pose == pytest.approx(np.asarray(Pose.from_xyz_rpy(centre_m, rpy_rad).matrix))
+
+
+@pytest.mark.planning
+def test_the_ompl_recording_holds_the_cpp_examples_sphere(composer):
+    """freespace_ompl_example.cpp's obstacle: a 0.15 m sphere at (0.5, 0, 0.55) m."""
+    scene = SCENES["freespace_ompl_example"](composer)
+
+    (shape,) = scene.env.getSceneGraph().getLink("sphere_attached").collision
+    assert shape.geometry.getRadius() == pytest.approx(0.15)
+    centre = scene.env.getState().link_transforms["sphere_attached"] * shape.origin
+    assert np.asarray(centre.translation) == pytest.approx([0.5, 0.0, 0.55])

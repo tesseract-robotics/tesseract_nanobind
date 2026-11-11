@@ -20,7 +20,10 @@ pixi run python -m tesseract_robotics.examples.freespace_clearance_objective_exa
 
 --8<-- "docs/demos/players/freespace_ompl_example.html"
 
-Basic OMPL planning between joint configurations using the KUKA LBR iiwa 14 R820:
+Basic OMPL planning between joint configurations using the KUKA LBR iiwa 14 R820. The arm swings
+joint_a1 from -0.4 to 0.4 rad around one obstacle, a 0.15 m sphere at (0.5, 0, 0.55) m, as in
+tesseract_planning's C++ `freespace_ompl_example.cpp`. The six cubes are the scene of
+[the cost-threshold example](#ending-the-optimize-loop-on-cost) below.
 
 ```bash
 tesseract_freespace_ompl_example

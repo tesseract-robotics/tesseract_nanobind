@@ -109,3 +109,10 @@ def test_every_scene_names_a_manifest_entry():
 def test_the_hero_is_recorded_when_nothing_is_named():
     entries = manifest.load_manifest()
     assert "car_seat_example" in {entry.module for entry in record.select(entries, [])}
+
+
+def test_a_shared_example_helper_is_an_input_of_the_recording():
+    sources = [path.name for path in record.input_sources("online_planning_sqp_example")]
+    assert sources[0] == "online_planning_sqp_example.py"
+    assert "online_planning_scene.py" in sources
+    assert sources[-1] == "scenes.py"

@@ -6,11 +6,27 @@ from tests.docs.doc_assets import sqp_scene
 globals().update(sqp_scene(robot))
 -->
 
-Two examples replan a trajectory while an obstacle moves through the robot's path.
+Two examples replan a gantry robot's trajectory while a person walks through the cell.
 `online_planning_sqp_example` is a port of tesseract_planning's C++ `online_planning_example.cpp`:
-it builds one `TrajOptQPProblem` and, every tick, moves the obstacle and re-solves it with
+it builds one `TrajOptQPProblem` and, every tick, moves the person and re-solves it with
 `TrustRegionSQPSolver`, starting from the previous solution. `online_planning_example` is not a
 port: it does the same job through the task composer, running a whole pipeline per plan.
+
+## The person
+
+The scene models the person as a cylinder, radius 0.5 m and 2 m tall, on two prismatic joints;
+the robot keeps its own 2 m estop cylinder, on the gantry, out of it. In the C++ example someone
+drags the person's joints by hand. Both Python examples share a scripted walk instead
+(`online_planning_scene.py`): a closed loop at 1.3 m/s, a comfortable adult walking speed, one
+replan every 0.1 s, the spacing of the C++ example's planned waypoints. The lower half of the
+loop comes within 1.42 m of the straight path to the target, so the plan bends away from the
+person on every lap; the loop keeps clear of the plan's start and target, which stay fixed.
+
+Inside the cylinder stands a figure 1.75 m tall, built from spheres, capsules and boxes with
+segment lengths from standard ratios of stature. It is visual only: the planner sees the
+cylinder. The figure faces one way throughout, because the scene gives the person no rotation.
+The recordings show the robot sweeping along the plan in force at each tick, forward and back,
+as the C++ example replays its current plan.
 
 ## Overview
 
@@ -91,8 +107,8 @@ tesseract_online_planning_sqp_example
     Manipulator joints (8): ['gantry_axis_1', 'gantry_axis_2', 'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
     Building optimization problem (collision: discrete)...
     Running initial global solve...
-    Initial solve: cost=3.9284, time=<ms>
-    Online replanning (10 iterations)...
+    Initial solve: cost=3.4399, time=<ms>
+    Online replanning (52 iterations)...
     Replan timing: avg=<ms> (<Hz>)
     Trajectory: 12 waypoints x 8 joints
     ```
@@ -119,13 +135,21 @@ vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
 
 ### 2. Warm-start from the previous solution
 
-Between ticks, push the previous trajectory back into the variables:
+Between ticks, rebuild the problem with the previous trajectory as the variables' initial values,
+as the C++ `setupProblem` does:
 
 ```python
-nodes_variables.setVariables(trajectory.flatten())
+from tesseract_robotics.trajopt_ifopt import createNodesVariables
+
+seeded = createNodesVariables("trajectory", joint_names, list(trajectory), bounds)
+# ... a new TrajOptQPProblem(seeded) with the constraint and cost sets, setup(), then:
 solver.init(problem)
 solver.stepSQPSolver()
 ```
+
+Writing the values into an existing problem with `NodesVariables.setVariables` is not the same:
+it only writes the values, and the collision constraints keep evaluating the trajectory they were
+set up with. The solver then reports convergence without moving the plan.
 
 ### 3. Reset the trust region each tick
 
@@ -140,7 +164,10 @@ solver.setBoxSize(0.01)  # Reset trust region
 ### 4. Single step vs full solve
 
 - Use `solver.solve(problem)` on the first tick for global convergence.
-- Use `solver.stepSQPSolver()` per tick afterwards for incremental optimization.
+- Use `solver.stepSQPSolver()` per tick afterwards for incremental optimization. The C++ example
+  takes one step per loop, as fast as the solver runs. At a 0.1 s tick and walking speed one step
+  of the 0.01 trust box lets the person into the plan's margin, so the example takes up to
+  `SQP_STEPS_PER_TICK` (10) steps a tick and stops at the first that converges.
 
 ### 5. Sparse collision checking
 

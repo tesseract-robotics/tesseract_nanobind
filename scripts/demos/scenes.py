@@ -9,11 +9,15 @@ from types import ModuleType
 
 from tesseract_robotics.command_language import CompositeInstruction
 from tesseract_robotics.environment import Environment
+from tesseract_robotics.examples import online_planning_scene
 from tesseract_robotics.planning import TaskComposer
 from tesseract_robotics.viewer import RecordingPhase, TesseractViewer, Trajectory
 
 # The TWC cell the demo shows.
 TWC_CELL = "rail"
+# Length of the TWC recording [s]: one period of its slowest joint, the rail at 0.2 Hz, which
+# carries the robot along the whole cell and back. The example's own animation runs 60 s.
+TWC_DURATION_S = 5.0
 
 
 @dataclass(frozen=True)
@@ -83,21 +87,29 @@ def _clearance_objective(composer: TaskComposer) -> Scene:
     )
 
 
-def _online(composer: TaskComposer) -> Scene:
-    # The last replan, as the example's main shows it.
-    results = _example("online_planning_example").run(composer=composer)
-    program = results["trajectories"][-1].raw_results
+def _walk(module: str, results: dict) -> Scene:
+    """The person's walk, with the robot sweeping along the plan in force at each tick."""
+    example = _example(module)
     env = results["robot"].env
-    return Scene(env, [RecordingPhase(env, program)], [program])
+    online_planning_scene.style_for_viewer(env)
+    trajectory = Trajectory.from_rows(
+        example.recording_joint_names(results), example.recording_rows(results)
+    )
+    return Scene(env, [RecordingPhase(env, trajectory)])
+
+
+def _online(composer: TaskComposer) -> Scene:
+    # One pipeline plan per tick of one lap, so each tick shows a plan made for it.
+    module = "online_planning_example"
+    results = _example(module).run(
+        num_iterations=online_planning_scene.ticks_per_lap(), composer=composer
+    )
+    return _walk(module, results)
 
 
 def _online_sqp(_composer: TaskComposer) -> Scene:
-    example = _example("online_planning_sqp_example")
-    results = example.run()
-    env = results["robot"].env
-    example.style_for_viewer(env)
-    trajectory = Trajectory.from_rows(results["joint_names"], example.final_rows(results))
-    return Scene(env, [RecordingPhase(env, trajectory)])
+    module = "online_planning_sqp_example"
+    return _walk(module, _example(module).run())
 
 
 def _python_constraints(_composer: TaskComposer) -> Scene:
@@ -133,7 +145,13 @@ def _twc(_composer: TaskComposer) -> Scene:
     example = _example("twc_workcell_positioner_viewer")
     env = example.run(TWC_CELL)["env"]
     return Scene(
-        env, [RecordingPhase(env, Trajectory.from_rows(*example.animation_rows(TWC_CELL)))]
+        env,
+        [
+            RecordingPhase(
+                env,
+                Trajectory.from_rows(*example.animation_rows(TWC_CELL, duration=TWC_DURATION_S)),
+            )
+        ],
     )
 
 
