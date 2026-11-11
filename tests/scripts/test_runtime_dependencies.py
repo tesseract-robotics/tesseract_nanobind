@@ -1,7 +1,7 @@
 """Contract test: every third-party module the package imports is a declared dependency.
 
-The conda recipe's import test caught `tesseract_robotics.planning` importing `yaml`
-without `pyyaml` in `[project] dependencies` (#162): a plain `pip install` of the wheel
+An import test caught `tesseract_robotics.planning` importing `yaml`
+without `pyyaml` in `[project] dependencies`: a plain `pip install` of the wheel
 failed on `import tesseract_robotics.planning`. An import counts as declared when a
 `[project] dependencies` entry or an extra (`support`, from `scripts/support_metadata.py`)
 names its distribution.

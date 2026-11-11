@@ -57,8 +57,7 @@ flowchart LR
 The SWIG bindings follow the same pattern one level up:
 [tesseract-robotics-python-feedstock](https://github.com/tesseract-robotics-packaging/tesseract-robotics-python-feedstock)
 builds `tesseract_python` as a conda package against the same channel. This
-repository ships wheels to PyPI, and its own feedstock is being set up (see
-[Conda package](#conda-package-tesseract-robotics-nanobind)).
+repository ships wheels to PyPI instead and has no feedstock of its own yet.
 
 ## C++ packages: the feedstocks
 
@@ -122,56 +121,6 @@ What each fork changes on its `dev` branch:
 `keep-portable-shebang.patch` exists because, with `python` out of host, OMPL's
 `install_python` macro writes the build tool's Python into its script shebangs. The
 patch keeps `#!/usr/bin/env python3`.
-
-## Conda package: tesseract-robotics-nanobind
-
-The PyPI wheels need no conda (see [Building a wheel](#building-a-wheel)); the conda
-package is the other way to install the bindings, for conda envs that already hold the
-tesseract stack. Both build the same `CMakeLists.txt`: the wheel against a colcon prefix
-(`TESSERACT_CPP_PREFIX`), the package against the conda host prefix.
-
-The bindings get a feedstock of their own, `tesseract-robotics-nanobind-feedstock`,
-laid out like `tesseract-robotics-python-feedstock`: rattler-build, conda-smithy,
-GitHub Actions on linux-64, linux-aarch64, osx-arm64 and win-64 (the platforms the
-`label/dev` stack is published for: its `tesseract-robotics-planning` has no osx-64 build
-of the current dev snapshot), Python 3.12 to 3.14 (#162 step 2). It turns this repository into the conda package
-`tesseract-robotics-nanobind`, built the same way as the C++ stack under it.
-
-!!! warning "Status"
-    - **Incomplete:** the feedstock repository does not exist yet, so neither
-      does the `packaging/tesseract-robotics-nanobind-feedstock` submodule the
-      `build-feedstock-nanobind` task runs in. The tree is prepared (rendered with
-      conda-smithy: recipe, `.ci_support`, GitHub Actions workflow); its CI and the upload
-      to `label/dev` (by the holder of the channel's `BINSTAR_TOKEN`) follow.
-    - **Confirmed:** the recipe builds on osx-arm64 for Python 3.12 against the
-      `label/dev` stack (about 30 min locally, `build-locally.py`) and its tests pass:
-      imports, `pip check`, and 289 collision and kinematics tests. An earlier build's
-      import test found `pyyaml` missing from `[project] dependencies`; it is declared now.
-    - **Under verification:** linux-64, linux-aarch64 and win-64, and Python 3.13 and 3.14.
-
-The recipe (`recipe/recipe.yaml`):
-
-| Section | Contents | Why |
-|---|---|---|
-| `source` | `archive/<sha>.tar.gz` of this repository on the `dev` branch; the release tag on `master` | the dev track pins the merge SHA of the license PR (#368) or later: earlier commits have no `LICENSE` / `NOTICE` |
-| `build` | `pip install . --no-deps --no-build-isolation`, `SETUPTOOLS_SCM_PRETEND_VERSION` = the recipe version, `CONDA_PREFIX` = the host prefix | the archive has no `.git` for setuptools-scm; with `TESSERACT_CPP_PREFIX` unset (the wheel build sets it to its colcon prefix), `CMakeLists.txt` finds the C++ stack and its data through `$CONDA_PREFIX` |
-| `host` | `python`, `pip`, `scikit-build-core >=0.11`, `setuptools-scm`, `nanobind ==2.12.0`, `tesseract-robotics`, `tesseract-robotics-planning`, `trajopt`, `descartes-light`, `libboost-devel`, `eigen-abi-devel`, `taskflow 3.11.*` | every `find_package` in `CMakeLists.txt` resolves from these and their run deps |
-| `run` | `numpy >=2.0`, `scipy >=1.17.1`, `loguru`, `pyyaml`, `viser >=1.1.1`, `trimesh >=4`, `pillow`, `taskflow 3.11.*`, plus the C++ packages' `run_exports` | the `[project] dependencies`, so `pip check` passes. Not `tesseract-robotics-nanobind-support`: the robot models are already in `tesseract-robotics`' `share/tesseract`, which `get_tesseract_resource_path()` finds through `$CONDA_PREFIX` |
-| `run_constraints` | `tesseract-robotics-python <0.0a0` | both packages install `tesseract_robotics` |
-| `tests` | imports + `pip check`; `pytest tests/tesseract_collision tests/tesseract_kinematics` from the source tree | the two suites load the contact-manager and kinematics plugins and need no planner. `tesseract_nanobind_selftest` is not used: it runs tests bundled under `tesseract_robotics/tests`, which no build installs |
-| `about` | `license: Apache-2.0`, `license_file: [LICENSE, NOTICE]` | #368 |
-
-`recipe/conda_build_config.yaml` uses the dev-track channels of the C++
-feedstocks: `channel_sources: tesseract-robotics/label/dev,tesseract-robotics,conda-forge`,
-`channel_targets: tesseract-robotics dev`, and the same `libboost_devel`,
-`eigen_abi_devel` and `jsoncpp` pins. The extension modules are `cp312-abi3`, but
-like any conda Python package they are built once per interpreter; the recipe
-skips Python below 3.12.
-
-Locally, `pixi run build-feedstock-nanobind` builds the stack feedstocks first,
-then this checkout (`TESSERACT_NANOBIND_SRC_DIR` points the recipe at it instead
-of the pinned archive) into `packaging/output`, for Python 3.12 on the host
-platform.
 
 ## pixi environments: where each one gets its C++
 
@@ -296,12 +245,11 @@ search paths. Data is found through functions the caller uses explicitly:
 
 - **Task composer config.** `get_task_composer_config_path()`:
   `TESSERACT_TASK_COMPOSER_CONFIG_FILE` when set, else the config the wheel bundles in
-  `tesseract_robotics/data/`, else the conda env's `share/` (an editable install).
+  `tesseract_robotics/data/`, else the pixi env's `share/` for an editable install.
 - **Support data.** tesseract's robot models and meshes are a separate wheel,
   `tesseract-robotics-nanobind-support` (the `[support]` extra), built from the same prefix by
   `packaging/tesseract-robotics-nanobind-support`. `get_tesseract_resource_path()` returns its
-  directory, or the conda env's `share/` (an editable install, or the conda package
-  `tesseract-robotics-nanobind`), to pass to
+  directory (or the pixi env's `share/`), to pass to
   `GeneralResourceLocator(paths=[...])` or `addPath()`; `get_tesseract_support_path()` is its
   `tesseract/support/`. Without either it raises `SupportDataNotFoundError`.
 - **Windows DLLs.** A wheel needs nothing: delvewheel adds its bundled DLL directory. For a
