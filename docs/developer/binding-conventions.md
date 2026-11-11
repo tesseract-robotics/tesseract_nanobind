@@ -27,6 +27,23 @@ alias of a native overload (`getStateByMap`, `calcInvKinMultiple`, ...) does not
 Properties are used for stored scalar components of value types (`Quaterniond.x`,
 `Isometry3d.translation`); methods for everything that mirrors a C++ method.
 
+## Units and frames
+
+Units are SI throughout (metres, radians, seconds) and live in the parameter and attribute names
+(`radius_m`, `z_m`, `joint_positions` documented in rad) and in the docstrings; frames live in the
+names of the frames themselves (`working_frame`, `tcp_frame`) and in `ManipulatorInfo`. They are not
+encoded as `NewType`s or frame-tagged `Pose` generics.
+
+Decision (0.36): a `Radians` / `Metres` `NewType` over `float` makes every literal argument a type
+error at the call site (`box(0.5, 0.5, 0.5)` would need `box(Metres(0.5), ...)`), arrays cannot
+carry a `NewType` at all, and every value crossing the C++ boundary would need wrapping on the way
+back. That is a large ergonomic cost for users, and it would not catch the errors that matter in
+practice, which are frame mix-ups, not unit mix-ups. A frame-tagged `Pose` would catch those, but
+it needs every Tesseract API that takes a transform to name its frame in the type, which the C++
+does not; the bindings would have to invent it. Where a frame matters at a boundary we own, the
+code carries it explicitly instead: the emitters' `FramedPose` pairs a pose with its
+`MoveFrames`, and an unbound frame raises `UnboundFrameError`.
+
 ## Errors
 
 - One named exception per failure mode, subclassing the builtin a caller would catch:
