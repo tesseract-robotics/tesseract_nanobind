@@ -43,6 +43,20 @@ jobs:
         # here instead of silently re-solving to other header versions.
         locked: true
 
+    # What libclang extracted on earlier runs (scripts/audit_cache.py): each entry is keyed on
+    # the content of every file its parse read, so a restored entry answers only where nothing
+    # it reads changed; everything else is parsed again. The newest earlier cache is restored.
+    - name: Restore the fact cache
+      uses: actions/cache/restore@v4
+      with:
+        path: .cache/binding-audit
+        key: binding-audit-facts-${{ github.run_id }}
+        restore-keys: binding-audit-facts-
+
+    # Entries used after this stamp survive the prune below.
+    - name: Stamp the run start
+      run: touch "$RUNNER_TEMP/audit-start"
+
     # tests/audit (fixtures and the real binding TUs): the contract tests of the audit. The ledger
     # row test audits every module, so it runs below on the one audit pass instead.
     - name: Contract tests
@@ -78,3 +92,16 @@ jobs:
     - name: Report is current
       if: ${{ !cancelled() && steps.audit.outcome == 'success' }}
       run: git diff --exit-code -I '^tesseract-robotics `' -- docs/developer/binding-api-audit.md
+
+    # Only after a run that reached every step: a failed run used only part of the cache.
+    - name: Drop the facts this run did not use
+      if: ${{ success() }}
+      run: pixi run -e audit audit-cache-prune .cache/binding-audit "$RUNNER_TEMP/audit-start"
+
+    # Also after a failed step: the facts it computed are as valid as a passing run's.
+    - name: Save the fact cache
+      if: ${{ !cancelled() }}
+      uses: actions/cache/save@v4
+      with:
+        path: .cache/binding-audit
+        key: binding-audit-facts-${{ github.run_id }}
