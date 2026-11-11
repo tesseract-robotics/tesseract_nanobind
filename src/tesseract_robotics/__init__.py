@@ -22,8 +22,7 @@ import importlib
 import importlib.util
 import os
 import sys
-from importlib.metadata import PackageNotFoundError, version
-from importlib.resources import files
+from importlib.metadata import distribution, version
 from pathlib import Path
 
 
@@ -43,35 +42,28 @@ def _tesseract_dll_path_() -> None:
 _tesseract_dll_path_()
 del _tesseract_dll_path_
 
-try:
-    __version__ = version("tesseract-robotics-nanobind")
-except PackageNotFoundError:
-    __version__ = "0.0.0.dev"  # fallback for editable installs without build
+# Raises importlib.metadata.PackageNotFoundError when the distribution is not installed: an
+# editable install carries metadata too, so a missing version means a broken install.
+__version__ = version("tesseract-robotics-nanobind")
 
 
-def _filesystem_path(resource: object) -> Path | None:
-    """`resource` (an importlib.resources Traversable) as a filesystem path, if it is one."""
-    return resource if isinstance(resource, Path) else None
-
-
-def _prefix_share(relative: str) -> Path | None:
-    """`share/<relative>` of `$TESSERACT_CPP_PREFIX`, if it exists.
-
-    The editable install (pixi dev env) gets its data from the native stack's install prefix
-    (`pixi run native-build`; the env sets `TESSERACT_CPP_PREFIX`).
-    """
-    prefix = os.environ.get("TESSERACT_CPP_PREFIX")
-    if not prefix:
-        return None
-    share = Path(prefix) / "share"
-    return share if (share / relative).exists() else None
+_DISTRIBUTION = "tesseract-robotics-nanobind"
 
 
 def get_data_path() -> Path:
-    """Directory of the data the bindings wheel bundles (the task composer config)."""
-    path = _filesystem_path(files(__name__) / "data")
-    if path is None:
-        raise FileNotFoundError("tesseract_robotics is not installed as a directory on disk")
+    """Directory of the data the bindings distribution installs (the task composer config).
+
+    Located through the distribution's own file record, not the package directory: an editable
+    install imports `tesseract_robotics` from the source tree while CMake installs the data
+    next to the extension modules in site-packages, and `importlib.metadata` resolves the
+    installed location for both a wheel and an editable install.
+
+    Raises:
+        FileNotFoundError: the distribution's data directory does not exist on disk.
+    """
+    path = Path(str(distribution(_DISTRIBUTION).locate_file("tesseract_robotics/data")))
+    if not path.is_dir():
+        raise FileNotFoundError(f"{_DISTRIBUTION} data directory {path} does not exist")
     return path
 
 
@@ -88,24 +80,24 @@ def get_tesseract_resource_path() -> Path:
 
     Pass it to a resource locator to resolve `package://tesseract/support/...`:
 
-        GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    ```python
+    GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    ```
 
-    It comes from the tesseract-robotics-nanobind-support wheel, or for an editable install from
-    `$TESSERACT_CPP_PREFIX`'s share/.
+    The one source is the tesseract-robotics-nanobind-support distribution, installed by the
+    `[support]` extra and by the development environment's `install` task.
 
     Raises:
-        SupportDataNotFoundError: neither is installed.
+        SupportDataNotFoundError: the support distribution is not installed.
     """
-    # The [support] extra is optional: absent → no spec. A present but broken install raises.
-    if importlib.util.find_spec(SUPPORT_PACKAGE) is not None:
-        return importlib.import_module(SUPPORT_PACKAGE).data_dir()
-    share = _prefix_share("tesseract/package.xml")
-    if share is not None:
-        return share
-    raise SupportDataNotFoundError(
-        "tesseract's support data (robot models and meshes) is not installed: "
-        "pip install 'tesseract-robotics-nanobind[support]'"
-    )
+    # The [support] extra is optional: absent means no spec. A present but broken install raises
+    # its own error from the unguarded import instead of reading as absent.
+    if importlib.util.find_spec(SUPPORT_PACKAGE) is None:
+        raise SupportDataNotFoundError(
+            "tesseract's support data (robot models and meshes) is not installed: "
+            "pip install 'tesseract-robotics-nanobind[support]'"
+        )
+    return importlib.import_module(SUPPORT_PACKAGE).data_dir()
 
 
 def get_tesseract_support_path() -> Path:
@@ -118,7 +110,7 @@ def get_tesseract_support_path() -> Path:
 
 
 class TaskComposerConfigNotFoundError(FileNotFoundError):
-    """No task composer config found via env var, bundled data, or prefix share."""
+    """No task composer config: the env var names a missing file, or the install lacks one."""
 
 
 _TASK_COMPOSER_CONFIG = "task_composer_plugins.yaml"
@@ -127,12 +119,12 @@ _TASK_COMPOSER_CONFIG = "task_composer_plugins.yaml"
 def get_task_composer_config_path() -> Path:
     """The task composer plugin config file.
 
-    TESSERACT_TASK_COMPOSER_CONFIG_FILE when set, else the config the wheel bundles, else (editable
-    install) `$TESSERACT_CPP_PREFIX`'s.
+    TESSERACT_TASK_COMPOSER_CONFIG_FILE when set, else the config the distribution installs
+    under `data/task_composer_config/` (wheel and editable install alike).
 
     Raises:
-        TaskComposerConfigNotFoundError: nothing resolves to an existing file, or the env var
-            names a file that does not exist.
+        TaskComposerConfigNotFoundError: the env var names a file that does not exist, or the
+            installed config is missing.
     """
     env_cfg = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
     if env_cfg:
@@ -141,16 +133,9 @@ def get_task_composer_config_path() -> Path:
         raise TaskComposerConfigNotFoundError(
             f"TESSERACT_TASK_COMPOSER_CONFIG_FILE={env_cfg!r} does not exist"
         )
-    bundled = _filesystem_path(
-        files(__name__) / "data" / "task_composer_config" / _TASK_COMPOSER_CONFIG
-    )
-    if bundled is not None and bundled.is_file():
-        return bundled
-    relative = f"tesseract_planning/task_composer/config/{_TASK_COMPOSER_CONFIG}"
-    share = _prefix_share(relative)
-    if share is not None:
-        return share / relative
-    raise TaskComposerConfigNotFoundError(
-        "no task composer config found: checked TESSERACT_TASK_COMPOSER_CONFIG_FILE, the bundled "
-        "data/task_composer_config/, and $TESSERACT_CPP_PREFIX share"
-    )
+    installed = get_data_path() / "task_composer_config" / _TASK_COMPOSER_CONFIG
+    if not installed.is_file():
+        raise TaskComposerConfigNotFoundError(
+            f"{_DISTRIBUTION} installed no task composer config at {installed}"
+        )
+    return installed

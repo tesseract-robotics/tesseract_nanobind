@@ -5,16 +5,18 @@ Provides high-level interfaces for loading and managing robot environments,
 wrapping the lower-level Environment and related classes.
 
 Example:
+    ```python
+    from tesseract_robotics import get_tesseract_resource_path
+    from tesseract_robotics.common import GeneralResourceLocator
     from tesseract_robotics.planning import Robot
 
-    # Load from package URLs
+    # Load from the support package's URLs
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     robot = Robot.from_urdf(
         "package://tesseract/support/urdf/abb_irb2400.urdf",
-        "package://tesseract/support/urdf/abb_irb2400.srdf"
+        "package://tesseract/support/urdf/abb_irb2400.srdf",
+        locator,
     )
-
-    # Or from file paths
-    robot = Robot.from_files("/path/to/robot.urdf", "/path/to/robot.srdf")
 
     # Access robot state
     state = robot.get_state()
@@ -22,17 +24,20 @@ Example:
 
     # Set joint positions
     robot.set_joints({"joint_1": 0.5, "joint_2": -0.3})
+    ```
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, overload
 
 import numpy as np
 from numpy.typing import ArrayLike
 
 from tesseract_robotics.common import (
+    AllowedCollisionMatrix,
     GeneralResourceLocator,
     Isometry3d,
     LinkId,
@@ -41,6 +46,7 @@ from tesseract_robotics.common import (
 from tesseract_robotics.environment import (
     AddLinkCommand,
     ChangeCollisionMarginsCommand,
+    Command,
     Environment,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
@@ -48,6 +54,17 @@ from tesseract_robotics.environment import (
     RemoveLinkCommand,
 )
 from tesseract_robotics.kinematics import KinGroupIKInput
+from tesseract_robotics.planning.errors import (
+    EnvironmentCommandError,
+    EnvironmentInitError,
+    IKNoSolutionError,
+    InvalidEnvironmentError,
+    JointCountMismatchError,
+    JointNamesRequiredError,
+    JointNotFoundError,
+    ResourceNotFoundError,
+    UninitializedEnvironmentError,
+)
 from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.scene_graph import (
     Joint,
@@ -63,9 +80,13 @@ class RobotState:
 
     Attributes:
         joint_names: List of joint names
-        joint_positions: Array of joint positions (radians for revolute)
-        joint_velocities: Array of joint velocities (optional)
-        joint_accelerations: Array of joint accelerations (optional)
+        joint_positions: Array of joint positions, one per name (rad revolute, m prismatic)
+        joint_velocities: Array of joint velocities (rad/s revolute, m/s prismatic), optional
+        joint_accelerations: Array of joint accelerations (rad/s^2 revolute, m/s^2 prismatic),
+            optional
+
+    Raises:
+        JointCountMismatchError: `joint_positions` and `joint_names` differ in length.
     """
 
     joint_names: list[str]
@@ -73,9 +94,14 @@ class RobotState:
     joint_velocities: np.ndarray | None = None
     joint_accelerations: np.ndarray | None = None
 
-    def __post_init__(self):
-        """Convert arrays to numpy float64 for C++ interop."""
+    def __post_init__(self) -> None:
+        """Convert arrays to numpy float64 for C++ interop and check their lengths."""
         self.joint_positions = np.asarray(self.joint_positions, dtype=np.float64)
+        if self.joint_positions.shape != (len(self.joint_names),):
+            raise JointCountMismatchError(
+                f"{len(self.joint_names)} joint names but joint_positions has shape "
+                f"{self.joint_positions.shape}"
+            )
         if self.joint_velocities is not None:
             self.joint_velocities = np.asarray(self.joint_velocities, dtype=np.float64)
         if self.joint_accelerations is not None:
@@ -87,11 +113,9 @@ class RobotState:
 
     def __getitem__(self, joint_name: str) -> float:
         """Get position of a specific joint by name."""
-        try:
-            idx = self.joint_names.index(joint_name)
-            return float(self.joint_positions[idx])
-        except ValueError:
-            raise KeyError(f"Joint '{joint_name}' not found")
+        if joint_name not in self.joint_names:
+            raise JointNotFoundError(f"Joint '{joint_name}' not found in {self.joint_names}")
+        return float(self.joint_positions[self.joint_names.index(joint_name)])
 
     def __repr__(self) -> str:
         joints_str = ", ".join(
@@ -133,7 +157,7 @@ class Robot:
         locator: GeneralResourceLocator | None = None,
     ):
         """
-        Initialize Robot wrapper.
+        Wrap an environment without checking it; use `Robot.build` to validate.
 
         Args:
             env: Initialized Tesseract Environment
@@ -141,6 +165,37 @@ class Robot:
         """
         self.env = env
         self.locator = locator or GeneralResourceLocator()
+
+    @classmethod
+    def build(
+        cls,
+        env: Environment,
+        locator: GeneralResourceLocator | None = None,
+    ) -> Robot:
+        """
+        Wrap an environment after checking it is an initialised `Environment`.
+
+        Args:
+            env: Initialized Tesseract Environment
+            locator: Resource locator (created if not provided)
+
+        Returns:
+            The wrapped robot.
+
+        Raises:
+            InvalidEnvironmentError: `env` is not an `Environment`.
+            UninitializedEnvironmentError: `env` has not been initialised.
+        """
+        if not isinstance(env, Environment):
+            raise InvalidEnvironmentError(
+                f"Robot wraps a tesseract_robotics.environment.Environment, got {type(env).__name__}"
+            )
+        if not env.isInitialized():
+            raise UninitializedEnvironmentError(
+                "Environment is not initialised; call Environment.init(...) first, "
+                "or load with Robot.from_urdf / Robot.from_files."
+            )
+        return cls(env, locator)
 
     @classmethod
     def from_urdf(
@@ -163,23 +218,24 @@ class Robot:
             Initialized Robot instance
 
         Raises:
-            RuntimeError: If environment initialization fails
+            ResourceNotFoundError: The locator resolves neither URL.
+            EnvironmentInitError: The environment rejects the URDF / SRDF pair.
         """
         locator = locator or GeneralResourceLocator()
 
         urdf_resource = locator.locateResource(urdf_url)
         if urdf_resource is None:
-            raise RuntimeError(f"Could not locate URDF resource: {urdf_url}")
+            raise ResourceNotFoundError(f"Could not locate URDF resource: {urdf_url}")
         srdf_resource = locator.locateResource(srdf_url)
         if srdf_resource is None:
-            raise RuntimeError(f"Could not locate SRDF resource: {srdf_url}")
+            raise ResourceNotFoundError(f"Could not locate SRDF resource: {srdf_url}")
 
         urdf_path = Path(urdf_resource.getFilePath())
         srdf_path = Path(srdf_resource.getFilePath())
 
         env = Environment()
         if not env.init(urdf_path, srdf_path, locator):
-            raise RuntimeError(f"Failed to initialize environment from {urdf_url}")
+            raise EnvironmentInitError(f"Failed to initialize environment from {urdf_url}")
 
         return cls(env, locator)
 
@@ -200,15 +256,22 @@ class Robot:
 
         Returns:
             Initialized Robot instance
+
+        Raises:
+            ResourceNotFoundError: A file does not exist.
+            EnvironmentInitError: The environment rejects the URDF / SRDF pair.
         """
         locator = locator or GeneralResourceLocator()
 
         urdf_path = Path(urdf_path)
         srdf_path = Path(srdf_path)
+        for path in (urdf_path, srdf_path):
+            if not path.is_file():
+                raise ResourceNotFoundError(f"No such file: {path}")
 
         env = Environment()
         if not env.init(urdf_path, srdf_path, locator):
-            raise RuntimeError(f"Failed to initialize environment from {urdf_path}")
+            raise EnvironmentInitError(f"Failed to initialize environment from {urdf_path}")
 
         return cls(env, locator)
 
@@ -225,7 +288,9 @@ class Robot:
         `package://tesseract/support/...`, e.g. with the support data installed
         (`pip install 'tesseract-robotics-nanobind[support]'`):
 
-            locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        ```python
+        locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        ```
 
         Args:
             robot_name: Name of robot (e.g., "abb_irb2400", "lbr_iiwa_14_r820")
@@ -272,15 +337,25 @@ class Robot:
         Args:
             joint_values: Joint positions as dict or array-like
             joint_names: Joint names (required if joint_values is sequence)
+
+        Raises:
+            JointNamesRequiredError: `joint_values` is a sequence and no `joint_names` given.
+            JointCountMismatchError: `joint_values` and `joint_names` differ in length.
         """
         if isinstance(joint_values, dict):
             names = list(joint_values.keys())
             values = np.array(list(joint_values.values()), dtype=np.float64)
         else:
             if joint_names is None:
-                raise ValueError("joint_names required when joint_values is a sequence")
+                raise JointNamesRequiredError(
+                    "joint_names required when joint_values is a sequence"
+                )
             names = joint_names
             values = np.asarray(joint_values, dtype=np.float64)
+            if values.shape != (len(names),):
+                raise JointCountMismatchError(
+                    f"{len(names)} joint names but joint_values has shape {values.shape}"
+                )
 
         self.env.setState(names, values)
 
@@ -340,7 +415,9 @@ class Robot:
             tip_link: Link whose pose to return (e.g. "tool0"); a link, not a named TCP
 
         Returns:
-            Pose of the tip link in world
+            Pose of the tip link in the scene graph's root frame (what
+            `KinematicGroup.calcFwdKin` reports, not relative to the group's base link; the
+            two coincide when the base link is the root)
         """
         group = self.env.getKinematicGroup(group_name)
         joint_positions = np.asarray(joint_positions, dtype=np.float64)
@@ -349,6 +426,25 @@ class Robot:
 
         return Pose(poses[LinkId(tip_link)])
 
+    @overload
+    def ik(
+        self,
+        group_name: str,
+        target_pose: Pose | Isometry3d,
+        tip_link: str,
+        seed: ArrayLike | None = None,
+        all_solutions: Literal[False] = False,
+    ) -> np.ndarray: ...
+    @overload
+    def ik(
+        self,
+        group_name: str,
+        target_pose: Pose | Isometry3d,
+        tip_link: str,
+        seed: ArrayLike | None = None,
+        *,
+        all_solutions: Literal[True],
+    ) -> list[np.ndarray]: ...
     def ik(
         self,
         group_name: str,
@@ -356,7 +452,7 @@ class Robot:
         tip_link: str,
         seed: ArrayLike | None = None,
         all_solutions: bool = False,
-    ) -> np.ndarray | list[np.ndarray] | None:
+    ) -> np.ndarray | list[np.ndarray]:
         """
         Compute inverse kinematics.
 
@@ -366,11 +462,14 @@ class Robot:
             tip_link: Link to solve for (e.g. "tool0"); a link, not a named TCP: strip a TCP
                 offset first (`target * offset.inverse()`)
             seed: Initial joint configuration (current state if None)
-            all_solutions: If True, return all solutions; otherwise return first
+            all_solutions: If True, return every solution; otherwise the first
 
         Returns:
-            If all_solutions=False: Joint positions array, or None if no solution
-            If all_solutions=True: List of joint positions arrays, or None if none found
+            With `all_solutions=False`, the joint positions (rad) of the first solution; with
+            `all_solutions=True`, the list of every solution's joint positions.
+
+        Raises:
+            IKNoSolutionError: The pose is unreachable from the group.
         """
         group = self.env.getKinematicGroup(group_name)
 
@@ -387,13 +486,15 @@ class Robot:
 
         result = group.calcInvKin(ik_input, seed)
 
-        if result is None or len(result) == 0:
-            return None
+        if len(result) == 0:
+            raise IKNoSolutionError(
+                f"No IK solution for tip link '{tip_link}' of group '{group_name}' at {target_pose}"
+            )
 
         if all_solutions:
             return [np.asarray(sol) for sol in result]
 
-        return result[0]
+        return np.asarray(result[0])
 
     def get_manipulator_info(
         self,
@@ -407,7 +508,7 @@ class Robot:
         Build a ManipulatorInfo for a kinematic group.
 
         Every call returns a new object. The TCP is `tcp_frame * tcp_offset`; see
-        [TCP offsets](../api/tesseract_environment.md#tcp-offsets).
+        how a named offset resolves: `Environment.findTCPOffset`.
 
         Args:
             group_name: Kinematic group name
@@ -425,11 +526,16 @@ class Robot:
             info.tcp_offset = tcp_offset
         return info
 
+    def _apply(self, command: Command, what: str) -> None:
+        """Apply an environment command; raise if the environment refuses it."""
+        if not self.env.applyCommand(command):
+            raise EnvironmentCommandError(f"Environment refused to {what}")
+
     def add_link(
         self,
         link: Link,
         joint: Joint,
-    ) -> bool:
+    ) -> None:
         """
         Add a new link to the environment.
 
@@ -437,29 +543,28 @@ class Robot:
             link: Link to add
             joint: Joint connecting link to parent
 
-        Returns:
-            True if successful
+        Raises:
+            EnvironmentCommandError: The environment refused the link (duplicate name, unknown
+                parent link).
         """
-        cmd = AddLinkCommand(link, joint)
-        return self.env.applyCommand(cmd)
+        self._apply(AddLinkCommand(link, joint), f"add link '{link.getName()}'")
 
-    def remove_link(self, link_name: str) -> bool:
+    def remove_link(self, link_name: str) -> None:
         """
         Remove a link from the environment.
 
         Args:
             link_name: Name of link to remove
 
-        Returns:
-            True if successful
+        Raises:
+            EnvironmentCommandError: The environment has no such link.
         """
-        cmd = RemoveLinkCommand(link_name)
-        return self.env.applyCommand(cmd)
+        self._apply(RemoveLinkCommand(link_name), f"remove link '{link_name}'")
 
     def move_link(
         self,
         joint: Joint,
-    ) -> bool:
+    ) -> None:
         """
         Move a link by providing a new joint configuration.
 
@@ -468,18 +573,17 @@ class Robot:
         Args:
             joint: Joint object specifying new parent-child relationship
 
-        Returns:
-            True if successful
+        Raises:
+            EnvironmentCommandError: The environment refused the move.
         """
-        cmd = MoveLinkCommand(joint)
-        return self.env.applyCommand(cmd)
+        self._apply(MoveLinkCommand(joint), f"move link of joint '{joint.getName()}'")
 
     def add_allowed_collision(
         self,
         link1: str,
         link2: str,
         reason: str = "Adjacent",
-    ) -> bool:
+    ) -> None:
         """
         Add an allowed collision pair.
 
@@ -488,28 +592,27 @@ class Robot:
             link2: Second link name
             reason: Reason for allowing collision
 
-        Returns:
-            True if successful
+        Raises:
+            EnvironmentCommandError: The environment refused the pair.
         """
-        from tesseract_robotics.common import AllowedCollisionMatrix
-
         acm = AllowedCollisionMatrix()
         acm.addAllowedCollision(link1, link2, reason)
-        cmd = ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD)
-        return self.env.applyCommand(cmd)
+        self._apply(
+            ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD),
+            f"allow collisions between '{link1}' and '{link2}'",
+        )
 
-    def set_collision_margin(self, margin: float) -> bool:
+    def set_collision_margin(self, margin: float) -> None:
         """
         Set default collision margin distance.
 
         Args:
             margin: Collision margin in meters
 
-        Returns:
-            True if successful
+        Raises:
+            EnvironmentCommandError: The environment refused the margin.
         """
-        cmd = ChangeCollisionMarginsCommand(margin)
-        return self.env.applyCommand(cmd)
+        self._apply(ChangeCollisionMarginsCommand(margin), f"set collision margin {margin}")
 
     @property
     def scene_graph(self) -> SceneGraph:

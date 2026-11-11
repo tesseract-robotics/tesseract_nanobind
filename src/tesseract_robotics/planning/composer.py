@@ -20,11 +20,12 @@ Example:
 
 from __future__ import annotations
 
-import os
-from collections.abc import Iterator
+import copy
+import threading
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import numpy as np
 from loguru import logger
@@ -41,7 +42,15 @@ from tesseract_robotics.common import (
     GeneralResourceLocator,
 )
 from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.planning.errors import (
+    ConflictingExecutorError,
+    InvalidThreadCountError,
+    PipelineLayoutError,
+    PipelineWarmupError,
+    UnknownPipelineError,
+)
 from tesseract_robotics.planning.profile_types import check_descartes_profile_types
+from tesseract_robotics.planning.profiles.pipelines import default_profiles_for
 from tesseract_robotics.task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
@@ -66,7 +75,8 @@ class TrajectoryPoint:
         positions: Joint positions (radians)
         velocities: Joint velocities (optional)
         accelerations: Joint accelerations (optional)
-        time: Time from start (optional)
+        time: Time from start in seconds; set only where the waypoint carries a time
+            parameterization (a waypoint without velocities has no time, not time zero)
     """
 
     joint_names: list[str]
@@ -85,26 +95,9 @@ class TrajectoryPoint:
         return f"TrajectoryPoint([{pos_str}]{time_str})"
 
 
-def _extract_array_field(getter, field_name: str) -> np.ndarray | None:
-    """Extract optional array field (velocity/acceleration) from StateWaypoint."""
-    try:
-        val = getter()
-        if val is not None and len(val) > 0:
-            return np.array(val)
-    except (AttributeError, RuntimeError) as e:
-        logger.debug(f"{field_name} not available: {type(e).__name__}")
-    return None
-
-
-def _extract_time_field(getter, field_name: str) -> float | None:
-    """Extract optional time field from StateWaypoint."""
-    try:
-        val = getter()
-        if val is not None:
-            return float(val)
-    except (AttributeError, RuntimeError) as e:
-        logger.debug(f"{field_name} not available: {type(e).__name__}")
-    return None
+def _optional_array(values: np.ndarray) -> np.ndarray | None:
+    """A state waypoint's optional vector: an empty vector is how the waypoint says "not set"."""
+    return np.array(values) if len(values) > 0 else None
 
 
 @dataclass
@@ -151,10 +144,11 @@ class PlanningResult:
         Convert trajectory to numpy array.
 
         Returns:
-            Array of shape (N, num_joints) with joint positions
+            Array of shape (N, num_joints) with joint positions; shape (0, 0) for an empty
+            trajectory, which does not know its joint count.
         """
         if not self.trajectory:
-            return np.array([])
+            return np.empty((0, 0))
         return np.array([pt.positions for pt in self.trajectory])
 
 
@@ -165,7 +159,9 @@ ABORT_PROPAGATION_MESSAGE = "Error (Abort Triggered)"
 FAILED_STATUS_CODE = 0
 
 
-def _failure_message(infos, aborting=None) -> str:
+def _failure_message(
+    infos: Iterable[TaskComposerNodeInfo], aborting: TaskComposerNodeInfo | None = None
+) -> str:
     """Name the node that failed, not the ErrorTask a pipeline routes every failure into.
 
     When a node fails, the pipeline triggers an abort, and its ErrorTask, the pipeline itself and each
@@ -175,14 +171,14 @@ def _failure_message(infos, aborting=None) -> str:
     solve that had ended at OPT_SCO_ITERATION_LIMIT.
 
     Args:
-        infos: The failed run's ``TaskComposerNodeInfo`` objects (``name``, ``status_code``,
-            ``status_message``).
-        aborting: The aborting node's info, ``getInfo(getAbortingNode())`` (``None`` when no node
+        infos: The failed run's `TaskComposerNodeInfo` objects (`name`, `status_code`,
+            `status_message`).
+        aborting: The aborting node's info, `getInfo(getAbortingNode())` (`None` when no node
             aborted), reported when no node carries a specific message.
 
     Returns:
-        ``"<node>: <message>"`` for every failed node with a specific message, sorted by node and
-        joined with ``"; "``; else the aborting node's message; else ``"Planning failed"``.
+        `"<node>: <message>"` for every failed node with a specific message, sorted by node and
+        joined with `"; "`; else the aborting node's message; else `"Planning failed"`.
     """
     specific = sorted(
         f"{info.name}: {info.status_message}"
@@ -198,6 +194,26 @@ def _failure_message(infos, aborting=None) -> str:
     return "Planning failed"
 
 
+# Pipelines the `plan_*` conveniences run when none is named.
+DEFAULT_FREESPACE_PIPELINE: Final = "TrajOptPipeline"
+DEFAULT_OMPL_PIPELINE: Final = "FreespacePipeline"
+DEFAULT_CARTESIAN_PIPELINE: Final = "DescartesDPipeline"
+
+# Pipelines `warmup()` loads when none are named: the ones the `plan_*` conveniences and the
+# IFOPT variants run.
+DEFAULT_WARMUP_PIPELINES: Final = (
+    "TrajOptPipeline",
+    "TrajOptIfoptPipeline",
+    "FreespacePipeline",
+    "FreespaceIfoptPipeline",
+    "CartesianPipeline",
+    "OMPLPipeline",
+)
+
+# Name of the executor plugin the factory builds when no thread count is given.
+EXECUTOR_PLUGIN_NAME: Final = "TaskflowExecutor"
+
+
 class TaskComposer:
     """
     High-level interface for task composer planning pipelines.
@@ -205,7 +221,7 @@ class TaskComposer:
     Wraps the TaskComposerPluginFactory and handles all the AnyPoly
     boilerplate for setting up and running planning tasks.
 
-    Available Pipelines (the full registry: ``get_available_pipelines()``):
+    Available Pipelines (the full registry: `get_available_pipelines()`):
         FreespacePipeline: OMPL + TrajOpt smoothing + time param (recommended)
         CartesianPipeline: Cartesian path with TrajOpt
         OMPLPipeline: OMPL sampling-based planning only
@@ -214,13 +230,18 @@ class TaskComposer:
             (DescartesFPipeline in float; the *NPC variants skip the
             post-plan contact check)
 
+    Error model: a configuration or programming error (unknown pipeline, profiles of the
+    wrong type, a malformed program) raises; a planner that ran and found no solution returns
+    a `PlanningResult` with `successful=False` and the failing node's message.
+
     Example:
+        ```python
         composer = TaskComposer.from_config()
 
         # Plan with TrajOpt (optimization-based)
         result = composer.plan_freespace(robot, program)
 
-        # Plan with OMPL (sampling-based: RRT, RRT*, PRM, etc.)
+        # Plan with OMPL + TrajOpt smoothing (sampling-based: RRT, RRT*, PRM, etc.)
         result = composer.plan_ompl(robot, program)
 
         # Plan Cartesian path
@@ -228,6 +249,7 @@ class TaskComposer:
 
         # Or specify pipeline directly
         result = composer.plan(robot, program, pipeline="TrajOptPipeline")
+        ```
     """
 
     def __init__(
@@ -236,7 +258,6 @@ class TaskComposer:
         locator: GeneralResourceLocator | None = None,
         num_threads: int | None = None,
         executor: TaskComposerExecutor | None = None,
-        config_path: str | Path | None = None,
     ):
         """
         Initialize TaskComposer.
@@ -244,14 +265,14 @@ class TaskComposer:
         Args:
             factory: Initialized TaskComposerPluginFactory
             locator: Resource locator
-            num_threads: Number of threads for executor (overrides YAML config)
+            num_threads: Number of threads for executor (overrides YAML config); not capped to
+                the core count
             executor: Pre-configured executor (overrides num_threads and YAML)
-            config_path: Path to the config YAML the factory was built from
-                (informational; get_available_pipelines reads the factory)
 
         Raises:
             TypeError: If factory is not a TaskComposerPluginFactory
-            ValueError: If both num_threads and executor are provided
+            ConflictingExecutorError: If both num_threads and executor are provided
+            InvalidThreadCountError: If num_threads is below 1
 
         Note:
             Use TaskComposer.from_config() for simpler initialization.
@@ -265,12 +286,14 @@ class TaskComposer:
                 f"create a factory with TaskComposerPluginFactory(config_path, locator)."
             )
         if num_threads is not None and executor is not None:
-            raise ValueError("Cannot specify both num_threads and executor")
+            raise ConflictingExecutorError("Cannot specify both num_threads and executor")
+        if num_threads is not None and num_threads < 1:
+            raise InvalidThreadCountError(f"num_threads must be at least 1, got {num_threads}")
         self.factory = factory
         self.locator = locator or GeneralResourceLocator()
         self._num_threads = num_threads
         self._executor = executor
-        self._config_path = Path(config_path) if config_path else None
+        self._executor_lock = threading.Lock()
 
     @classmethod
     def from_config(
@@ -298,7 +321,11 @@ class TaskComposer:
         Returns:
             Initialized TaskComposer
 
+        Raises:
+            PipelineWarmupError: A pipeline to warm up does not load.
+
         Example:
+            ```python
             # Use YAML config (default)
             composer = TaskComposer.from_config()
 
@@ -312,6 +339,7 @@ class TaskComposer:
             from tesseract_robotics.task_composer import TaskflowTaskComposerExecutor
             executor = TaskflowTaskComposerExecutor("MyExecutor", 8)
             composer = TaskComposer.from_config(executor=executor)
+            ```
         """
         from tesseract_robotics import get_task_composer_config_path
 
@@ -323,9 +351,7 @@ class TaskComposer:
         # A Path: the factory reads a `str` as YAML text (#337).
         factory = TaskComposerPluginFactory(Path(config_path), locator)
 
-        instance = cls(
-            factory, locator, num_threads=num_threads, executor=executor, config_path=config_path
-        )
+        instance = cls(factory, locator, num_threads=num_threads, executor=executor)
 
         # Pre-load plugins if requested
         if warmup:
@@ -350,53 +376,46 @@ class TaskComposer:
                        Pass [] (empty list) to skip loading (useful for tests).
 
         Returns:
-            List of successfully loaded pipeline names.
+            The pipeline names that were loaded (every name asked for).
+
+        Raises:
+            PipelineWarmupError: A pipeline does not load; the message names it and the
+                factory's reason.
 
         Example:
+            ```python
             # At application startup
             composer = TaskComposer.from_config()
             composer.warmup()  # Takes ~10-15s, pre-loads common pipelines
 
             # Later planning calls are fast
             result = composer.plan(robot, program)  # ~8s instead of ~22s
+            ```
         """
-        if pipelines is not None and len(pipelines) == 0:
-            return []
-
-        # Default to commonly used pipelines
         if pipelines is None:
-            pipelines = [
-                "TrajOptPipeline",
-                "TrajOptIfoptPipeline",
-                "FreespacePipeline",
-                "FreespaceIfoptPipeline",
-                "CartesianPipeline",
-                "OMPLPipeline",
-            ]
+            pipelines = list(DEFAULT_WARMUP_PIPELINES)
 
-        loaded = []
         for name in pipelines:
             try:
                 self.factory.createTaskComposerNode(name)
-                loaded.append(name)
             except TaskComposerPluginError as e:
-                logger.debug(f"Failed to load pipeline {name}: {e}")
+                raise PipelineWarmupError(f"Pipeline '{name}' failed to load: {e}") from e
 
-        return loaded
+        return list(pipelines)
 
     @property
     def executor(self) -> TaskComposerExecutor:
-        """Get or create task executor (lazy initialization)."""
-        if self._executor is None:
-            if self._num_threads is not None:
-                # Create executor with explicit thread count (capped to available cores)
-                max_threads = os.cpu_count() or 1
-                threads = min(self._num_threads, max_threads)
-                self._executor = TaskflowTaskComposerExecutor("TaskflowExecutor", threads)
-            else:
-                # Use factory (respects YAML config)
-                self._executor = self.factory.createTaskComposerExecutor("TaskflowExecutor")
-        return self._executor
+        """The task executor, created on first use (thread-safe)."""
+        with self._executor_lock:
+            if self._executor is None:
+                if self._num_threads is not None:
+                    self._executor = TaskflowTaskComposerExecutor(
+                        EXECUTOR_PLUGIN_NAME, self._num_threads
+                    )
+                else:
+                    # Use factory (respects YAML config)
+                    self._executor = self.factory.createTaskComposerExecutor(EXECUTOR_PLUGIN_NAME)
+            return self._executor
 
     def plan(
         self,
@@ -411,19 +430,31 @@ class TaskComposer:
 
         Args:
             robot: Robot instance
-            program: Motion program or CompositeInstruction
+            program: Motion program or CompositeInstruction; never modified
             pipeline: Pipeline name (e.g., "TrajOptPipeline", "OMPLPipeline")
-            profiles: Custom profiles (uses defaults if None)
-            auto_seed: Seed Cartesian waypoints with current robot state (default: True).
-                       Set to False if you've already provided waypoint seeds.
+            profiles: Custom profiles; None uses the defaults of `pipeline`
+            auto_seed: Seed Cartesian waypoints with current robot state (default: True), on
+                a copy of the program. Set to False if you've already provided waypoint seeds.
 
         Returns:
-            PlanningResult with trajectory if successful
+            PlanningResult: with a trajectory if the planner succeeded, with `successful=False`
+            and the failing node's message if it ran and found no solution.
 
         Raises:
+            UnknownPipelineError: `pipeline` is not a configured task node of the factory.
+            NoDefaultProfilesError: `profiles` is None and `pipeline` has no default profiles.
+            PipelineLayoutError: `pipeline` lacks the `program` output or an input port.
             ProfileTypeMismatchError: a Descartes node of `pipeline` reads a scalar type that
                 `profiles` holds only as the other type under some profile name.
+            EmptyProgramError: `program` is a `MotionProgram` with no targets.
+            TaskComposerPluginError: a plugin of `pipeline` fails to load.
         """
+        plugins = self.factory.getTaskComposerNodePlugins()
+        if pipeline not in plugins:
+            raise UnknownPipelineError(
+                f"Unknown pipeline '{pipeline}'; configured: {', '.join(sorted(plugins))}"
+            )
+
         # Convert MotionProgram to CompositeInstruction if needed
         if isinstance(program, CompositeInstruction):
             composite = program
@@ -432,59 +463,21 @@ class TaskComposer:
             composite = program.to_composite_instruction(joint_names)
 
         if auto_seed:
+            # assignCurrentStateAsSeed writes into the composite: seed a copy
+            composite = copy.deepcopy(composite)
             assignCurrentStateAsSeed(composite, robot.env)
 
-        # Setup profiles - create pipeline-specific defaults if not provided
-        # Each pipeline may use multiple planners (e.g., OMPL + TrajOpt)
-        # IMPORTANT: Check IFOPT-specific pipelines before generic TrajOpt/Freespace
-        # to avoid "TrajOpt" in "TrajOptIfoptPipeline" matching the wrong branch
         if profiles is None:
-            if "TrajOptIfopt" in pipeline:
-                from .profiles import create_trajopt_ifopt_default_profiles
+            profiles = default_profiles_for(pipeline)
 
-                profiles = create_trajopt_ifopt_default_profiles()
-            elif "FreespaceIfopt" in pipeline:
-                from .profiles import create_freespace_ifopt_pipeline_profiles
-
-                profiles = create_freespace_ifopt_pipeline_profiles()
-            elif "Freespace" in pipeline:
-                from .profiles import create_freespace_pipeline_profiles
-
-                profiles = create_freespace_pipeline_profiles()
-            elif "Cartesian" in pipeline:
-                from .profiles import create_cartesian_pipeline_profiles
-
-                profiles = create_cartesian_pipeline_profiles()
-            elif "TrajOpt" in pipeline:
-                from .profiles import create_trajopt_default_profiles
-
-                profiles = create_trajopt_default_profiles()
-            elif "OMPL" in pipeline:
-                from .profiles import create_ompl_default_profiles
-
-                profiles = create_ompl_default_profiles()
-            elif "Descartes" in pipeline:
-                from .profiles import create_descartes_default_profiles
-
-                profiles = create_descartes_default_profiles()
-            else:
-                profiles = ProfileDictionary()
-
-        # Create task
-        try:
-            task = self.factory.createTaskComposerNode(pipeline)
-        except TaskComposerPluginError as e:
-            return PlanningResult(successful=False, message=str(e))
+        task = self.factory.createTaskComposerNode(pipeline)
 
         # A Descartes node never finds a profile of the other scalar type: refuse before planning.
         check_descartes_profile_types(self.factory, pipeline, task, profiles)
 
         output_ports = task.getOutputPortMappings()
         if not output_ports.contains("program"):
-            return PlanningResult(
-                successful=False,
-                message=f"Pipeline '{pipeline}' has no 'program' output key",
-            )
+            raise PipelineLayoutError(f"Pipeline '{pipeline}' has no 'program' output key")
         output_key = output_ports.single("program")
         # Different pipelines use different input keys
         input_ports = task.getInputPortMappings()
@@ -493,9 +486,8 @@ class TaskComposer:
         elif input_ports.contains("program"):
             input_key = input_ports.single("program")
         else:
-            return PlanningResult(
-                successful=False,
-                message=f"Pipeline '{pipeline}' has unknown input key configuration",
+            raise PipelineLayoutError(
+                f"Pipeline '{pipeline}' has neither a 'planning_input' nor a 'program' input key"
             )
 
         # Wrap data for task composer
@@ -508,7 +500,6 @@ class TaskComposer:
         task_data.setData("environment", environment_anypoly)
         task_data.setData("profiles", profiles_anypoly)
 
-        # Execute
         future = None
         try:
             future = self.executor.run(task, task_data)
@@ -545,13 +536,6 @@ class TaskComposer:
                 data_storage=future.context.data_storage,
             )
 
-        except (TypeError, RuntimeError, ValueError, AttributeError, KeyError) as e:
-            logger.debug(f"Planning failed with {type(e).__name__}: {e}")
-            return PlanningResult(
-                successful=False,
-                message=f"{type(e).__name__}: {e}",
-            )
-
         finally:
             # Cleanup to prevent memory issues
             del task_data
@@ -565,105 +549,111 @@ class TaskComposer:
         self,
         robot: Robot,
         program: MotionProgram | CompositeInstruction,
+        pipeline: str | None = None,
         profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
-        Plan freespace motion using TrajOpt pipeline.
+        Plan freespace motion.
 
-        Convenience method that uses TrajOptPipeline for optimization-based
-        collision-free motion planning. For sampling-based planning, use plan_ompl().
+        Uses TrajOpt for collision-free point-to-point motion.
 
         Args:
             robot: Robot instance
-            program: Motion program
+            program: Motion program or CompositeInstruction
+            pipeline: Pipeline name (default: `DEFAULT_FREESPACE_PIPELINE`, "TrajOptPipeline")
             profiles: Custom profiles
 
         Returns:
             PlanningResult
         """
-        return self.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
+        return self.plan(
+            robot, program, pipeline=pipeline or DEFAULT_FREESPACE_PIPELINE, profiles=profiles
+        )
 
     def plan_ompl(
         self,
         robot: Robot,
         program: MotionProgram | CompositeInstruction,
+        pipeline: str | None = None,
         profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
-        Plan freespace motion using OMPL pipeline.
+        Plan freespace motion with OMPL sampling-based planners.
 
-        Uses sampling-based planners (RRT, RRT*, PRM, etc.) for collision-free
-        motion planning. Good for complex environments where optimization-based
-        planners may get stuck in local minima.
+        Uses OMPL (RRT, RRT*, PRM, etc.) for collision-free motion planning. Good for complex
+        environments where optimization-based planners may get stuck in local minima.
+
+        The default pipeline is `FreespacePipeline`: OMPL finds the path, TrajOpt smooths it, and
+        time parameterization follows. A raw OMPL path with no smoothing step comes from
+        `pipeline="OMPLPipeline"`. The module-level `plan_ompl` shares this default.
 
         Args:
             robot: Robot instance
-            program: Motion program
+            program: Motion program or CompositeInstruction
+            pipeline: Pipeline name (default: `DEFAULT_OMPL_PIPELINE`, "FreespacePipeline")
             profiles: Custom profiles (use to configure specific OMPL planner)
 
         Returns:
             PlanningResult
         """
-        return self.plan(robot, program, pipeline="OMPLPipeline", profiles=profiles)
+        return self.plan(
+            robot, program, pipeline=pipeline or DEFAULT_OMPL_PIPELINE, profiles=profiles
+        )
 
     def plan_cartesian(
         self,
         robot: Robot,
         program: MotionProgram | CompositeInstruction,
+        pipeline: str | None = None,
         profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
-        Plan Cartesian motion using Descartes pipeline.
+        Plan Cartesian motion.
 
-        For motions requiring precise Cartesian paths.
+        Uses Descartes for precise Cartesian path following.
 
         Args:
             robot: Robot instance
-            program: Motion program
+            program: Motion program or CompositeInstruction
+            pipeline: Pipeline name (default: `DEFAULT_CARTESIAN_PIPELINE`, "DescartesDPipeline",
+                the double-precision Descartes pipeline; "DescartesFPipeline" is the float
+                one, and their "NPC" variants skip the post-plan contact check)
             profiles: Custom profiles
 
         Returns:
             PlanningResult
         """
-        return self.plan(robot, program, pipeline="DescartesDPipeline", profiles=profiles)
+        return self.plan(
+            robot, program, pipeline=pipeline or DEFAULT_CARTESIAN_PIPELINE, profiles=profiles
+        )
 
     def _extract_trajectory(self, composite: CompositeInstruction) -> list[TrajectoryPoint]:
-        """Extract trajectory points from CompositeInstruction."""
+        """Extract trajectory points from CompositeInstruction.
+
+        Velocity and acceleration are set only where the planner (or a time parameterization
+        task) wrote them: OMPL and TrajOpt output positions only; a pipeline that ends in time
+        parameterization (FreespacePipeline, the Descartes pipelines) fills all three. A
+        waypoint without velocities is not time-parameterized, so its `time` is None.
+        """
         trajectory = []
 
         for instr in composite:
             if not instr.isMoveInstruction():
                 continue
 
-            move_instr = instr.asMoveInstruction()
-            wp = move_instr.getWaypoint()
+            wp = instr.asMoveInstruction().getWaypoint()
 
             if not wp.isStateWaypoint():
                 continue
 
             state_wp = wp.asStateWaypoint()
-
-            # Extract optional velocity/acceleration/time if available
-            #
-            # WHY THESE MAY BE MISSING:
-            # - OMPL planners output only positions (no velocity/acceleration)
-            # - Time parameterization adds velocity/acceleration/time
-            # - TrajOpt may or may not include dynamics depending on profile
-            # - Simple interpolation typically lacks dynamics data
-            #
-            # PIPELINE IMPLICATIONS:
-            # - If you need velocities: ensure pipeline includes time parameterization
-            # - FreespacePipeline: OMPL → interpolation → TOTG (adds vel/acc/time)
-            # - TrajOptPipeline: may include velocity costs but not always populated
-            #
-            # To enable velocity/acceleration output, use a pipeline with
-            # TimeOptimalTrajectoryGeneration (TOTG) or IterativeSplineParameterization
+            velocities = _optional_array(state_wp.getVelocity())
             point = TrajectoryPoint(
                 joint_names=[jid.name() for jid in state_wp.getJointIds()],
                 positions=np.array(state_wp.getPosition()),
-                velocities=_extract_array_field(state_wp.getVelocity, "Velocity"),
-                accelerations=_extract_array_field(state_wp.getAcceleration, "Acceleration"),
-                time=_extract_time_field(state_wp.getTime, "Time"),
+                velocities=velocities,
+                accelerations=_optional_array(state_wp.getAcceleration()),
+                time=float(state_wp.getTime()) if velocities is not None else None,
             )
 
             trajectory.append(point)
@@ -676,11 +666,10 @@ class TaskComposer:
 
         Takes the configured node names from the factory
         (`TaskComposerPluginFactory.getTaskComposerNodePlugins`), so a config
-        that uses `!include` is read as the C++ factory expanded it, and a
-        composer built from a factory without `config_path` lists its
-        pipelines too. Each name is then created once to check that its C++
-        plugin loads; names that raise `TaskComposerPluginError` are logged
-        and left out.
+        that uses `!include` is read as the C++ factory expanded it. Each name is
+        then created once to check that its C++ plugin loads; names that raise
+        `TaskComposerPluginError` are logged and left out (listing is introspection,
+        so one broken plugin does not hide the rest; `warmup` raises instead).
 
         Returns:
             Sorted list of pipeline names that can be used with plan().

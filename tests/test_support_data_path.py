@@ -13,14 +13,13 @@ from tesseract_robotics import (
 )
 
 
-def test_without_the_extra_or_a_prefix_it_raises_by_name(monkeypatch):
+def test_without_the_extra_it_raises_by_name(monkeypatch):
     real_find_spec = importlib.util.find_spec
     monkeypatch.setattr(
         importlib.util,
         "find_spec",
         lambda name, *a: None if name == SUPPORT_PACKAGE else real_find_spec(name, *a),
     )
-    monkeypatch.delenv("TESSERACT_CPP_PREFIX", raising=False)
     with pytest.raises(SupportDataNotFoundError, match=r"\[support\]"):
         get_tesseract_resource_path()
 

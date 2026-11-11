@@ -5,18 +5,24 @@ Provides top-level functions for common planning operations that handle
 all the setup automatically.
 
 Example:
-    from tesseract_robotics.planning import Robot, MotionProgram, plan_freespace
+    ```python
+    from tesseract_robotics import get_tesseract_resource_path
+    from tesseract_robotics.common import GeneralResourceLocator
+    from tesseract_robotics.planning import JointTarget, MotionProgram, Robot, plan_freespace
 
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
     program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+        .set_joint_names(robot.get_joint_names("manipulator"))
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
-        .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
+        .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
     )
 
     result = plan_freespace(robot, program)
     if result.successful:
         print(f"Found {len(result)} waypoints")
+    ```
 """
 
 from __future__ import annotations
@@ -89,12 +95,7 @@ def plan_freespace(
     """
     if composer is None:
         composer = TaskComposer.from_config()
-    return composer.plan(
-        robot,
-        program,
-        pipeline=pipeline or "TrajOptPipeline",
-        profiles=profiles,
-    )
+    return composer.plan_freespace(robot, program, pipeline=pipeline, profiles=profiles)
 
 
 def plan_ompl(
@@ -113,7 +114,8 @@ def plan_ompl(
     get stuck in local minima.
 
     Note: default pipeline is FreespacePipeline (OMPL + TrajOpt smoothing +
-    time parameterization). For raw OMPL output, pass pipeline="OMPLPipeline".
+    time parameterization), the same as `TaskComposer.plan_ompl`. For raw OMPL output, pass
+    pipeline="OMPLPipeline".
 
     Args:
         robot: Robot instance
@@ -152,12 +154,7 @@ def plan_ompl(
     """
     if composer is None:
         composer = TaskComposer.from_config()
-    return composer.plan(
-        robot,
-        program,
-        pipeline=pipeline or "FreespacePipeline",
-        profiles=profiles,
-    )
+    return composer.plan_ompl(robot, program, pipeline=pipeline, profiles=profiles)
 
 
 def plan_cartesian(
@@ -211,12 +208,7 @@ def plan_cartesian(
     """
     if composer is None:
         composer = TaskComposer.from_config()
-    return composer.plan(
-        robot,
-        program,
-        pipeline=pipeline or "DescartesDPipeline",
-        profiles=profiles,
-    )
+    return composer.plan_cartesian(robot, program, pipeline=pipeline, profiles=profiles)
 
 
 def assign_current_state_as_seed(
