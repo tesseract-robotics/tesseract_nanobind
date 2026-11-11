@@ -13,6 +13,10 @@ Five facts, each one extractor's output on one parse:
   bodies parse (`BODY_PARSE_OPTIONS`);
 - `gil_releases`: `audit_gil.Scanner.scan` of the GIL audit's own bodies parse.
 
+Each fact is one TU's. A module with parts (`audit_ownership.MODULE_PARTS`) is several TUs, each
+cached on its own inputs; `merge_includes`, `merge_decls`, `merge_bound` and `merge_api` join
+their facts into the module's, and fail loudly where two TUs disagree about one thing.
+
 A fact's `FactKey.toolchain` (`audit_toolchain.Toolchain`, built by `fact_key`) holds whatever
 the parse reads besides the files it records: the parse arguments and options, the
 environment's package set (libclang, every header package, nanobind), the header-search
@@ -91,6 +95,11 @@ GIL_EXTRACTORS = (*COMMON_EXTRACTORS, "audit_gil.py", "gil_entry_points.py")
 
 class FactShapeError(CacheError):
     """A stored fact is valid JSON but not the shape its extractor writes."""
+
+
+class PartConflictError(ValueError):
+    """Two translation units of one module disagree about one name: a Python name bound to two
+    C++ classes, a class with two base lists, or one API symbol extracted from both."""
 
 
 @dataclass(frozen=True)
@@ -395,6 +404,78 @@ def gil_releases(
         module, scope, name, where = _strings(row)
         out[Release(module, scope, name)] = where
     return out
+
+
+def merge_includes(facts: Iterable[IncludeFacts]) -> IncludeFacts:
+    """The `IncludeFacts` of a module's TUs together: what any of them includes, in TU order."""
+    direct: dict[Path, None] = {}
+    inclusions: dict[tuple[str, Path], None] = {}
+    included: set[Path] = set()
+    for f in facts:
+        direct.update(dict.fromkeys(f.direct))
+        inclusions.update(dict.fromkeys(f.inclusions))
+        included |= f.included
+    return IncludeFacts(tuple(direct), tuple(inclusions), frozenset(included))
+
+
+def merge_decls(facts: Iterable[DeclFacts]) -> DeclFacts:
+    """The `DeclFacts` of a module's TUs together.
+
+    Raises:
+        PartConflictError: two TUs give one class different public bases.
+    """
+    names: set[str] = set()
+    ancestors: dict[str, frozenset[str]] = {}
+    bases: dict[str, tuple[str, ...]] = {}
+    for f in facts:
+        names |= f.names
+        for k, v in f.ancestors.items():
+            ancestors[k] = ancestors.get(k, frozenset()) | v
+        _join(bases, f.bases, "public bases")
+    return DeclFacts(frozenset(names), ancestors, bases)
+
+
+def merge_bound(facts: Iterable[BoundFacts]) -> BoundFacts:
+    """The `BoundFacts` of a module's TUs together: one extension, one class per Python name.
+
+    Raises:
+        PartConflictError: two TUs bind one Python name to different C++ classes.
+    """
+    classes: dict[str, str] = {}
+    exceptions: set[str] = set()
+    for f in facts:
+        _join(classes, f.classes, "bound class")
+        exceptions |= f.exceptions
+    return BoundFacts(classes, frozenset(exceptions))
+
+
+def merge_api(apis: Iterable[Mapping[str, CppSymbol]]) -> dict[str, CppSymbol]:
+    """The extracted API of a module's TUs together, in TU order. Each audited header is
+    extracted from one TU only, so a name two TUs both extract is a conflict even when equal:
+    its overloads would otherwise be split over two headers' symbols.
+
+    Raises:
+        PartConflictError: a symbol name extracted from two TUs.
+    """
+    out: dict[str, CppSymbol] = {}
+    for api in apis:
+        if twice := sorted(api.keys() & out.keys()):
+            raise PartConflictError(
+                f"API symbols extracted from two translation units of one module: {twice}; "
+                "include their headers from one TU"
+            )
+        out.update(api)
+    return out
+
+
+def _join[V](into: dict[str, V], more: Mapping[str, V], what: str) -> None:
+    """`into |= more`, refusing a key `more` maps to another value."""
+    for k, v in more.items():
+        if k in into and into[k] != v:
+            raise PartConflictError(
+                f"{what} {k!r}: {into[k]!r} in one translation unit, {v!r} in another"
+            )
+        into[k] = v
 
 
 def _object(value: Json) -> dict[str, Json]:

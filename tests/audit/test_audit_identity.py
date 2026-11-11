@@ -18,7 +18,7 @@ HERE = "tests/audit/fixtures/renamed/widget.h"
 
 
 def test_qualified_path_names_namespaces():
-    tu = audit.parse_tu(audit.binding_source("trajopt_ifopt"))
+    tu = audit.parse_tu(audit.primary_source("trajopt_ifopt"))
     var = next(
         c for c in tu.cursor.walk_preorder()
         if c.kind == audit.ci.CursorKind.CLASS_DECL and c.spelling == "Var" and c.is_definition()
@@ -51,7 +51,7 @@ def test_bound_classes_rejects_a_tu_without_function_bodies():
 
 
 def test_bound_classes_reads_each_nb_class():
-    tu = audit.parse_tu(audit.binding_source("time_parameterization"), bodies=True)
+    tu = audit.parse_tu(audit.primary_source("time_parameterization"), bodies=True)
     bound = audit.bound_classes(tu)
     assert bound["TimeOptimalTrajectoryGenerationCompositeProfile"] == (
         "tesseract::time_parameterization::TimeOptimalTrajectoryGenerationCompositeProfile"
@@ -62,13 +62,33 @@ def test_bound_classes_reads_each_nb_class():
 
 
 def test_bound_classes_resolves_namespace_aliases():
-    tu = audit.parse_tu(audit.binding_source("trajopt_ifopt"), bodies=True)
+    tu = audit.parse_tu(audit.primary_source("trajopt_ifopt"), bodies=True)
     assert audit.bound_classes(tu)["Var"] == "trajopt_ifopt::Var"  # bound as nb::class_<ti::Var>
 
 
 def test_bound_index_knows_binding_modules_only():
     assert audit.bound_index("trajopt_ifopt")["Var"] == "trajopt_ifopt::Var"
     assert audit.bound_index("snapshot_owner") == {}  # a fixture stub, no binding source
+
+
+@pytest.mark.parametrize(
+    ("module", "name", "qualified"),
+    [
+        # trajopt_ifopt_collision.cpp, a part of trajopt_ifopt (audit_ownership.MODULE_PARTS)
+        ("trajopt_ifopt", "TrajOptCollisionConfig", "trajopt_common::TrajOptCollisionConfig"),
+        # environment_commands.cpp, a part of environment
+        ("environment", "AddLinkCommand", "tesseract::environment::AddLinkCommand"),
+        # task_composer_plugin_factory.cpp, a part of task_composer
+        (
+            "task_composer",
+            "TaskComposerPluginFactory",
+            "tesseract::task_composer::TaskComposerPluginFactory",
+        ),
+    ],
+)
+def test_bound_index_holds_the_classes_a_part_binds(module, name, qualified):
+    """A module is all its TUs: a class bound in a part is the module's (`binding_sources`)."""
+    assert audit.bound_index(module)[name] == qualified
 
 
 def test_cpp_api_sets_qualified_on_classes_and_enums():
@@ -84,7 +104,7 @@ def test_cpp_api_sets_qualified_on_classes_and_enums():
 
 def test_cpp_api_is_the_same_on_a_tu_with_function_bodies():
     """One TU may feed both `cpp_api` and `bound_classes`: bodies add no API symbol."""
-    cpp = audit.binding_source("time_parameterization")
+    cpp = audit.primary_source("time_parameterization")
     plain, bodies = audit.parse_tu(cpp), audit.parse_tu(cpp, bodies=True)
 
     def owned(tu):

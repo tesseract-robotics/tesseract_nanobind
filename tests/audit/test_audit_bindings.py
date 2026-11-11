@@ -179,8 +179,10 @@ PLANNING = (
 
 @pytest.mark.parametrize("module", PLANNING)
 def test_planning_binding_tu_parses_clean(module):
-    """#256: the binding build's include dirs (OMPL, OSQP) and defines reach the audit parse."""
-    audit.parse_tu(audit.binding_source(module))
+    """#256: the binding build's include dirs (OMPL, OSQP) and defines reach the audit parse,
+    of every TU of the module (its primary and parts)."""
+    for source in audit.binding_sources(module):
+        audit.parse_tu(source)
 
 
 def test_ompl_include_is_versioned_or_plain(tmp_path):
@@ -518,7 +520,7 @@ def fixture_report():
         FIXTURES / "package_init.py",
         FIXTURE_PREFIX,
         (FIXTURE_INCLUDE,),
-        other_bindings=(FIXTURES / "other_bindings.cpp",),
+        other_bindings={"other": (FIXTURES / "other_bindings.cpp",)},
         stub_roots=(FIXTURES,),
         prefixes=NESTED,
     )
@@ -603,6 +605,28 @@ def test_header_owned_by_another_binding_is_listed_as_delegated(fixture_report):
     assert fixture_report.delegated == {"tesseract/fixture/shared.h": "other"}
 
 
+def test_a_header_a_part_includes_is_the_modules():
+    """A module is its primary and its parts: shared.h, #included by the part only, is the
+    `fixture` module's own header, audited from the part's TU (the unbound `Shared` is a gap),
+    not delegated to `other`."""
+    report = audit.audit_tu(
+        "fixture",
+        FIXTURES / "fixture_bindings.cpp",
+        FIXTURE_STUB,
+        FIXTURES / "package_init.py",
+        FIXTURE_PREFIX,
+        (FIXTURE_INCLUDE,),
+        other_bindings={"other": (FIXTURES / "other_bindings.cpp",)},
+        stub_roots=(FIXTURES,),
+        prefixes=NESTED,
+        parts=(FIXTURES / "fixture_part_bindings.cpp",),
+    )
+    assert report.delegated == {}
+    shared = [g for g in report.gaps if g.symbol == "Shared"]
+    assert [g.kind for g in shared] == [audit.Kind.CLASS]
+    assert "tesseract/fixture/shared.h:" in shared[0].location
+
+
 def test_including_binding_audits_a_foreign_header_its_owner_does_not_include():
     """Phase C: other_bindings.cpp #includes shared.h, which fixture_bindings.cpp (its prefix
     owner) does not, so the `other` module audits it: the unbound `Shared` is a gap there."""
@@ -613,7 +637,7 @@ def test_including_binding_audits_a_foreign_header_its_owner_does_not_include():
         FIXTURES / "package_init.py",
         ("tesseract/other/",),
         (FIXTURE_INCLUDE,),
-        other_bindings=(FIXTURES / "fixture_bindings.cpp",),
+        other_bindings={"fixture": (FIXTURES / "fixture_bindings.cpp",)},
         stub_roots=(FIXTURES,),
         prefixes={"fixture": FIXTURE_PREFIX, "other": ("tesseract/other/",)},
     )
@@ -822,7 +846,6 @@ def test_quaternion_scalar_last_accepted(real_reports):
     [
         ("collision", "ContactResultMap.__len__", "container-protocol"),
         ("collision", "ContactResultVector.__len__", "container-protocol"),
-        ("common", "VectorVector3d.__setitem__", "container-protocol"),
         ("common", "Isometry3d.__repr__", "presentation-dunder"),
         ("common", "SimpleLocatedResource.__init__", "serialization-default-ctor"),
         ("environment", "AddLinkCommand.__init__", "serialization-default-ctor"),
@@ -1054,6 +1077,6 @@ def test_call_operator_is_neither_gap_nor_deviation(fixture_report):
 
 def test_common_audits_directly_included_acm():
     """C1: allowed_collision_matrix.h reaches the TU via utils.h before its own #include."""
-    tu = audit.parse_tu(audit.binding_source("common"))
+    tu = audit.parse_tu(audit.primary_source("common"))
     headers = audit.audited_headers(tu, "common", audit.owner_prefixes(), audit.INCLUDE_DIRS)
     assert "allowed_collision_matrix.h" in {h.name for h in headers}

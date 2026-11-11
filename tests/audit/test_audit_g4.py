@@ -12,7 +12,7 @@ TCP = "task_composer_planning"
 KIN = "kinematics"
 COLLISION = "collision"
 PLUGIN_AUTHOR = "plugin-author-factory-interface"
-# C20 (Jelle 2026-10-16: apply to core): the core won't-fix factory interfaces.
+# C20 (applied to core): the core won't-fix factory interfaces.
 CORE_FACTORY_INTERFACES = (
     (KIN, "FwdKinFactory"),
     (KIN, "InvKinFactory"),

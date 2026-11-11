@@ -24,8 +24,8 @@ flowchart LR
     ledger --> verify
 ```
 
-1. **Coverage** (`audit_ownership.check_coverage`): every `src/bindings/<m>.cpp` (except the helper sources linked into a module) is in exactly one module table. Each header is assigned its owning module.
-2. **Parse** (`audit_parse.parse_tu`, `cpp_api`): libclang parses the binding TU, plus one synthetic TU per owned header that the binding does not include, and builds the C++ API. Each symbol is keyed by its dotted name and carries its overloads, its arity, its qualified class and any structural `absent_ok` rule.
+1. **Coverage** (`audit_ownership.check_coverage`): every binding module is in exactly one module table. Each header is assigned its owning module. A module is one or more translation units ([Modules of several TUs](#modules-of-several-tus)).
+2. **Parse** (`audit_parse.parse_tu`, `cpp_api`): libclang parses each of the module's binding TUs, plus one synthetic TU per owned header that the binding does not include, and builds the C++ API. Each symbol is keyed by its dotted name and carries its overloads, its arity, its qualified class and any structural `absent_ok` rule.
 3. **Stub** (`audit_stub.py_api`): reads the committed `.pyi`, including `@overload`s, `@staticmethod`s and base classes. A module that is itself the compiled extension has its stub at `src/tesseract_robotics/<m>.pyi`; a wrapped package (`common`, `scene_graph`, `motion_planners`, `motion_planners_simple`, `motion_planners_descartes`, `motion_planners_trajopt_ifopt`) keeps `<m>/_<m>.pyi` beside its `__init__.py`, which the audit also reads.
 4. **Match** (`audit_match.match`): compares the two APIs symbol by symbol and overload by overload. Each difference becomes a covered row, an accepted row (with its rule), a gap or a deviation.
 5. **Report** (`audit_report.render_markdown`, `to_json`): writes `docs/developer/binding-api-audit.md` with provenance, coverage and per-module tables. Each open row gets an `issue` column read from the ledger.
@@ -98,7 +98,7 @@ The audit's cost is libclang: two parses of each binding (one with function bodi
 
 | fact | parse | replaces |
 |---|---|---|
-| `include_facts` | declarations (`PARSE_OPTIONS`), binding TU and synthetic TU | the inclusion directives and `get_includes()` that header ownership and the `api` key read |
+| `include_facts` | declarations (`PARSE_OPTIONS`), each binding TU and synthetic TU | the inclusion directives and `get_includes()` that header ownership and the `api` key read |
 | `api_facts` | the same parse, per `Selection` | the `cpp_api` walk, minus the rule that reads other modules |
 | `bound_facts` | bodies (`BODY_PARSE_OPTIONS`) | `bound_classes` + `bound_exceptions`; every module's `bound_index` |
 | `decl_facts` | declarations (`PARSE_OPTIONS`) | the three whole-TU walks `decl_names`, `class_ancestors`, `public_bases` |
@@ -253,7 +253,7 @@ The scripts import in one direction, top to bottom. Each file has one job.
 | `scripts/audit_ownership.py` | module tables, header ownership (longest prefix), not-API and third-party header patterns, coverage errors |
 | `scripts/audit_parse.py` | libclang TUs → `CppSymbol`/`CppOverload`; structural `absent_ok` predicates; `bound_classes` from `nb::class_`/`nb::enum_` |
 | `scripts/audit_symbols.py` | the C++ API as plain data (`CppSymbol`, `CppOverload`, `Dependency`), its JSON form and `resolve_bound`; needs no libclang |
-| `scripts/audit_bound.py` | what a binding TU binds: `bound_classes` reads the `nb::class_`/`nb::enum_` constructions in the `NB_MODULE` body (Python name → qualified C++ class); `audit_match` builds its per-module `bound_index` from it |
+| `scripts/audit_bound.py` | what a binding TU binds: `bound_classes` reads the `nb::class_`/`nb::enum_` constructions in the TU's main file (Python name → qualified C++ class); `audit_match` builds its per-module `bound_index` from it |
 | `scripts/audit_telemetry.py` | event log of fetches and timed phases (`BINDING_AUDIT_EVENTS`), and its totals; imports no audit script |
 | `scripts/audit_toolchain.py` | `Toolchain` and `Selection`, the typed parts of a fact's key; the include-dir listing and `require_listed` |
 | `scripts/audit_cache.py` | content-addressed fact cache: entries keyed on every file a parse read, per-entry lock, prune (`audit-cache-prune`) |
@@ -280,6 +280,19 @@ A module's audited API is every header it owns:
 - `PLUGIN_ANCHOR_INCLUDES` lists headers a binding `#include`s only to call the plugin anchor they declare (`PLUGIN_ANCHOR_DECL`), which puts the plugin library linked into the module on the plugin search path. They are skipped although the binding includes them directly, and printed with their reason. `audit_anchor.check_anchor_headers` checks each one at class granularity: a function must have the anchor signature `const void* f()`, and a class must derive only from plugin factory interfaces (the `plugin-author-factory-interface` classes); a class's members are not inspected. Any other declaration fails the run, so the list cannot hide a new function or class. Entries are exact include spellings, never patterns. The content check runs for the owning module's binding include; a listed header reached only through another module's include path is skipped without the content check.
 
 Every other declaration in the TU is used only to resolve Python names.
+
+## Modules of several TUs
+
+An extension module is an ordered set of translation units in `src/bindings/`: its primary `<m>.cpp`, the one TU with `NB_MODULE`, then the parts `audit_ownership.MODULE_PARTS` lists in registration order (`common` → `common_eigen`, `common_logging`). Each part is compiled on its own and linked into the module's target (`target_sources` in `CMakeLists.txt`). `binding_sources(m)` returns them, primary first; every consumer reads all of them:
+
+- header ownership: a header any TU of the module `#include`s directly is the module's own, and the other modules' sources count the same way for delegation and foreign headers;
+- the API: each audited header is extracted from the first TU that includes it, so the primary keeps the selection, and the cache key, it would have on its own;
+- class identity: `bound_index(m)` holds the classes every TU binds;
+- the GIL list: `audit_gil` scans each TU and lists its releases under the module, so `scripts/nogil_entry_points.yaml` is keyed by module, never by file.
+
+`module_sources` classifies every `.cpp` in `src/bindings/` as exactly one of a primary (it holds `NB_MODULE` naming its own file), a declared part, or a `NON_MODULE_SOURCES` helper that binds nothing (no `nb::`). Anything else fails before the audit starts: a forgotten part would otherwise drop every class it binds from the audit without a trace. `tests/audit/test_audit_parts.py` also pins `MODULE_PARTS` and the helpers to `CMakeLists.txt`'s `target_sources`.
+
+Two TUs of one module that disagree raise `PartConflictError`: one Python name bound to two classes, a class with two base lists, or one API symbol extracted from both (a free function overloaded across headers that two TUs include first). The fix is to include those headers from one TU.
 
 ## Ownership
 
@@ -481,6 +494,14 @@ A rule exists only when a real row needs it. Leaving the row as a gap or deviati
 | `PrefixMismatchError` | `audit_tu` gets a prefix that disagrees with the module's entry | `audit_tu` |
 | `AnchorHeaderApiError` | a `PLUGIN_ANCHOR_INCLUDES` header declares more than its anchor and plugin factories | `check_anchor_headers`, from `audit_tu` |
 | `StaleAnchorIncludeError` | a `PLUGIN_ANCHOR_INCLUDES` header that its owning module's binding does not `#include` | `check_anchor_includes_current`, from `audit_tu` |
+| `StrayBindingSourceError` | a `.cpp` in `src/bindings/` without `NB_MODULE` that is neither a declared part nor a helper | `module_sources`, first use of `binding_modules` |
+| `MissingBindingSourceError` | a declared part or helper has no file | `module_sources` |
+| `ModuleEntryMismatchError` | a primary's `NB_MODULE` is not exactly one, named after its file | `module_sources` |
+| `DeclaredPrimaryError` | a declared part or helper holds an `NB_MODULE` | `module_sources` |
+| `UnknownPartOwnerError` | a `MODULE_PARTS` key is no module primary | `module_sources` |
+| `DuplicateSourceError` | a source declared twice | `module_sources` |
+| `BindingHelperError` | a `NON_MODULE_SOURCES` helper uses nanobind | `module_sources` |
+| `PartConflictError` | two TUs of one module disagree about a bound class, a class's bases or an API symbol | `audit_facts.merge_*`, from `audit_tu` and `bound_index` |
 | `HeaderParseError` | a binding TU does not compile, or unincluded headers conflict | `parse_tu`, `unincluded_header_gaps` |
 | `SkippedBodiesError` | `bound_classes` gets a TU parsed without function bodies | `audit_bound.bound_classes` |
 | `IncludeDirError` | `include/ompl-<version>` is missing or ambiguous | import of `audit_parse` |

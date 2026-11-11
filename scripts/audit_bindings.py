@@ -1,8 +1,8 @@
 """Audit each binding's C++ API against its committed Python stub.
 
-For each extension module, libclang parses `src/bindings/<module>.cpp`
-(exactly the headers and macros the binding sees) and `ast` parses the
-committed stub (`<module>.pyi`, or `<module>/_<module>.pyi` for a wrapped module) and the
+For each extension module, libclang parses its binding TUs, `src/bindings/<module>.cpp` and
+the parts in `audit_ownership.MODULE_PARTS` (exactly the headers and macros the binding sees),
+and `ast` parses the committed stub (`<module>.pyi`, or `<module>/_<module>.pyi` for a wrapped module) and the
 package `__init__.py` if there is one. Every header under the
 module's prefix is audited: one the binding never includes is parsed in a
 synthetic TU (the binding plus that header) and reported as one `header` row.

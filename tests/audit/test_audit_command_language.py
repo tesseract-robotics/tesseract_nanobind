@@ -130,7 +130,7 @@ def test_rekeyed_core_patterns_hide_the_same_headers(module):
     prefixes' patterns (G2-G4) were never in the old table and are not compared."""
     prefixes = own.AUDITED_HEADER_PREFIX[module]
     core_prefixes = {p for m in CORE_MODULES for p in own.AUDITED_HEADER_PREFIX[m]}
-    direct = audit.direct_include_spellings([own.binding_source(module)])
+    direct = audit.direct_include_spellings(own.binding_sources(module))
     for spelling in audit.prefix_headers(module, own.owner_prefixes(), audit.INCLUDE_DIRS).values():
         if spelling in direct:
             continue

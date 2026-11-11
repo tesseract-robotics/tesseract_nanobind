@@ -1,8 +1,8 @@
 """Real-row contract tests of the audited motion-planner modules (#256 group 3).
 
-Each test pins one triage outcome of `docs/superpowers/state/phaseF-triage-{mp-base,mp-plan,
-sqp,tp}.md` against the module's report. Variants applied (Jelle 2026-10-16): C6 = 6a
-(`from_yaml`), C8 = 7a (bind the hooks), C3 = 8a (trampolines), C25 = not API.
+Each test pins one triage outcome for the motion-planner base, planner, SQP and task-composer
+planning modules against the module's report. Variants applied: C6 = 6a (`from_yaml`),
+C8 = 7a (bind the hooks), C3 = 8a (trampolines), C25 = not API.
 
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
@@ -366,7 +366,7 @@ def test_real_g3_symbol_rules(g3_reports, module, symbol, rule):
 
 def test_type_erased_data_premise():
     """The rule's premise: both fields are `std::shared_ptr<void>` in C++."""
-    tu = audit.parse_tu(own.binding_source(MP))
+    tu = audit.parse_tu(own.primary_source(MP))
     fields = {
         c.semantic_parent.spelling: c.type.spelling  # declared spelling; libc++'s canonical one is std::__1::…
         for c in tu.cursor.walk_preorder()
@@ -520,7 +520,7 @@ def test_prefixed_descartes_names_accepted(descartes_report, python):
 def test_bound_classes_resolve_descartes_instances_to_cpp_api_names():
     """0b's index must name the same qualified class `cpp_api` records for the template."""
     bound = audit.bound_index(DESCARTES)  # cached; parsed with function bodies
-    tu = audit.parse_tu(own.binding_source(DESCARTES))
+    tu = audit.parse_tu(own.primary_source(DESCARTES))
     prefixes = own.owner_prefixes()
     cpp = audit.cpp_api(tu, audit.audited_headers(tu, DESCARTES, prefixes, audit.INCLUDE_DIRS))
     for cpp_name, python in DESCARTES_RENAMES:

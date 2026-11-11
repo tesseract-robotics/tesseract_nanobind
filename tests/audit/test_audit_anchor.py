@@ -88,7 +88,7 @@ def test_every_entry_is_an_audited_modules_header_its_binding_includes():
         owner = audit.header_owner(spelling, prefixes)
         assert owner in audit.AUDITED_HEADER_PREFIX, spelling
         assert reason
-        includes = audit.direct_include_spellings([audit.binding_source(owner)])
+        includes = audit.direct_include_spellings(audit.binding_sources(owner))
         assert spelling in includes, (owner, spelling)
 
 

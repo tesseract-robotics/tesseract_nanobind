@@ -140,3 +140,57 @@ NB_MODULE(_unresolved, m) {}
     cpp.write_text(source)
     with pytest.raises(gil.UnresolvedScopeError, match="solve"):
         gil.Scanner(gil.parse(cpp, _args()), "fixture").scan()
+
+
+PART = FIXTURE.with_name("gil_part_bindings.cpp")
+
+
+def _scan_uncached(cpp, args, scan, parse):
+    return scan(parse(cpp, args))
+
+
+def test_a_release_in_a_part_is_the_modules(fixture_releases):
+    """A module is its primary and its parts (`audit_ownership.binding_sources`): a part's
+    releases are listed under the module, beside the primary's."""
+    found = gil.module_releases("fixture", (FIXTURE, PART), _args(), _scan_uncached)
+    assert {R("Sink", "flush"), R("module", "drain")} <= set(found)
+    assert set(fixture_releases) <= set(found)
+    assert found[R("Sink", "flush")].startswith(PART.name)
+
+
+@pytest.fixture(scope="module")
+def part_releases():
+    return gil.Scanner(gil.parse(PART, _args()), "fixture").scan()
+
+
+def test_a_released_init_is_named_init(part_releases):
+    assert R("Sink", "__init__") in part_releases
+
+
+def test_a_template_receiver_is_named_at_each_call_site(part_releases):
+    """bind_info(cls) / bind_boxes(c): one release per Python class a call site passes, as a
+    parameter or as a member of one, through a chain of `.def` calls."""
+    assert {R("InfoA", "probe"), R("InfoB", "probe"), R("BoxD", "fill"), R("BoxF", "fill")} <= set(
+        part_releases
+    )
+    assert not {r for r in part_releases if r.scope.startswith(("type-parameter", "fixture_part"))}
+
+
+def test_a_template_receivers_unreleased_def_is_not_reported(part_releases):
+    assert R("BoxD", "__init__") not in part_releases
+
+
+def test_the_cli_scans_every_part_of_a_module(monkeypatch):
+    """`main` scans each TU of `binding_sources`, not only the primary."""
+    scanned = []
+
+    def fetch(cpp, args, scan, parse):
+        scanned.append(cpp)
+        return {}
+
+    facts = load("audit_facts")
+    monkeypatch.setattr(facts, "gil_releases", fetch)
+    monkeypatch.setattr(gil, "load_entry_points", lambda path: {})
+    assert gil.main(["common"]) == 0
+    assert scanned == list(_own.binding_sources("common"))
+    assert len(scanned) > 1

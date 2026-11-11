@@ -3,24 +3,41 @@
 from __future__ import annotations
 
 import fnmatch
+import functools
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC = REPO_ROOT / "src"
 STUB_ROOT = SRC / "tesseract_robotics"
 
-# One extension module per binding TU: src/bindings/<module>.cpp, except the helper sources in
-# NON_MODULE_SOURCES. tests/scripts/test_generate_stubs.py pins this set ==
+# An extension module is an ordered set of translation units in src/bindings/: its primary
+# `<module>.cpp`, the one TU with `NB_MODULE`, then the parts in MODULE_PARTS, each a TU of its own
+# that binds one concern and is linked into the module (CMakeLists.txt `target_sources`). The
+# audit reads every TU of a module as that module's binding (`binding_sources`). Every `.cpp`
+# there is exactly one of a primary, a declared part or a NON_MODULE_SOURCES helper
+# (`module_sources`). tests/scripts/test_generate_stubs.py pins the primaries ==
 # generate_stubs.discover_modules().
 BINDINGS_DIR = SRC / "bindings"
 BINDING_GLOB = "*.cpp"
-# Sources in src/bindings/ that are linked into a module, not a module of their own.
+# `NB_MODULE(_common, m)` at the start of a line (a comment that mentions the macro is no entry).
+MODULE_ENTRY = re.compile(r"^NB_MODULE\(\s*(\w+)\s*,", re.MULTILINE)
+# Module -> its parts in registration order (the order NB_MODULE calls their `bind_*`).
+MODULE_PARTS: dict[str, tuple[str, ...]] = {
+    "common": ("common_eigen", "common_logging"),
+    "environment": ("environment_commands",),
+    "task_composer": ("task_composer_plugin_factory", "task_composer_anypoly"),
+    "trajopt_ifopt": ("trajopt_ifopt_collision",),
+}
+# Sources in src/bindings/ that are linked into a module but bind nothing (no `nb::`): no part.
 NON_MODULE_SOURCES = frozenset(
     {"serialization_planner_cereal_registration", "task_composer_plugin_pinning"}
 )
+# A source that uses nanobind binds something: it is a part, never a helper.
+NANOBIND_USE = re.compile(r"\bnb::|\bnanobind::")
 
 # Directly included headers under these prefixes (relative to an include dir) are a module's
 # audited API; every other declaration in the TU only resolves Python names. Explicit per
@@ -356,16 +373,167 @@ class UnknownPrefixError(LookupError):
     """An `UNAUDITED_HEADERS` key is neither `ANY_PREFIX` nor any module's header prefix."""
 
 
+class StrayBindingSourceError(LookupError):
+    """A source in src/bindings/ has no `NB_MODULE` and is neither a declared part
+    (`MODULE_PARTS`) nor a helper (`NON_MODULE_SOURCES`): the audit would read it as no
+    module's binding."""
+
+
+class MissingBindingSourceError(FileNotFoundError):
+    """A `MODULE_PARTS` or `NON_MODULE_SOURCES` entry has no source file."""
+
+
+class ModuleEntryMismatchError(ValueError):
+    """A primary's `NB_MODULE` names another module than its file, or appears more than once."""
+
+
+class DeclaredPrimaryError(ValueError):
+    """A declared part or helper holds an `NB_MODULE`: it is a module of its own."""
+
+
+class UnknownPartOwnerError(LookupError):
+    """A `MODULE_PARTS` key is no module primary."""
+
+
+class DuplicateSourceError(ValueError):
+    """A source is declared twice: as a part of two modules, twice in one, or as part and
+    helper."""
+
+
+class BindingHelperError(ValueError):
+    """A `NON_MODULE_SOURCES` helper uses nanobind: it binds, so it is a part the audit reads."""
+
+
+def module_sources(
+    directory: Path = BINDINGS_DIR,
+    parts: Mapping[str, tuple[str, ...]] = MODULE_PARTS,
+    helpers: frozenset[str] = NON_MODULE_SOURCES,
+) -> dict[str, tuple[Path, ...]]:
+    """Each extension module -> its translation units, primary first, then its parts in order.
+
+    Args:
+        directory: The binding sources (`BINDINGS_DIR`).
+        parts: Module -> its part stems (`MODULE_PARTS`).
+        helpers: Stems of the sources that bind nothing (`NON_MODULE_SOURCES`).
+
+    Raises:
+        DuplicateSourceError: a stem declared twice.
+        MissingBindingSourceError: a declared part or helper without a file.
+        DeclaredPrimaryError: a declared part or helper holds an `NB_MODULE`.
+        BindingHelperError: a helper uses nanobind.
+        ModuleEntryMismatchError: a primary's `NB_MODULE` is not exactly one, named after it.
+        StrayBindingSourceError: a source that is no primary, part or helper.
+        UnknownPartOwnerError: a `parts` key that is no primary.
+    """
+    declared = [s for stems in parts.values() for s in stems] + sorted(helpers)
+    if twice := sorted({s for s in declared if declared.count(s) > 1}):
+        raise DuplicateSourceError(f"declared more than once in MODULE_PARTS / helpers: {twice}")
+    texts = {p.stem: p.read_text(encoding="utf-8") for p in sorted(directory.glob(BINDING_GLOB))}
+    if missing := sorted(set(declared) - texts.keys()):
+        raise MissingBindingSourceError(f"declared sources with no file in {directory}: {missing}")
+    if entries := sorted(s for s in declared if MODULE_ENTRY.search(texts[s])):
+        raise DeclaredPrimaryError(f"declared parts or helpers that hold an NB_MODULE: {entries}")
+    if binding := sorted(s for s in helpers if NANOBIND_USE.search(texts[s])):
+        raise BindingHelperError(
+            f"helpers that use nanobind; declare them in MODULE_PARTS: {binding}"
+        )
+    primaries: list[str] = []
+    for stem, text in texts.items():
+        if stem in declared:
+            continue
+        names = MODULE_ENTRY.findall(text)
+        if not names:
+            raise StrayBindingSourceError(
+                f"{directory / f'{stem}.cpp'} has no NB_MODULE and is in neither MODULE_PARTS "
+                "nor NON_MODULE_SOURCES"
+            )
+        if [n.removeprefix("_") for n in names] != [stem]:
+            raise ModuleEntryMismatchError(
+                f"{directory / f'{stem}.cpp'}: NB_MODULE {names}, expected one naming {stem!r}"
+            )
+        primaries.append(stem)
+    if unknown := sorted(parts.keys() - set(primaries)):
+        raise UnknownPartOwnerError(f"MODULE_PARTS keys that are no module primary: {unknown}")
+    return {
+        m: tuple(directory / f"{s}.cpp" for s in (m, *parts.get(m, ()))) for m in sorted(primaries)
+    }
+
+
+@functools.cache
+def _layout() -> Mapping[str, tuple[Path, ...]]:
+    """`module_sources()` of the repo, validated once per process."""
+    return MappingProxyType(module_sources())
+
+
 def binding_modules() -> list[str]:
-    """Short names of all binding modules, sorted."""
-    return sorted(
-        p.stem for p in BINDINGS_DIR.glob(BINDING_GLOB) if p.stem not in NON_MODULE_SOURCES
+    """Short names of all binding modules, sorted.
+
+    Raises:
+        StrayBindingSourceError, MissingBindingSourceError, ModuleEntryMismatchError,
+            DeclaredPrimaryError, UnknownPartOwnerError, DuplicateSourceError,
+            BindingHelperError: see `module_sources`.
+    """
+    return list(_layout())
+
+
+def binding_sources(module: str) -> tuple[Path, ...]:
+    """The translation units of a binding module, primary first: `common` →
+    `(src/bindings/common.cpp, src/bindings/common_eigen.cpp, src/bindings/common_logging.cpp)`.
+
+    Raises:
+        UnknownModuleError: not a binding module.
+        StrayBindingSourceError, MissingBindingSourceError, ModuleEntryMismatchError,
+            DeclaredPrimaryError, UnknownPartOwnerError, DuplicateSourceError,
+            BindingHelperError: see `module_sources`.
+    """
+    layout = _layout()
+    if module not in layout:
+        raise UnknownModuleError(f"{module!r} is not a binding module; known: {', '.join(layout)}")
+    return layout[module]
+
+
+def primary_source(module: str) -> Path:
+    """The TU of a binding module that holds its `NB_MODULE`: `collision` →
+    `src/bindings/collision.cpp`. The audit reads all of `binding_sources`; this one alone is
+    the TU a synthetic TU includes, or a test parses for a class the primary binds.
+
+    Raises:
+        UnknownModuleError: see `binding_sources`.
+    """
+    return binding_sources(module)[0]
+
+
+def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
+    """`<…>` spellings the files #include, read as text (other bindings are not parsed)."""
+    return frozenset(
+        m for s in sources for m in INCLUDE_DIRECTIVE.findall(s.read_text(encoding="utf-8"))
     )
 
 
-def binding_source(module: str) -> Path:
-    """`collision` → `src/bindings/collision.cpp`."""
-    return BINDINGS_DIR / f"{module}.cpp"
+def foreign_headers(
+    module: str,
+    own_includes: frozenset[str],
+    other_includes: Mapping[str, frozenset[str]],
+    prefixes: Mapping[str, tuple[str, ...]],
+    include_dirs: Sequence[Path],
+) -> dict[Path, str]:
+    """Headers under another module's prefix that this binding #includes directly, that the
+    owner's binding does not, and that this module audits (`header_auditor`)."""
+    found: dict[Path, str] = {}
+    for spelling in own_includes:
+        owner = header_owner(spelling, prefixes)
+        if owner is None or owner == module or spelling in other_includes.get(owner, frozenset()):
+            continue
+        if is_unaudited(spelling, prefixes[owner]):
+            continue
+        includers = [module, *(m for m, inc in other_includes.items() if spelling in inc)]
+        if header_auditor(includers) != module:
+            continue
+        for d in include_dirs:
+            if (d / spelling).is_file():
+                found[(d / spelling).resolve()] = spelling
+                break
+    return found
 
 
 def package_init(module: str) -> Path | None:

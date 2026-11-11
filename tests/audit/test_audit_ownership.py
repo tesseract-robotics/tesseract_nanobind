@@ -218,11 +218,13 @@ def test_audit_tu_refuses_a_prefix_that_disagrees_with_prefixes(monkeypatch):
 
 
 def test_binding_modules_are_the_sources_in_src_bindings():
-    """One module per `src/bindings/<module>.cpp`; the sources linked into a module are not."""
+    """One module per primary `src/bindings/<module>.cpp`; the parts and helpers linked into a
+    module are not modules."""
     modules = own.binding_modules()
+    parts = {s for stems in own.MODULE_PARTS.values() for s in stems}
     assert "collision" in modules and "trajopt_sqp" in modules
-    assert not set(own.NON_MODULE_SOURCES) & set(modules)
-    assert all(own.binding_source(m).is_file() for m in modules)
+    assert not (set(own.NON_MODULE_SOURCES) | parts) & set(modules)
+    assert all(own.primary_source(m).is_file() for m in modules)
     assert all((own.BINDINGS_DIR / f"{s}.cpp").is_file() for s in own.NON_MODULE_SOURCES)
 
 
