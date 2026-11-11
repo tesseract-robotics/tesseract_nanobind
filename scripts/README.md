@@ -92,6 +92,33 @@ Runs OMPL parallel planner scaling benchmarks (1/2/4/8 planners):
 
 Tests how examples scale with parallel OMPL planners.
 
+### `bench_python_constraints.py`
+What a Python-defined constraint (`trajopt_ifopt.python_constraints`) costs in the online SQP
+loop, and whether it holds its bound. Runs `online_planning_sqp_example.py` with and without
+Python rules on every free waypoint and reports the replan time, the time spent in the Python
+callbacks and the largest tool-axis deviation; the last row holds the same axis with trajopt's
+C++ `CartAxisAlignConstraint` as the reference.
+
+```bash
+pixi run python scripts/bench_python_constraints.py --replans 30 --repeats 7
+```
+
+### `sim_world_hold.py`, `plot_python_constraint_effect.py`, `plot_python_constraint_figures.py`
+`sim_world_hold.py` is a closed-loop simulation of `WorldHold` and `HoldAxis`: the tool holds
+a world point while the arm's base drives and rocks, one single-waypoint solve per tick.
+`plot_python_constraint_effect.py` records the tool-axis deviation per replan of the online
+example, with and without `HoldAxis`. Both write JSON; `plot_python_constraint_figures.py`
+draws them. matplotlib is not in the repo's environments, so the figures run through
+`pixi exec`:
+
+```bash
+pixi run python scripts/plot_python_constraint_effect.py effect.json
+pixi run python scripts/sim_world_hold.py hold_50.json --rate 50
+pixi run python scripts/sim_world_hold.py hold_200.json --rate 200
+pixi exec --spec matplotlib-base python scripts/plot_python_constraint_figures.py \
+    effect.json hold_50.json hold_200.json figures/
+```
+
 ## Building Wheels
 
 The PyPI wheels are built without conda by `.github/workflows/wheels.yml`, the

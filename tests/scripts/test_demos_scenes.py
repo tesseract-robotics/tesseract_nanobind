@@ -59,6 +59,21 @@ def test_the_twc_scene_is_the_rail_cell():
     assert "rail" in scene.env.getName()
 
 
+def test_the_python_constraints_scene_plays_one_phase_per_act_in_one_environment():
+    example = importlib.import_module("tesseract_robotics.examples.python_constraints_example")
+
+    scene = SCENES["python_constraints_example"](None)
+
+    assert [phase.env for phase in scene.phases] == [scene.env] * len(example.ACTS)
+    for phase, act in zip(scene.phases, example.ACTS):
+        assert isinstance(phase.trajectory, Trajectory)
+        assert phase.trajectory.duration_s == pytest.approx(act.seconds - 1.0 / example.FRAME_HZ)
+    # The captions, gauges and glyphs are drawn by one decoration, onto links of that scene.
+    assert len(scene.decorations) == 1
+    link_names = {link_id.name() for link_id in scene.env.getLinkIds()}
+    assert {f"caption_{index}" for index in range(len(example.ACTS))} <= link_names
+
+
 def test_the_sqp_rows_are_the_final_solve_with_a_timestamp_last():
     example = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
     joints = ["a", "b"]
