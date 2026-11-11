@@ -41,12 +41,12 @@ import audit_types
 import clang.cindex as ci
 from audit_bound import bound_classes, bound_exceptions
 from audit_cache import CacheError, FactCache, FactKey, Json, sha256_of
+from audit_native import NATIVE_DIRS
 from audit_ownership import REPO_ROOT
 from audit_parse import (
     BODY_PARSE_OPTIONS,
     CONDA_PREFIX,
     INCLUDE_DIRS,
-    NATIVE_ROOT,
     PARSE_ARGS,
     PARSE_OPTIONS,
     decl_names,
@@ -75,7 +75,13 @@ HEADER_SEARCH_ENV = ("CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH")
 # the walks. Not `audit_telemetry.py`: it records a fetch and decides nothing about a fact.
 # Not `audit_ownership.py`: the parse reads only its path constants (in the key as `args`) and
 # its `header_rel` for error text, and binding PRs edit its tables all the time.
-COMMON_EXTRACTORS = ("audit_cache.py", "audit_toolchain.py", "audit_facts.py", "audit_parse.py")
+COMMON_EXTRACTORS = (
+    "audit_cache.py",
+    "audit_toolchain.py",
+    "audit_facts.py",
+    "audit_native.py",
+    "audit_parse.py",
+)
 DECL_EXTRACTORS = (*COMMON_EXTRACTORS, "audit_types.py")
 INCLUDE_EXTRACTORS = COMMON_EXTRACTORS
 API_EXTRACTORS = (*COMMON_EXTRACTORS, "audit_types.py", "audit_symbols.py")
@@ -195,11 +201,12 @@ def fact_key(
 
 def _in_repo(directory: Path) -> bool:
     """`directory` holds repo files. The pixi env can live inside the repo (`.pixi/envs/audit`
-    in CI) and so can the native stack (`.native/<triplet>` locally); their files are covered by
+    in CI) and so can the native stack (`.native/<triplet>` locally; in CI its root is the
+    workspace, which holds the repo, so only its own `ws/` and `vcpkg/` are left out); their files are covered by
     `environment_fingerprint` and by the content hash of each header a parse read, not by a
     listing."""
     d = directory.resolve()
-    outside = (CONDA_PREFIX.resolve(), NATIVE_ROOT.resolve())
+    outside = (CONDA_PREFIX.resolve(), *(n.resolve() for n in NATIVE_DIRS))
     return d.is_relative_to(REPO_ROOT) and not any(d.is_relative_to(o) for o in outside)
 
 

@@ -26,7 +26,8 @@ def defined_names(module: str) -> set[str]:
 
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
-# audit_types, audit_ownership, audit_telemetry, audit_toolchain, audit_cache, audit_symbols, audit_parse,
+# audit_types, audit_ownership, audit_telemetry, audit_toolchain, audit_cache, audit_symbols,
+# audit_native, audit_parse,
 # audit_bound, gil_entry_points, audit_facts, audit_stub, audit_lookup, audit_rules,
 # audit_anchor, audit_match, audit_report, audit_bindings.
 EXPECTED_SCRIPTS = (
@@ -36,6 +37,7 @@ EXPECTED_SCRIPTS = (
     "audit_toolchain",
     "audit_cache",
     "audit_symbols",
+    "audit_native",
     "audit_parse",
     "audit_bound",
     "gil_entry_points",
@@ -66,9 +68,7 @@ def test_combined_namespace_rejects_two_definitions_of_one_name():
 
 PARSE = {
     "CONDA_PREFIX", "LIBCLANG_MAJOR", "CLANG_RESOURCE_DIR", "CXX_STD",
-    "NATIVE_ROOT_ENV", "NativeStackMissingError", "ompl_include", "native_root",
-    "native_include_roots", "native_include_dirs", "NATIVE_ROOT", "NATIVE_INCLUDES",
-    "IncludeDirError", "INCLUDE_DIRS", "PARSE_ARGS", "PARSE_OPTIONS",
+    "native_include_dirs", "INCLUDE_DIRS", "PARSE_ARGS", "PARSE_OPTIONS",
     "MAX_REPORTED_DIAGNOSTICS", "HeaderParseError", "parse_tu", "STRINGSTREAM", "CEREAL_HOOKS",
     "ALLOCATION_OPERATORS", "OPERATOR_DUNDERS", "OSTREAM_DECL", "FOREIGN_NAMESPACES",
     "FUNCTION_KINDS", "METHOD_KINDS", "FIELD_KINDS", "RAW_BUFFER_POINTEES",
@@ -100,6 +100,19 @@ PARSE = {
 def test_parse_defines_exactly():
     assert defined_names("audit_parse") == PARSE
     assert not defined_names("audit_match") & PARSE
+
+
+# Where the native stack lives; out of `audit_parse` (its own job, and the 1k-line cap).
+NATIVE = {
+    "NATIVE_ROOT_ENV", "IncludeDirError", "NativeStackMissingError", "ompl_include",
+    "native_root", "native_include_roots", "native_stack_dirs", "NATIVE_ROOT",
+    "NATIVE_INCLUDES", "NATIVE_DIRS",
+}  # fmt: skip
+
+
+def test_native_defines_exactly():
+    assert defined_names("audit_native") == NATIVE
+    assert not defined_names("audit_parse") & NATIVE
 
 
 # #397: the C++ API as plain data, out of `audit_parse`; needs no libclang.
