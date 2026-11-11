@@ -18,6 +18,8 @@ TESSERACT_TASK_COMPOSER_PLUGINS), so the copies the wheel bundles are the ones l
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
@@ -73,6 +75,10 @@ def get_data_path() -> Path:
     return path
 
 
+# Import name of the tesseract-robotics-nanobind-support wheel (the [support] extra).
+SUPPORT_PACKAGE = "tesseract_robotics_support"
+
+
 class SupportDataNotFoundError(FileNotFoundError):
     """tesseract's support data is not installed (the tesseract-robotics-nanobind-support wheel)."""
 
@@ -90,12 +96,9 @@ def get_tesseract_resource_path() -> Path:
     Raises:
         SupportDataNotFoundError: neither is installed.
     """
-    try:
-        import tesseract_robotics_support
-    except ImportError:
-        pass
-    else:
-        return tesseract_robotics_support.data_dir()
+    # The [support] extra is optional: absent → no spec. A present but broken install raises.
+    if importlib.util.find_spec(SUPPORT_PACKAGE) is not None:
+        return importlib.import_module(SUPPORT_PACKAGE).data_dir()
     share = _prefix_share("tesseract/package.xml")
     if share is not None:
         return share
