@@ -1,7 +1,6 @@
 """The demo scenes: every manifest entry has one, and those without a planner build here."""
 
 import importlib
-import os
 import sys
 from pathlib import Path
 
@@ -23,16 +22,8 @@ STATIC = [
     "tesseract_material_mesh_viewer",
 ]
 # Animated without planning: a hand-built sweep and a sinusoid.
-TWC_SUPPORT = REPO / "ws/src/tesseract_ros_workcell/twc_support"
-# CI sets the variable, so a broken path there fails rather than skips.
-needs_twc = pytest.mark.skipif(
-    "TWC_SUPPORT_PATH" not in os.environ and not TWC_SUPPORT.exists(),
-    reason="needs the TWC workcell: git submodule update --init ws/src/tesseract_ros_workcell",
-)
-SCRIPTED = [
-    "sdf_collision_example",
-    pytest.param("twc_workcell_positioner_viewer", marks=needs_twc),
-]
+needs_twc = pytest.mark.usefixtures("twc_support")
+SCRIPTED = ["sdf_collision_example", "twc_workcell_positioner_viewer"]
 
 
 def test_every_manifest_entry_has_a_scene():
@@ -47,7 +38,9 @@ def test_a_static_scene_has_an_environment_and_no_phases(module):
 
 
 @pytest.mark.parametrize("module", SCRIPTED)
-def test_a_scripted_scene_plays_one_trajectory_in_its_environment(module):
+def test_a_scripted_scene_plays_one_trajectory_in_its_environment(module, request):
+    if module == "twc_workcell_positioner_viewer":
+        request.getfixturevalue("twc_support")
     scene = SCENES[module](None)
     assert [phase.env for phase in scene.phases] == [scene.env]
     assert isinstance(scene.phases[0].trajectory, Trajectory)

@@ -57,7 +57,7 @@ def test_a_new_viewer_example_is_noticed(tmp_path):
     assert manifest.viewer_examples(tmp_path) == {"new_viewer"}
 
 
-def test_the_hero_keeps_the_camera_jelle_picked():
+def test_the_hero_keeps_its_chosen_camera():
     entries = {entry.module: entry for entry in manifest.load_manifest()}
     hero = entries["car_seat_example"]
     assert manifest.player_query(hero.module, hero.camera) == HERO_QUERY

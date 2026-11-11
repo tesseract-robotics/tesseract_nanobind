@@ -1,85 +1,33 @@
-# Planning Benchmarks
+# Planning benchmarks
 
-## Why More CPUs Don't Make Planning Faster
+Run serially with `pixi run test-benchmark` (pytest-benchmark disables itself under xdist).
+Every benchmark validates the result it times with `assert_trajectory_valid`; a fast but
+unusable trajectory fails.
 
-Investigation into why benchmark tests didn't run faster with more CPUs.
-
-### Root Cause
-
-**OMPL's `optimize=True` mode (the default) runs for the full `planning_time` regardless of how many parallel planners are running.**
-
-With `optimize=True`:
-- OMPL loops until the timeout expires
-- Finding a solution early doesn't exit the loop
-- More planners = more thread overhead = actually SLOWER
-
-With `optimize=False`:
-- OMPL exits as soon as ANY planner finds a solution
-- More planners = higher probability of finding solution faster
-- Shows actual parallel speedup
-
-### Benchmark Results
-
-```
-optimize=False (first-solution mode) - SHOWS SCALING:
-  1 planner:  6.05s (baseline)
-  2 planners: 4.03s (1.50x faster)
-  4 planners: 3.83s (1.58x faster)
-  8 planners: 3.85s (1.57x faster)
-
-optimize=True (optimization mode) - NO SCALING / GETS WORSE:
-  1 planner:  3.92s (baseline)
-  2 planners: 3.84s (~same)
-  4 planners: 4.51s (slower, high variance)
-  8 planners: 7.26s (1.85x SLOWER)
-```
-
-### Why Speedup Caps at ~1.6x
-
-Even with `optimize=False`, speedup plateaus because:
-
-1. **TrajOpt is single-threaded**: The FreespacePipeline runs `OMPL → TrajOpt → ContactCheck → TimeParam`. TrajOpt alone takes ~2s and can't be parallelized.
-
-2. **Problem is too easy**: For simple problems (single sphere obstacle), a single planner finds a solution in <1s. The overhead of spawning threads dominates.
-
-3. **Collision checking contention**: All parallel planners share the collision manager. More planners = more lock contention.
-
-### Code Change
-
-Added `optimize` and `max_solutions` parameters to `create_freespace_pipeline_profiles()`:
-
-```python
-# Original behavior (no scaling)
-profiles = create_freespace_pipeline_profiles(num_planners=8)  # optimize=True
-
-# First-solution mode (shows scaling)
-profiles = create_freespace_pipeline_profiles(num_planners=8, optimize=False, max_solutions=1)
-```
-
-### When Parallelism Actually Helps
-
-1. **Difficult problems**: Narrow passages, many obstacles, tight collision margins where finding ANY solution takes significant time
-
-2. **First-solution mode** (`optimize=False`): When you just need a valid path quickly
-
-3. **Multiple independent planning problems**: Plan multiple robot motions concurrently instead of throwing CPUs at one easy problem
-
-### Running Benchmarks
+| File | What it times |
+|---|---|
+| `test_planning_benchmarks.py` | Each planning example's `run()`, and the freespace examples at 1, 2, 4 and 8 OMPL planners |
+| `test_parallel_scaling.py` | OMPL planner count against solve time on a sphere-obstacle freespace problem, with `optimize=True` and `optimize=False` |
+| `test_pose_accessors.py` | `Pose` scalar accessors; asserts the ratios the `transforms.py` perf note claims |
+| `freespace_problems.py` | The scaling problem. Its correctness tests run in the normal suite (`tests/test_freespace_benchmark_problems.py`) |
 
 ```bash
-# Run scaling comparison
-./scripts/run_scaling_benchmarks.sh
-
-# Run specific test
-pytest tests/benchmarks/test_parallel_scaling.py -v --benchmark-enable
-
-# Original benchmarks (for comparison)
-./scripts/run_benchmarks.sh
+pixi run test-benchmark
+pixi run pytest tests/benchmarks --benchmark-only --benchmark-json=results.json
+pixi run python tests/benchmarks/plot_benchmarks.py results.json
 ```
 
-### Files
+## Why more planners do not make this problem faster
 
-- `test_planning_benchmarks.py` - Original benchmarks (show no scaling)
-- `test_parallel_scaling.py` - New benchmarks demonstrating the issue
-- `plot_benchmarks.py` - Visualization utilities
-- `../../scripts/run_scaling_benchmarks.sh` - Run script with summary
+The measured table is at the top of `test_parallel_scaling.py`, with its hardware and method.
+Two facts explain it:
+
+- With `optimize=True` OMPL keeps improving the path until `planning_time` is spent, so extra
+  planners add threads, not speed.
+- With `optimize=False` the first solution ends the call, but the sphere problem is solved by
+  one planner in about 100 ms; thread start-up then
+  outweighs the extra samplers.
+
+Parallel planners pay off on problems where finding any solution is slow: narrow passages,
+many obstacles, tight margins. Hold one `TaskComposer` for every timed call: building one
+loads the plugins again (about 4 s) and swamps the planning time.

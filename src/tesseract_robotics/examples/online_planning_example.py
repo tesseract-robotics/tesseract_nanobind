@@ -1,83 +1,29 @@
-"""
-Online Planning Example
-=======================
+"""Online planning through the task composer: replan as an obstacle moves.
 
-Demonstrates real-time trajectory replanning as a dynamic obstacle moves.
+This is not a port of tesseract_planning's `online_planning_example.cpp`. That example
+builds one `TrajOptQPProblem` and advances a `TrustRegionSQPSolver` one step per
+replan, with the human moved by hand through a joint state publisher; the faithful
+port is `online_planning_sqp_example.py`. This one plans the same gantry + ABB IRB2400
+scene (start, target, model) from scratch through `TrajOptPipeline` each cycle, with
+the human moved along a scripted sine, to show what a full pipeline call costs per
+replan.
 
-C++ Reference:
-    tesseract_planning/tesseract_examples/src/online_planning_example.cpp
+Scene (tesseract_support `online_planning_example`):
+- Gantry: `gantry_axis_1`, `gantry_axis_2`, prismatic.
+- ABB IRB2400: `joint_1` .. `joint_6`.
+- Human: `human_x_joint`, `human_y_joint`, outside the `manipulator` group, so the
+  obstacle moves with `Environment.setState` and no collision manager is rebuilt.
 
-Overview
---------
-This example simulates an industrial scenario where a robot must replan its
-trajectory as a human worker moves through the workspace. The environment
-changes between planning iterations, requiring continuous collision avoidance.
+Differences from the C++ example, all deliberate:
+- Every cycle is an independent pipeline call: no warm start, no incremental SQP step.
+- The human follows `HUMAN_AMPLITUDE_M * sin(HUMAN_PHASE_STEP_RAD * k)` along x.
+- The C++ collision settings (margin 0.1 m, coefficient 10) come from
+  `create_trajopt_default_profiles`, not from this file.
 
-Robot Configuration
--------------------
-The model combines:
-- **Gantry**: 2 prismatic (linear) axes for XY positioning
-- **ABB IRB2400**: 6-axis industrial arm mounted on gantry
-- **Total**: 8 DOF manipulator (gantry_axis_1, gantry_axis_2, joint_1..joint_6)
-
-The human obstacle is modeled as joints (human_x_joint, human_y_joint) in the
-URDF, allowing its position to be updated via setState() rather than requiring
-full environment modifications.
-
-Key Concepts
-------------
-**Online/Real-Time Planning**:
-    Planning while the environment changes. The planner must complete before
-    the robot reaches the end of its current trajectory, else motion stalls.
-    C++ version achieves 10-100 Hz replanning; Python version is slower due
-    to TaskComposer overhead.
-
-**Dynamic Obstacles**:
-    Obstacles that move between planning cycles. Represented here as joints
-    so position updates are efficient (no collision manager rebuilding).
-
-**Warm Starting**:
-    C++ version uses previous solution as initial guess for next planning cycle.
-    This significantly speeds convergence when obstacles move slowly.
-
-**TrajOpt SQP Solver**:
-    The C++ version uses stepSQPSolver() for incremental optimization:
-    - OSQP as the QP sub-solver
-    - Trust region method for robust convergence
-    - Can be interrupted if environment changes mid-solve
-
-**Planning Rate vs Obstacle Velocity**:
-    If obstacles move faster than the planner can track, the solver may get
-    stuck in infeasible regions. Rule of thumb: replanning rate should be
-    5-10x faster than obstacle motion in joint space.
-
-Pipeline Comparison
--------------------
-**C++ (Real-Time)**:
-    1. Initialize TrustRegionSQPSolver with OSQP
-    2. Loop: update obstacle -> stepSQPSolver() -> execute trajectory slice
-    3. Warm-start from previous solution
-
-**Python (This Example)**:
-    1. Create TaskComposer with TrajOptPipeline
-    2. Loop: update obstacle -> full planning pipeline -> log results
-    3. No warm-start (each plan is independent)
-
-The Python version demonstrates the concept but is not suitable for true
-real-time control due to higher latency.
-
-Collision Configuration
------------------------
-From C++ source:
-- Collision margin: 0.1m (10cm safety buffer)
-- Margin coefficient: 10 (cost weight for collision term)
-- Discrete evaluator (vs continuous)
-
-Related Examples
-----------------
-- freespace_ompl_example.py: Static environment planning with OMPL
-- basic_cartesian_example.py: TrajOpt for Cartesian paths
-- car_seat_example.py: Multi-step planning with profile customization
+Related examples:
+- online_planning_sqp_example.py: the SQP port of the C++ example.
+- freespace_ompl_example.py: static environment planning with OMPL.
+- basic_cartesian_example.py: TrajOpt for Cartesian paths.
 """
 
 from __future__ import annotations
@@ -89,6 +35,7 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.planning import (
     MotionProgram,
     Robot,
@@ -96,6 +43,11 @@ from tesseract_robotics.planning import (
     TaskComposer,
 )
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
+
+# Peak displacement of the scripted human along x [m].
+HUMAN_AMPLITUDE_M = 0.2
+# Phase advance of the human's sine per replanning cycle [rad].
+HUMAN_PHASE_STEP_RAD = 0.2
 
 
 def update_human_position(robot, human_x, human_y):
@@ -105,9 +57,8 @@ def update_human_position(robot, human_x, human_y):
     prismatic joints (human_x_joint, human_y_joint). This allows efficient
     position updates without rebuilding the collision manager.
 
-    Alternative approaches (not used here):
-    - moveLink(): Move a link's origin (requires collision manager rebuild)
-    - Add/remove links: Full environment modification (slowest)
+    Alternatives, not used here: `moveLink` (rebuilds the collision manager) and
+    adding and removing links (a full environment edit).
 
     Args:
         robot: Robot instance with online_planning_example model
@@ -130,8 +81,8 @@ def run(
 ):
     """Run online planning example with moving human obstacle.
 
-    Simulates repeated planning cycles as a human obstacle oscillates through
-    the workspace. Measures planning time to characterize replanning rate.
+    Plans `num_iterations` times while a scripted human obstacle oscillates, and times each
+    plan.
 
     Args:
         pipeline: Planning pipeline ("TrajOptPipeline" or "TrajOptIfoptPipeline")
@@ -168,9 +119,7 @@ def run(
     start_position = np.zeros(len(joint_names))
     robot.set_joints(start_position, joint_names=joint_names)
 
-    # Target position from C++ source line 169:
-    # target_joint_position << 5.5, 3, 0, 0, 0, 0, 0, 0;
-    # This moves the gantry to (5.5m, 3.0m) while keeping arm in home pose
+    # online_planning_example.cpp: target_joint_position << 5.5, 3, 0, 0, 0, 0, 0, 0
     target_position = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
     # =========================================================================
@@ -195,11 +144,7 @@ def run(
     # =========================================================================
     for iteration in range(num_iterations):
         # --- Update Dynamic Obstacle ---
-        # Oscillate human position using sine wave
-        # IMPORTANT: Large displacements (>0.22m) can cause goal collisions
-        # that make planning infeasible. Real systems need collision-free goals.
-        t = iteration * 0.2
-        human_x = 0.2 * np.sin(t)  # +/- 20cm oscillation
+        human_x = HUMAN_AMPLITUDE_M * np.sin(HUMAN_PHASE_STEP_RAD * iteration)
         human_y = 0.0
         update_human_position(robot, human_x, human_y)
 
@@ -222,49 +167,33 @@ def run(
         )
 
         # --- Execute Planning with Timing ---
-        start_time = time.time()
-        try:
-            result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
-            planning_time = time.time() - start_time
-
-            if result.successful:
-                trajectories.append(result)
-                timings.append(planning_time)
-                print(
-                    f"Iteration {iteration + 1}: Success in {planning_time:.3f}s, "
-                    f"{len(result)} waypoints, human_x={human_x:.3f}"
-                )
-                # NOTE: In real online planning, the robot would execute the
-                # first segment while planning the next. Here we just measure
-                # planning time without actual execution.
-            else:
-                print(f"Iteration {iteration + 1}: Planning failed - {result.message}")
-                timings.append(planning_time)
-        except Exception as e:
-            planning_time = time.time() - start_time
-            timings.append(planning_time)
-            print(f"Iteration {iteration + 1}: Exception - {e}")
+        start_time = time.perf_counter()
+        result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
+        planning_time = time.perf_counter() - start_time
+        require_success(result, f"iteration {iteration + 1}")
+        trajectories.append(result)
+        timings.append(planning_time)
+        print(
+            f"Iteration {iteration + 1}: Success in {planning_time:.3f}s, "
+            f"{len(result)} waypoints, human_x={human_x:.3f}"
+        )
+        # A real online planner would execute the first segment while planning the
+        # next; this example only times the planning.
 
     # =========================================================================
     # STEP 5: Report Statistics
     # =========================================================================
-    # Planning rate determines how fast obstacles can move
-    # For real-time: need >10 Hz replanning for typical industrial speeds
-    if timings:
-        avg_time = np.mean(timings)
-        print("\nOnline Planning Summary:")
-        print(f"  Iterations: {num_iterations}")
-        print(f"  Successful: {len(trajectories)}")
-        print(
-            f"  Average planning time: {avg_time:.3f}s ({1.0 / avg_time if avg_time > 0 else 0:.1f} Hz)"
-        )
+    avg_time = float(np.mean(timings))
+    print("\nOnline Planning Summary:")
+    print(f"  Iterations: {num_iterations}")
+    print(f"  Average planning time: {avg_time:.3f}s ({1.0 / avg_time:.1f} Hz)")
 
     return {
         "trajectories": trajectories,
         "timings": timings,
         "robot": robot,
         "joint_names": joint_names,
-        "success": len(trajectories) > 0,
+        "success": True,
     }
 
 
@@ -275,12 +204,11 @@ def main() -> int:
 
     with TesseractViewer() as viewer:
         viewer.update_environment(results["robot"].env)
-        if results["trajectories"][-1].raw_results is not None:
-            viewer.update_trajectory(results["trajectories"][-1].raw_results)
+        viewer.update_trajectory(results["trajectories"][-1].raw_results)
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
-    return 0 if results["success"] else 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -1,8 +1,6 @@
 """`pick_env`: what the part does during a pick, which the post-attach environment can't show."""
 
 import importlib
-import os
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -10,7 +8,6 @@ import pytest
 from tesseract_robotics.viewer import Trajectory
 from tesseract_robotics.viewer.poses import link_poses
 
-TWC_SUPPORT = Path(__file__).resolve().parents[2] / "ws/src/tesseract_ros_workcell/twc_support"
 # Part position between start and end of the pick [m]; float64 round-off over the FK chain.
 FIXED_PART_ATOL_M = 1e-9
 # A carried part moves far more than this between the pick's two ends [m].
@@ -43,16 +40,31 @@ def test_the_part_stays_put_in_pick_env_and_travels_in_the_attached_env(example,
     assert travel_m > CARRIED_PART_MIN_TRAVEL_M
 
 
-@pytest.mark.skipif(
-    "TWC_SUPPORT_PATH" not in os.environ and not TWC_SUPPORT.exists(),
-    reason="needs the TWC workcell: git submodule update --init ws/src/tesseract_ros_workcell",
-)
 def test_twc_support_is_found_in_the_repo_submodule(monkeypatch, tmp_path):
     twc = _module("twc_workcell_positioner_viewer")
-    support = tmp_path / "ws/src/tesseract_ros_workcell/twc_support"
+    support = tmp_path / twc.TWC_SUPPORT_SUBMODULE
     support.mkdir(parents=True)
     source = tmp_path / "src/tesseract_robotics/examples/twc_workcell_positioner_viewer.py"
     monkeypatch.setattr(twc, "__file__", str(source))
-    monkeypatch.delenv("TWC_SUPPORT_PATH", raising=False)
+    monkeypatch.delenv(twc.TWC_SUPPORT_ENV, raising=False)
 
-    assert twc._find_twc_support() == support
+    assert twc.find_twc_support() == support
+
+
+def test_an_explicit_twc_support_wins_over_the_environment(monkeypatch, tmp_path):
+    twc = _module("twc_workcell_positioner_viewer")
+    explicit, from_env = tmp_path / "explicit", tmp_path / "env"
+    explicit.mkdir()
+    from_env.mkdir()
+    monkeypatch.setenv(twc.TWC_SUPPORT_ENV, str(from_env))
+
+    assert twc.find_twc_support(explicit) == explicit
+    assert twc.find_twc_support() == from_env
+
+
+def test_a_missing_twc_support_path_raises_instead_of_falling_through(monkeypatch, tmp_path):
+    twc = _module("twc_workcell_positioner_viewer")
+    monkeypatch.setenv(twc.TWC_SUPPORT_ENV, str(tmp_path / "missing"))
+
+    with pytest.raises(twc.TwcSupportNotFoundError, match="missing"):
+        twc.find_twc_support()

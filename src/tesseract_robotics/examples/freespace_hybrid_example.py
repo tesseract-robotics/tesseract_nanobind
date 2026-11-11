@@ -35,6 +35,7 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
 )
@@ -160,26 +161,17 @@ def run(
     print(f"Planning with {actual_pipeline}...")
     start_time = time.time()
 
-    try:
-        result = composer.plan(robot, program, pipeline=actual_pipeline, profiles=profiles)
-        planning_time_actual = time.time() - start_time
-
-        if result.successful:
-            print(f"Success in {planning_time_actual:.2f}s, {len(result)} waypoints")
-        else:
-            print(f"Failed in {planning_time_actual:.2f}s: {result.message}")
-
-    except Exception as e:
-        planning_time_actual = time.time() - start_time
-        print(f"Exception after {planning_time_actual:.2f}s: {e}")
-        result = None
+    result = composer.plan(robot, program, pipeline=actual_pipeline, profiles=profiles)
+    planning_time_actual = time.time() - start_time
+    require_success(result, actual_pipeline)
+    print(f"Success in {planning_time_actual:.2f}s, {len(result)} waypoints")
 
     return {
         "result": result,
         "robot": robot,
         "joint_names": joint_names,
         "planning_time": planning_time_actual,
-        "success": result.successful if result else False,
+        "success": True,
     }
 
 
@@ -195,7 +187,7 @@ def main() -> int:
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
-    return 0 if results["success"] else 1
+    return 0
 
 
 if __name__ == "__main__":

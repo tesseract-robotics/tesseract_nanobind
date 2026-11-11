@@ -57,6 +57,7 @@ from tesseract_robotics.environment import (
     ModifyAllowedCollisionsType,
     MoveLinkCommand,
 )
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.examples.lowlevel.example_support import (
     load_support_environment,
     run_pipeline,
@@ -433,7 +434,7 @@ def run():
         profiles,
         "TrajOptPipeline",
     )
-    assert pick_result.successful, f"PICK planning failed: {pick_result.message}"
+    require_success(pick_result, "PICK")
     print(f"PICK successful! {len(pick_result)} waypoints")
 
     # ==================== ATTACH ====================
@@ -450,7 +451,7 @@ def run():
         profiles,
         "TrajOptPipeline",
     )
-    assert place_result.successful, f"PLACE planning failed: {place_result.message}"
+    require_success(place_result, "PLACE")
     print(f"PLACE successful! {len(place_result)} waypoints")
 
     return {

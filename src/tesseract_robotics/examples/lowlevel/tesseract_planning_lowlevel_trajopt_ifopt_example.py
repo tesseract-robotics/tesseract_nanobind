@@ -35,6 +35,8 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import Environment
+from tesseract_robotics.examples.failures import TimeParameterizationFailedError, require_success
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
 from tesseract_robotics.motion_planners import PlannerRequest
 from tesseract_robotics.motion_planners_ompl import (
     OMPLMotionPlanner,
@@ -75,7 +77,8 @@ def run():
     srdf_path = Path(locator.locateResource(srdf_url).getFilePath())
 
     t_env = Environment()
-    assert t_env.init(urdf_path, srdf_path, locator)
+    if not t_env.init(urdf_path, srdf_path, locator):
+        raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     # Manipulator info
     manip_info = ManipulatorInfo()
@@ -143,7 +146,7 @@ def run():
 
     ompl_planner = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE)
     ompl_response = ompl_planner.solve(ompl_request)
-    assert ompl_response.successful, f"OMPL failed: {ompl_response.message}"
+    require_success(ompl_response, "OMPL")
     print(f"OMPL found path with {ompl_response.results.size()} instructions")
 
     # Interpolate OMPL results
@@ -173,7 +176,7 @@ def run():
 
     trajopt_planner = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE)
     trajopt_response = trajopt_planner.solve(trajopt_request)
-    assert trajopt_response.successful, f"TrajOptIfopt failed: {trajopt_response.message}"
+    require_success(trajopt_response, "TrajOptIfopt")
     print("TrajOptIfopt optimization complete")
 
     trajopt_results_instruction = trajopt_response.results
@@ -199,7 +202,8 @@ def run():
     time_profiles = ProfileDictionary()
     time_profiles.addProfile(time_param.getName(), "DEFAULT", isp_profile)
 
-    assert time_param.compute(trajopt_results_instruction, t_env, time_profiles)
+    if not time_param.compute(trajopt_results_instruction, t_env, time_profiles):
+        raise TimeParameterizationFailedError("time parameterization failed")
     print("Time parameterization complete")
 
     # Print results

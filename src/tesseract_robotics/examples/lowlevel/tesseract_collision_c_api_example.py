@@ -1,6 +1,5 @@
 """
 Low-Level Collision Checking Example (C-API Style)
-===================================================
 
 Demonstrates collision detection using Tesseract's discrete contact manager
 via the low-level C++ bindings without high-level abstractions.
@@ -11,23 +10,20 @@ C++ Reference:
 High-Level Alternative:
     examples/tesseract_collision_example.py (uses Robot wrapper class)
 
-Overview
---------
+**Overview**
 This example directly uses the C++ API bindings for maximum control:
 1. Manually load URDF/SRDF and initialize Environment
 2. Construct Link/Joint/Collision objects explicitly
 3. Use OFKTStateSolver for forward kinematics
 4. Query DiscreteContactManager for collision detection
 
-Why Use Low-Level API?
-----------------------
+**Why Use Low-Level API?**
 - Direct access to all C++ functionality
 - Fine-grained control over object lifetimes
 - Performance-critical applications
 - When the high-level Robot API doesn't expose needed features
 
-Key Concepts
-------------
+**Key Concepts**
 **DiscreteContactManager**:
     Checks collision at instantaneous poses (single point in time).
     Backed by Bullet physics engine for fast broad-phase/narrow-phase queries.
@@ -58,8 +54,7 @@ Key Concepts
     AddLinkCommand, RemoveLinkCommand, etc. modify the scene graph.
     After modifications, call getDiscreteContactManager() again to refresh.
 
-Pipeline
---------
+**Pipeline**
 1. Environment Setup:
    - GeneralResourceLocator finds URDF/SRDF in the support data passed as `paths`
    - Environment.init() parses robot description and loads collision plugins
@@ -67,7 +62,7 @@ Pipeline
 
 2. State Solver Configuration:
    - OFKTStateSolver wraps the scene graph
-   - setStateByNamesAndValues() updates joint positions
+   - setState() updates joint positions
    - getState() returns SceneState with all link_transforms
 
 3. Contact Manager Configuration:
@@ -81,8 +76,7 @@ Pipeline
    - contactTest() populates ContactResultMap
    - Flatten and iterate results
 
-Related Examples
-----------------
+**Related Examples**
 - tesseract_collision_example.py: Same workflow with Robot API
 - geometry_showcase_example.py: All supported collision geometry types
 - scene_graph_example.py: Direct scene graph manipulation
@@ -106,6 +100,7 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import AddLinkCommand, Environment
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
 from tesseract_robotics.geometry import Sphere
 from tesseract_robotics.scene_graph import (
     Collision,
@@ -153,7 +148,8 @@ def main():
 
     # init() parses URDF/SRDF and loads configured plugins (collision, kinematics)
     # Returns False if parsing fails - always check return value
-    assert env.init(urdf_path, srdf_path, locator)
+    if not env.init(urdf_path, srdf_path, locator):
+        raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     # ABB IRB2400 is a 6-axis industrial robot with joints named joint_1..joint_6
     robot_joint_names = [f"joint_{i + 1}" for i in range(6)]
@@ -227,7 +223,7 @@ def main():
 
         # Update state solver with new joint positions
         # This recomputes all link transforms via forward kinematics
-        solver.setStateByNamesAndValues(robot_joint_names, robot_joint_pos)
+        solver.setState(robot_joint_names, robot_joint_pos)
         scene_state = solver.getState()
 
         # CRITICAL: Sync contact manager with updated link transforms

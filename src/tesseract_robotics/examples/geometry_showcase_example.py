@@ -1,20 +1,17 @@
 """
 Geometry Showcase Example
-=========================
 
 Demonstrates ALL geometry types available in tesseract_robotics bindings.
 
 C++ Reference:
     tesseract_geometry/examples/create_geometries_example.cpp
 
-Overview
---------
+**Overview**
 This example creates a visual gallery of every geometry type supported by
 Tesseract. Each geometry is positioned in a grid next to a KUKA IIWA robot
 for visual comparison.
 
-Geometry Types
---------------
+**Geometry Types**
 **Primitives** (mathematical definitions, fast collision):
     - Box: Axis-aligned rectangular solid (length x width x height)
     - Sphere: Ball defined by radius
@@ -35,8 +32,7 @@ Geometry Types
     - createMeshFromPath(): Load Mesh from STL/OBJ/DAE files
     - createConvexMeshFromPath(): Load as ConvexMesh for efficient collision
 
-Key Concepts
-------------
+**Key Concepts**
 1. **Visual vs Collision Geometry**: Links have separate visual (rendering) and
    collision (physics) geometry. They can differ - e.g., use detailed mesh for
    visual but convex hull for fast collision.
@@ -50,8 +46,7 @@ Key Concepts
 4. **Scale Parameter**: File loaders accept scale vector [sx, sy, sz] to
    resize meshes on import.
 
-Related Examples
-----------------
+**Related Examples**
 - scene_graph_example.py: Building kinematic chains with links/joints
 - tesseract_collision_example.py: Collision checking with geometries
 """
@@ -68,7 +63,6 @@ from tesseract_robotics import (
 )
 from tesseract_robotics.common import (
     GeneralResourceLocator,
-    VectorVector3d,
 )
 from tesseract_robotics.geometry import (
     Box,
@@ -161,11 +155,10 @@ def create_tetrahedron_vertices_faces():
     This demonstrates the vertex/face data format required by Tesseract meshes.
 
     Returns:
-        Tuple of (VectorVector3d vertices, numpy faces array)
+        Tuple of (list of (3,) vertex arrays, numpy faces array)
     """
-    # VectorVector3d is the required container for mesh vertices
     # Each vertex is a 3D point in local coordinates
-    vertices = VectorVector3d()
+    vertices = []
     vertices.append(np.array([0.0, 0.0, 0.1], dtype=np.float64))  # apex
     vertices.append(np.array([0.1, 0.0, -0.05], dtype=np.float64))
     vertices.append(np.array([-0.05, 0.087, -0.05], dtype=np.float64))
@@ -208,10 +201,10 @@ def create_pyramid_vertices_faces():
     general mesh collision (BVH tree).
 
     Returns:
-        Tuple of (VectorVector3d vertices, numpy faces array)
+        Tuple of (list of (3,) vertex arrays, numpy faces array)
     """
     # Square pyramid: 5 vertices (apex + 4 base corners)
-    vertices = VectorVector3d()
+    vertices = []
     vertices.append(np.array([0.0, 0.0, 0.15], dtype=np.float64))  # apex at top
     vertices.append(np.array([0.1, 0.1, 0.0], dtype=np.float64))  # base corners
     vertices.append(np.array([0.1, -0.1, 0.0], dtype=np.float64))

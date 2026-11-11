@@ -38,6 +38,8 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import Environment
+from tesseract_robotics.examples.failures import TimeParameterizationFailedError, require_success
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
 from tesseract_robotics.motion_planners import PlannerRequest
 from tesseract_robotics.motion_planners_ompl import (
     OMPLMotionPlanner,
@@ -75,7 +77,10 @@ def run():
     t_env = Environment()
 
     # locator_fn must be kept alive by maintaining a reference
-    assert t_env.init(abb_irb2400_urdf_fname, abb_irb2400_srdf_fname, locator)
+    if not t_env.init(abb_irb2400_urdf_fname, abb_irb2400_srdf_fname, locator):
+        raise EnvironmentInitError(
+            f"failed to initialize the environment from {abb_irb2400_urdf_fname}"
+        )
 
     # Fill in the manipulator information. This is used to find the kinematic chain
     # for the manipulator. This must match the SRDF, although the exact tcp_frame
@@ -141,7 +146,7 @@ def run():
     ompl_planner = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE)
 
     response = ompl_planner.solve(request)
-    assert response.successful
+    require_success(response, "OMPL")
     results_instruction = response.results
 
     # The OMPL program does not generate dense waypoints. This function will
@@ -169,7 +174,7 @@ def run():
     trajopt_request.profiles = trajopt_profiles
 
     trajopt_response = trajopt_planner.solve(trajopt_request)
-    assert trajopt_response.successful
+    require_success(trajopt_response, "TrajOpt")
 
     trajopt_results_instruction = trajopt_response.results
 
@@ -190,7 +195,8 @@ def run():
     time_profiles = ProfileDictionary()
     time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
 
-    assert time_parameterization.compute(trajopt_results_instruction, t_env, time_profiles)
+    if not time_parameterization.compute(trajopt_results_instruction, t_env, time_profiles):
+        raise TimeParameterizationFailedError("time parameterization failed")
 
     # Get the results as a list of instructions
     trajopt_results = trajopt_results_instruction.getInstructions()

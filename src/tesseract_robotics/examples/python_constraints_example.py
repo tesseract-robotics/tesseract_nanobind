@@ -2,19 +2,19 @@
 
 An ABB IRB 2400 rides a rail, with a grinder on its flange. The tool tip rests on a mark on a
 workpiece. One TrajOpt problem is solved per frame, a single waypoint warm-started from the
-last one, and the rules of ``tesseract_robotics.trajopt_ifopt.python_constraints`` are switched
+last one, and the rules of `tesseract_robotics.trajopt_ifopt.python_constraints` are switched
 on one after another:
 
 1. No rule: the rail moves and the tool goes with it.
-2. ``WorldHold``: the tip stays on the mark while the rail moves; the tool axis wanders.
-3. ``HoldAxis``: the tool axis locks onto vertical, to half a degree.
-4. ``WatchTheTool``: a camera on a mast on the carriage has stared ahead so far, losing the
+2. `WorldHold`: the tip stays on the mark while the rail moves; the tool axis wanders.
+3. `HoldAxis`: the tool axis locks onto vertical, to half a degree.
+4. `WatchTheTool`: a camera on a mast on the carriage has stared ahead so far, losing the
    tip as the rail moved. Now its pan and tilt are the solver's, and it turns to keep the tip
    within 3 degrees of its optical axis. It stays on from here.
-5. The rail becomes the solver's seventh axis. ``PointsDown`` gives the tool a 20 degree cone,
-   and ``ElbowUp`` raises a plane under the elbow: the carriage drives to where the elbow fits.
-6. ``StayDexterous``: manipulability stays above a rising bound.
-7. ``Clearance``: a ball drives in, and the forearm keeps its distance while the tip stays put.
+5. The rail becomes the solver's seventh axis. `PointsDown` gives the tool a 20 degree cone,
+   and `ElbowUp` raises a plane under the elbow: the carriage drives to where the elbow fits.
+6. `StayDexterous`: manipulability stays above a rising bound.
+7. `Clearance`: a ball drives in, and the forearm keeps its distance while the tip stays put.
 8. All seven at once, while the mark moves: the tip traces a circle on the workpiece.
 
 Every bound that moves ramps from the live value, so nothing jumps when a rule comes on. The
@@ -24,13 +24,15 @@ rule is on, and what the frame's solve took against the 30 Hz frame. Captions, g
 glyphs are links of the environment, posed by the same trajectory as the robot, so a recording
 carries them.
 
-Run it::
+Run it:
 
-    tesseract_python_constraints_example            # the acts play by themselves
-    tesseract_python_constraints_example --sliders  # you drive: rail, ball and every rule
+```bash
+tesseract_python_constraints_example            # the acts play by themselves
+tesseract_python_constraints_example --sliders  # you drive: rail, ball and every rule
+```
 
-With ``--sliders`` the mark has a handle to drag, and handing the rail to the solver switches
-on an eighth rule, written here: ``CarriageFollows`` keeps the carriage abeam of the tip.
+With `--sliders` the mark has a handle to drag, and handing the rail to the solver switches
+on an eighth rule, written here: `CarriageFollows` keeps the carriage abeam of the tip.
 Either way the viewer's control panel has a slider for the opacity of the rules' glyphs.
 """
 
@@ -397,8 +399,7 @@ def _add_link(
         joint.type = JointType.PRISMATIC
         joint.axis = np.asarray(axis, dtype=np.float64)
         joint.limits = JointLimits(-2000.0, 2000.0, 0.0, 10.0, 10.0, 10.0)
-    if not robot.add_link(link, joint):
-        raise RuntimeError(f"could not add link {name!r}")
+    robot.add_link(link, joint)
 
 
 def panel_frame() -> tuple[np.ndarray, np.ndarray]:

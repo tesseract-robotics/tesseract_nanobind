@@ -64,6 +64,7 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.planning import (
     MotionProgram,
     Pose,
@@ -167,7 +168,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
         composer = TaskComposer.from_config()
     result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
 
-    assert result.successful, f"Planning failed: {result.message}"
+    require_success(result, "glass upright")
     print("Planning successful!")
     print(f"\nTrajectory has {len(result)} waypoints:")
     for i, point in enumerate(result.trajectory):

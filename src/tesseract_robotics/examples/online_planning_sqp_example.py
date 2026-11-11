@@ -1,6 +1,5 @@
 """
 Online Planning with Low-Level SQP API
-======================================
 
 Demonstrates real-time trajectory replanning using the low-level SQP solver: tens of Hz
 (docs/examples/online-planning.md has measured rates for both collision modes).
@@ -8,20 +7,17 @@ Demonstrates real-time trajectory replanning using the low-level SQP solver: ten
 C++ Reference:
     tesseract_planning/examples/src/online_planning_example.cpp (0.35.0)
 
-Key Difference from online_planning_example.py
-----------------------------------------------
+**Key Difference from online_planning_example.py**
 - Uses TrustRegionSQPSolver.stepSQPSolver() for incremental optimization
 - Builds the optimization problem directly (no TaskComposer)
 - Warm-starts from previous solution
 - Achieves real-time rates suitable for robot control
 
-Collision Checking Modes
-------------------------
+**Collision Checking Modes**
 - Discrete: Single timestep collision check (SingleTimestepCollisionEvaluator)
 - Continuous: LVS (longest valid segment) between timesteps (LVSDiscreteCollisionEvaluator)
 
-Architecture
-------------
+**Architecture**
 1. Build a TrajOptQPProblem over the node variables, as the C++ reference does:
    - Node/Var for each waypoint (replaces JointPosition)
    - NodesVariables container (passed to the TrajOptQPProblem constructor)
@@ -56,6 +52,17 @@ from tesseract_robotics.planning import Robot
 
 # Waypoint spacing when the viewer plays the final solve [s]. The solver's steps carry no time.
 VIEWER_STEP_S = 0.1
+# The scripted human of the replanning loop: x = CENTER + AMPLITUDE * sin(PHASE_STEP * k) [m, rad].
+# The C++ example has no script: a person drags the human with a joint state publisher.
+HUMAN_CENTER_M = 0.5
+HUMAN_AMPLITUDE_M = 0.3
+HUMAN_PHASE_STEP_RAD = 0.3
+# Initial trust box of the SQP solver, online_planning_example.cpp's default [rad or m].
+TRUST_BOX_SIZE = 0.01
+
+
+class SolverDidNotConvergeError(RuntimeError):
+    """The initial global solve did not end in `SQPStatus.CONVERGED`."""
 
 
 # --8<-- [start:problem]
@@ -263,8 +270,7 @@ def run(
 
     # --8<-- [start:sqp_loop]
     # Create SQP solver with OSQP
-    # Match C++ defaults: box_size=0.01
-    box_size = 0.01
+    box_size = TRUST_BOX_SIZE
     qp_solver = tsqp.OSQPEigenSolver()
     solver = tsqp.TrustRegionSQPSolver(qp_solver)
     solver.verbose = verbose
@@ -275,6 +281,10 @@ def run(
     t0 = time.perf_counter()
     solver.solve(problem)
     solve_time = time.perf_counter() - t0
+    if solver.getStatus() != tsqp.SQPStatus.CONVERGED:
+        raise SolverDidNotConvergeError(
+            f"initial solve ended {tsqp.toString(solver.getStatus())}, expected SQP_CONVERGED"
+        )
     x = solver.getResults().best_var_vals
     cost = problem.getTotalExactCost()
     print(f"Initial solve: cost={cost:.4f}, time={solve_time * 1000:.1f}ms")
@@ -287,7 +297,7 @@ def run(
 
     for iteration in range(num_replan):
         # Move obstacle
-        human_x = 0.5 + 0.3 * np.sin(iteration * 0.3)
+        human_x = HUMAN_CENTER_M + HUMAN_AMPLITUDE_M * np.sin(HUMAN_PHASE_STEP_RAD * iteration)
         update_human_position(robot, human_x, 0.0)
 
         # The solver leaves the problem's variables at best_var_vals: one row per waypoint
@@ -311,6 +321,8 @@ def run(
 
         # Single SQP step (incremental optimization)
         solver.init(problem)
+        # The return value is False on every step here, converged or not, so it is not
+        # checked; tests/examples validates the trajectory the loop ends with.
         solver.stepSQPSolver()
 
         # Reset box size (trust region loop can shrink it to zero)
@@ -336,7 +348,7 @@ def run(
         "robot": robot,
         "joint_names": joint_names,
         "steps": steps,
-        "success": len(trajectories) > 0,
+        "success": True,
     }
 
 

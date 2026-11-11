@@ -238,7 +238,7 @@ def closest_approaches(robot: Robot, result: PlanningResult) -> list[Clearance]:
     for start, end in zip(positions[:-1], positions[1:]):
         steps = max(1, int(np.ceil(np.max(np.abs(end - start)) / CLEARANCE_SCAN_STEP_RAD)))
         for fraction in np.linspace(0.0, 1.0, steps + 1):
-            solver.setStateByNamesAndValues(joint_names, start + fraction * (end - start))
+            solver.setState(joint_names, start + fraction * (end - start))
             manager.setCollisionObjectsTransform(solver.getState().link_transforms)
             contacts = ContactResultMap()
             manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))

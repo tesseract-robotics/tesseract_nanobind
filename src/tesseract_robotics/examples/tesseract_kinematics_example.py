@@ -1,21 +1,18 @@
 """
 Kinematics Example
-==================
 
 Demonstrates forward and inverse kinematics using the high-level Robot API.
 
 C++ Reference:
     tesseract_kinematics/examples/kinematics_example.cpp
 
-Overview
---------
+**Overview**
 This example shows the kinematics pipeline:
 1. Load robot with kinematic solver (KDL by default)
 2. Compute forward kinematics (FK): joint angles -> end effector pose
 3. Compute inverse kinematics (IK): target pose -> joint angles
 
-Key Concepts
-------------
+**Key Concepts**
 **Forward Kinematics (FK)**:
     Given joint angles, compute the pose of any link in the kinematic chain.
     FK is always unique - one set of joint angles produces exactly one pose.
@@ -44,11 +41,10 @@ Key Concepts
 **Quaternion Convention**:
     Project canonical order is scalar-last `[qx, qy, qz, qw]` — used by
     every public Python API (`Pose.from_xyz_quat`, `Quaterniond.from_xyzw`,
-    `q.coeffs()`, etc.). The `Quaterniond(w, x, y, z)` 4-double ctor is
-    Eigen's exception, for direct interop only.
+    `q.coeffs()`, etc.). `Quaterniond([x, y, z, w])` takes the same order; there is no
+    scalar-first constructor.
 
-Related Examples
-----------------
+**Related Examples**
 - basic_cartesian_example.py: Uses IK internally for Cartesian planning
 - freespace_ompl_example.py: Uses FK for state validation
 - pick_and_place_example.py: FK/IK for grasp pose computation
@@ -58,7 +54,10 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator, Quaterniond
-from tesseract_robotics.planning import Pose, Robot
+from tesseract_robotics.planning import Robot
+
+# Offset of every joint from the IK seed to the configuration the IK target is taken from [rad].
+IK_TARGET_OFFSET_RAD = 0.1
 
 
 def main():
@@ -93,20 +92,15 @@ def main():
     # =========================================================================
     # STEP 3: Inverse Kinematics
     # =========================================================================
-    # Define target pose for end effector
-    # Pose.from_xyz_quat([x, y, z], [qx, qy, qz, qw]) - note scalar-last quaternion
-    # This quaternion represents a rotation about the z-axis
-    target_pose = Pose.from_xyz_quat([0.7, -0.1, 1.0], [0.7071, 0, 0.7071, 0])
+    # Target pose: the FK of a configuration IK_TARGET_OFFSET_RAD away from the seed, so a
+    # solution exists and the solver, started at the seed, can be checked against it.
+    target_pose = robot.fk("manipulator", joint_pos + IK_TARGET_OFFSET_RAD, tip_link="tool0")
 
     # robot.ik() solves for joint angles that achieve target pose
     # seed: initial guess for iterative solver (affects which solution is found)
     # tip_link: end of kinematic chain (must match FK tip_link for consistency)
-    ik_solutions = []
-    ik_result = robot.ik("manipulator", target_pose, seed=joint_pos, tip_link="tool0")
-
-    # IK returns None if no solution found (pose unreachable or solver failed)
-    if ik_result is not None:
-        ik_solutions.append(ik_result)
+    # IK raises IKNoSolutionError if no solution is found (pose unreachable or solver failed)
+    ik_solutions = [robot.ik("manipulator", target_pose, seed=joint_pos, tip_link="tool0")]
 
     # Report results
     # For 7-DOF robot, infinite solutions exist for a 6D pose (self-motion)

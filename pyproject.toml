@@ -72,6 +72,7 @@ tesseract_online_planning_example = "tesseract_robotics.examples.online_planning
 tesseract_online_planning_sqp_example = "tesseract_robotics.examples.online_planning_sqp_example:main"
 tesseract_pointcloud_octree_collision_example = "tesseract_robotics.examples.pointcloud_octree_collision_example:main"
 tesseract_pick_and_place_example = "tesseract_robotics.examples.pick_and_place_example:main"
+tesseract_pythonic_api_example = "tesseract_robotics.examples.pythonic_api_example:main"
 tesseract_plugin_configuration_example = "tesseract_robotics.examples.plugin_configuration_example:main"
 tesseract_puzzle_piece_auxillary_axes_example = "tesseract_robotics.examples.puzzle_piece_auxillary_axes_example:main"
 tesseract_python_constraints_example = "tesseract_robotics.examples.python_constraints_example:main"
@@ -91,7 +92,16 @@ minversion = "6.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 # tests/audit needs libclang, which only the `audit` env has: run it with `pixi run -e audit audit-test`.
-addopts = ["-ra", "--strict-markers", "--tb=short", "--ignore=tests/audit"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--tb=short", "--ignore=tests/audit"]
+# An xfail that starts passing fails the run, so a stale xfail cannot hide.
+xfail_strict = true
+# A hung planner or a deadlocked thread test must fail the run, not stall it. The longest
+# example plans (TrajOptIfopt on a 9-DOF toolpath) take under 2 minutes on a loaded runner;
+# a test that needs more, or less, sets `@pytest.mark.timeout(seconds)`.
+timeout = 600
+timeout_method = "thread"
+# Warnings are errors: a warning that surfaces is fixed or filtered below with its reason.
+filterwarnings = ["error"]
 markers = [
     "viewer: Viewer examples (deselect with '-m \"not viewer\"')",
     "planning: Motion planning examples",
@@ -196,6 +206,7 @@ nanobind = "==2.12.0"  # exact: committed .pyi stubs are stubgen output of this 
 # Dev/test deps
 pytest = ">=7.0"
 pytest-xdist = ">=3.0"
+pytest-timeout = ">=2.3"
 pytest-benchmark = "*"
 pyyaml = ">=6.0"  # tests (task composer config fixtures) and scripts/audit_gil.py
 ruff = ">=0.8.0"
@@ -238,10 +249,10 @@ vcs2l = "*"
 
 [tool.pixi.tasks]
 check-wheel-sources = { cmd = "python scripts/check_wheel_sources.py", description = "Check wheel sources against upstream development submodules" }
-test = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q -n auto", depends-on = [
+test = { cmd = "python -m pytest tests --ignore=tests/benchmarks -q -n auto", depends-on = [
     "install",
 ] }
-test-benchmark = { cmd = "python -m pytest tests/benchmarks -x -q", depends-on = [
+test-benchmark = { cmd = "python -m pytest tests/benchmarks -q", depends-on = [
     "install",
 ], description = "Run benchmark tests (serial, no xdist)" }
 lint = "ruff check ."
@@ -351,6 +362,16 @@ viser = ">=1.1.1"
 trimesh = ">=4"
 pillow = "*"
 
+# Docs figures (scripts/docs_figures): matplotlib renders them from the real library, so it
+# lives in the default env beside the bindings. matplotlib-base: no GUI toolkit.
+[tool.pixi.feature.figures.dependencies]
+matplotlib-base = ">=3.9"
+
+[tool.pixi.feature.figures.tasks]
+docs-figures = { cmd = "python -m scripts.docs_figures", description = "Regenerate the docs figures in docs/assets/figures and their lock, from the library (deterministic); NAME... for some" }
+docs-figures-check = { cmd = "python -m scripts.docs_figures --check", description = "Regenerate the docs figures into build/ and fail unless they and their inputs match the committed SVGs and figures.lock.json bit for bit" }
+docs-figures-measure = { cmd = "python -m scripts.docs_figures --measure", description = "Re-run a measured figure's benchmark (NAME, e.g. planner_comparison) into docs/assets/figures/data/; then run docs-figures" }
+
 [tool.pixi.feature.profile.dependencies]
 py-spy = ">=0.4.2"
 
@@ -380,7 +401,7 @@ audit-telemetry = { cmd = "python scripts/audit_telemetry_report.py", descriptio
 audit-cache-prune = { cmd = "python scripts/audit_cache_prune.py", description = "Drop the libclang fact-cache entries a run did not use (CI, before saving the cache)" }
 
 [tool.pixi.environments]
-default = { features = ["profile", "viewer", "native"], solve-group = "default" }
+default = { features = ["profile", "viewer", "native", "figures"], solve-group = "default" }
 py312 = { features = ["py312", "viewer", "native"], solve-group = "py312" }
 py315 = { features = ["py315", "native"], solve-group = "py315" }
 wheel-312 = { features = ["wheel-test", "wheel-py312"], no-default-feature = true, solve-group = "wheel-312" }

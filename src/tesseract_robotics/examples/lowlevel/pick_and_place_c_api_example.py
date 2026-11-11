@@ -47,6 +47,7 @@ from tesseract_robotics.environment import (
     ModifyAllowedCollisionsType,
     MoveLinkCommand,
 )
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.examples.lowlevel.example_support import (
     add_fixed_link,
     load_support_environment,
@@ -279,7 +280,7 @@ def run(ifopt: bool = False):
         place_program.push_back(MoveInstructionPoly(instruction))
 
     place_result = run_pipeline(env, place_program, profiles, pipeline)
-    assert place_result.successful, f"PLACE planning failed: {place_result.message}"
+    require_success(place_result, "PLACE")
     print(f"PLACE successful! {len(place_result)} waypoints")
 
     return {

@@ -1,6 +1,5 @@
 """
 Contact Managers Example
-========================
 
 Port of upstream `box_box_example.cpp` on every discrete backend, then the
 contact-manager plugin factory, collision margins, the allowed collision
@@ -15,8 +14,7 @@ C++ Reference:
     common/test/utils_unit.cpp  (TestGetAllowedCollisions)
     support/urdf/contact_manager_plugins.yaml
 
-Overview
---------
+**Overview**
 1. `ContactManagersPluginFactory(Path, locator)` from `contact_manager_plugins.yaml`;
    list the discrete and continuous plugins.
 2. Run `box_box_example` on BulletDiscreteBVH, BulletDiscreteSimple and
@@ -36,8 +34,7 @@ Overview
 8. `EnvironmentContactAllowedValidator`, managers by name and the
    `SetActive*ContactManagerCommand` pair on the IIWA environment.
 
-Key Concepts
-------------
+**Key Concepts**
 **PLY loading deviation**:
     Upstream reads `box_2m.ply` with `loadSimplePlyFile`, which is not bound.
     Here it is loaded with `createMeshFromPath` and turned into a hull with

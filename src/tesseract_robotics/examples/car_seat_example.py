@@ -6,16 +6,14 @@ manufacturing: picking car seats from a staging area and placing them in a
 vehicle body. It showcases dynamic scene modification, mesh handling, and
 multi-phase planning workflows.
 
-PIPELINE OVERVIEW
------------------
+**PIPELINE OVERVIEW**
 1. LOAD ENVIRONMENT: 8-DOF robot (linear carriage + 7-axis arm), workcell
 2. ADD SEATS: Dynamic mesh loading - visual (DAE) + collision (10 convex STLs per seat)
 3. PICK PHASE: Plan freespace motion Home -> Pick1 (above seat_1)
 4. ATTACH: Reparent seat_1 from world to end_effector (MoveLinkCommand)
 5. PLACE PHASE: Plan transport motion Pick1 -> Place1 with attached object
 
-KEY CONCEPTS DEMONSTRATED
--------------------------
+**KEY CONCEPTS DEMONSTRATED**
 1. Dynamic Scene Graph Modification:
    - AddLinkCommand: add objects at runtime
    - MoveLinkCommand: reparent links (attach/detach objects)
@@ -34,27 +32,23 @@ KEY CONCEPTS DEMONSTRATED
    - carriage_rail: linear prismatic joint (extends workspace)
    - joint_s, l, e, u, r, b, t: 7-DOF arm (Motoman-style naming)
 
-ROBOT CONFIGURATION (from C++)
-------------------------------
+**ROBOT CONFIGURATION (from C++)**
 Joint positions defined in getPredefinedPosition():
 - Home: all zeros (robot at origin)
 - Pick1: carriage=2.22m, arm configured for downward reach at seat_1
 - Pick2/Pick3: similar configurations for seats 2 and 3
 - Place1: carriage=4.15m (far end), arm oriented for vehicle mounting
 
-TRAJOPT SETTINGS (from C++)
----------------------------
+**TRAJOPT SETTINGS (from C++)**
 Collision constraint: margin=0, buffer=0.005m, coeff=10
 Collision cost: margin=0.005m, buffer=0.01m, coeff=50
 Solver: OSQP, max_iter=200, min_approx_improve=1e-3
 
-C++ SOURCE
-----------
+**C++ SOURCE**
 tesseract_planning/tesseract_examples/src/car_seat_example.cpp
 Author: Levi Armstrong, Southwest Research Institute, July 2019
 
-RELATED EXAMPLES
-----------------
+**RELATED EXAMPLES**
 - pick_and_place_example.py: simpler pick-and-place workflow
 - glass_upright_example.py: orientation-constrained motion
 - lowlevel/car_seat_c_api_example.py: low-level API version with detailed comments
@@ -78,6 +72,7 @@ from tesseract_robotics.environment import (
     ModifyAllowedCollisionsType,
     MoveLinkCommand,
 )
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.geometry import createMeshFromResource
 from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
@@ -379,13 +374,7 @@ def plan_motion(
     print(f"Planning with {pipeline}...")
     result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
 
-    if not result.successful:
-        print(f"Planning failed: {result.message}")
-        # Check if there are additional error details
-        if hasattr(result, "raw_results"):
-            print(f"Raw results type: {type(result.raw_results)}")
-
-    assert result.successful, f"{phase_name} failed: {result.message}"
+    require_success(result, phase_name)
     print(f"{phase_name} OK: {len(result)} waypoints")
     return result
 

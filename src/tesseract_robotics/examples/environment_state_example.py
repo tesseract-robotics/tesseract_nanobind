@@ -1,6 +1,5 @@
 """
 Environment State Example
-=========================
 
 Reads and sets an IIWA environment's state through every native `setState` /
 `getState` / `getLinkTransforms` overload, with its first joint made FLOATING,
@@ -14,8 +13,7 @@ C++ Reference:
     environment/src/environment.cpp  (currentStateChanged :651-654, findTCPOffset :832-862)
     common/test/tesseract_common_unit.cpp  (ManipulatorInfo :433-470)
 
-Overview
---------
+**Overview**
 1. A `ReplaceJointCommand` makes `joint_a1` FLOATING at x = 1.25, as upstream's
    floating-joint test; the floating value then moves to y = 1.5 and z = 1.5,
    one `setState` overload per step.
@@ -28,8 +26,7 @@ Overview
    registered callback; a link name or an unknown name raises `RuntimeError`.
 5. `ManipulatorInfo`: the full constructor, `empty` and `getCombined`.
 
-Key Concepts
-------------
+**Key Concepts**
 **Floating joints**:
     A FLOATING joint has no joint value; its pose is set as an `Isometry3d`
     through `floating_joints`. It is not an active joint, so it adds no

@@ -45,6 +45,7 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.planning import (
     JointTarget,
     MotionProgram,
@@ -144,7 +145,7 @@ def run(pipeline="FreespacePipeline", num_planners=None, *, composer: TaskCompos
 
     result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
 
-    assert result.successful, f"Planning failed: {result.message}"
+    require_success(result, "freespace")
     print(f"Planning successful! {len(result)} waypoints")
 
     return {"result": result, "robot": robot, "joint_names": joint_names}

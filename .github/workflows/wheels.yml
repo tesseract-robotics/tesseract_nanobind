@@ -753,7 +753,7 @@ jobs:
         cache: true
     - name: install wheel in conda OpenMP consumer
       working-directory: tesseract_nanobind
-      run: pixi run -e wheel-openmp uv pip install ../test-wheels/*.whl pytest pytest-xdist
+      run: pixi run -e wheel-openmp uv pip install ../test-wheels/*.whl pytest pytest-xdist pytest-timeout
     - name: one OpenMP runtime in both import orders
       working-directory: tesseract_nanobind
       run: |

@@ -31,15 +31,20 @@ from tesseract_robotics.motion_planners_ompl import (
     OMPLPlannerType,
     OMPLRealVectorMoveProfile,
     OMPLSolverConfig,
+    RNG_setSeed,
     RRTConnectConfigurator,
     RRTstarConfigurator,
     SBLConfigurator,
 )
+from tesseract_robotics.planning import Robot
 from tesseract_robotics.planning.profiles import (
     UnknownConfiguratorFieldError,
     UnknownPlannerTypeError,
     create_ompl_planner_configurators,
 )
+
+from ..planning_validity import assert_trajectory_valid
+from .planned_result import planning_result
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 
@@ -160,6 +165,54 @@ def _with_profile(request: PlannerRequest, profile: OMPLRealVectorMoveProfile) -
     return request
 
 
+class TestOMPLSeedDeterminism:
+    """`RNG_setSeed` makes a solve reproducible: same seed, identical path.
+
+    The contract holds for one planner that stops at its first solution and does not smooth:
+    OMPL then draws every sample from the seeded generator and nothing depends on a clock.
+    With several planners racing, which thread's path comes back first is the scheduler's choice,
+    so equality is not promised there (see `test_racing_planners_return_valid_paths`).
+    """
+
+    SEED = 1234
+    OTHER_SEED = 4321
+
+    @staticmethod
+    def _first_solution_profile(num_planners: int) -> OMPLRealVectorMoveProfile:
+        profile = OMPLRealVectorMoveProfile()
+        profile.solver_config.planners = [RRTConnectConfigurator() for _ in range(num_planners)]
+        profile.solver_config.optimize = False
+        profile.solver_config.max_solutions = 1
+        profile.solver_config.simplify = False
+        return profile
+
+    def _solve(self, request: PlannerRequest, profile, seed: int) -> np.ndarray:
+        RNG_setSeed(seed)
+        response = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE).solve(_with_profile(request, profile))
+        result = planning_result(response)
+        assert_trajectory_valid(Robot.build(request.env), result)
+        return result.to_numpy()
+
+    def test_same_seed_gives_an_identical_path(self, abb_irb2400_request):
+        profile = self._first_solution_profile(num_planners=1)
+        first = self._solve(abb_irb2400_request, profile, self.SEED)
+        second = self._solve(abb_irb2400_request, profile, self.SEED)
+        np.testing.assert_array_equal(first, second)
+
+    def test_a_different_seed_gives_a_different_path(self, abb_irb2400_request):
+        # The seed reaches the sampler: were it ignored, the test above would hold trivially.
+        profile = self._first_solution_profile(num_planners=1)
+        first = self._solve(abb_irb2400_request, profile, self.SEED)
+        other = self._solve(abb_irb2400_request, profile, self.OTHER_SEED)
+        assert first.shape != other.shape or not np.array_equal(first, other)
+
+    def test_racing_planners_return_valid_paths(self, abb_irb2400_request):
+        # Two planners race: the paths may differ between runs, each must still be valid.
+        profile = self._first_solution_profile(num_planners=2)
+        for _ in range(2):
+            self._solve(abb_irb2400_request, profile, self.SEED)
+
+
 class TestPlannerConfigurators:
     """#301: all 14 OMPLPlannerType values have a bound configurator."""
 
@@ -188,7 +241,7 @@ class TestPlannerConfigurators:
         response = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE).solve(
             _with_profile(abb_irb2400_request, profile)
         )
-        assert response.successful, f"{cls_name} planning failed: {response.message}"
+        assert_trajectory_valid(Robot.build(abb_irb2400_request.env), planning_result(response))
 
     @pytest.mark.parametrize("name", list(OMPLPlannerType.__members__))
     def test_create_ompl_planner_configurators_accepts_every_type(self, name):
@@ -271,7 +324,7 @@ class TestMotionPlannerBase:
         request = _with_profile(abb_irb2400_request, OMPLRealVectorMoveProfile())
         planner = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE)
         response = MotionPlanner.solve(planner, request)
-        assert response.successful, response.message
+        assert_trajectory_valid(Robot.build(request.env), planning_result(response))
 
 
 class TestProfileHooks:

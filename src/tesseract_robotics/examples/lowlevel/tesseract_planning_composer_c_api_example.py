@@ -6,8 +6,7 @@ planning pipelines. TaskComposer is Tesseract's workflow engine for combining
 planners (OMPL, TrajOpt, Descartes) with post-processing (interpolation, time
 parameterization) into reusable pipelines defined in YAML configuration.
 
-Pipeline Overview
------------------
+**Pipeline Overview**
 TaskComposer executes task graphs loaded from YAML config files. Each pipeline
 is a directed graph of tasks:
 
@@ -25,8 +24,7 @@ CartesianPipeline:
 TrajOptPipeline:
   1. TrajOpt only - optimization-based planning (may fail if initial guess is poor)
 
-Key Concepts
-------------
+**Key Concepts**
 TaskComposerPluginFactory: Loads pipeline definitions and planner plugins from YAML.
   - Default config: tesseract_planning/config/task_composer_plugins.yaml
   - Plugins are loaded dynamically (libtesseract_task_composer_planning_nodes.dylib)
@@ -54,8 +52,7 @@ AnyPoly Wrapping: Required at plugin boundaries because C++ RTTI doesn't work
 This example does each step with the bindings; `tesseract_robotics.planning.TaskComposer`
 wraps the same steps for the high-level examples.
 
-Configuration Files
--------------------
+**Configuration Files**
 task_composer_plugins.yaml structure:
   executors:
     TaskflowExecutor: {threads: 4}
@@ -71,23 +68,20 @@ Plugin Resolution:
     tesseract_task_composer registers them with the plugin loader by path
     (TESSERACT_TASK_COMPOSER_PLUGINS), in a wheel and an editable install alike
 
-Why Use TaskComposer?
----------------------
+**Why Use TaskComposer?**
 - Encapsulates complex multi-stage planning workflows
 - YAML-configurable without code changes
 - Plugin architecture for custom planners
 - Handles data marshaling between planners
 - Parallel task execution where graph allows
 
-When to Bypass TaskComposer
----------------------------
+**When to Bypass TaskComposer**
 - Need direct planner access (custom OMPL algorithms, TrajOpt cost functions)
 - Want to avoid plugin loading overhead
 - Custom time parameterization settings
 See: tesseract_planning_lowlevel_c_api_example.py
 
-Related Examples
-----------------
+**Related Examples**
 - tesseract_planning_lowlevel_c_api_example.py: Direct planner access
 - freespace_ompl_c_api_example.py: OMPL planning via TaskComposer
 - basic_cartesian_c_api_example.py: TrajOpt Cartesian planning

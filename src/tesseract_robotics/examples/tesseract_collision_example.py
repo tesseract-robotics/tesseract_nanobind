@@ -1,22 +1,19 @@
 """
 Collision Checking Example
-==========================
 
 Demonstrates collision detection using Tesseract's discrete contact manager.
 
 C++ Reference:
     tesseract_collision/examples/bullet_discrete_simple_example.cpp
 
-Overview
---------
+**Overview**
 This example shows the collision checking workflow:
 1. Load robot and add obstacle geometry to the environment
 2. Get DiscreteContactManager from environment
 3. Sweep through robot configurations checking for collisions
 4. Interpret contact results (distances, link pairs)
 
-Key Concepts
-------------
+**Key Concepts**
 **Contact Managers**:
     - DiscreteContactManager: Check collision at single poses (this example)
     - ContinuousContactManager: Check collision along trajectory (motion planning)
@@ -34,8 +31,7 @@ Key Concepts
     - nearest_points: Closest points on each geometry
     - normal: Contact normal vector
 
-Pipeline
---------
+**Pipeline**
 1. Environment Setup:
    - Load URDF/SRDF defining robot links and collision geometry
    - Add obstacle objects with collision components
@@ -50,8 +46,7 @@ Pipeline
    - contactTest(): Run collision query
    - Iterate ContactResultMap for collision pairs
 
-Related Examples
-----------------
+**Related Examples**
 - geometry_showcase_example.py: Geometry types for collision
 - freespace_ompl_example.py: Collision-free motion planning
 - basic_cartesian_example.py: TrajOpt uses collision gradients

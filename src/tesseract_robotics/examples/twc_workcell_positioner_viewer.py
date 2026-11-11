@@ -7,7 +7,7 @@ Available workcells:
 - rail: ABB IRB4600 on linear rail (1-DOF prismatic)
 
 Usage:
-    python twc_workcell_positioner_viewer.py [positioner|rail]
+    python twc_workcell_positioner_viewer.py [positioner|rail] [--twc-support DIR]
 """
 
 import argparse
@@ -23,33 +23,52 @@ import numpy as np
 from tesseract_robotics.common import ResourceLocator, SimpleLocatedResource
 from tesseract_robotics.environment import Environment
 
+TWC_SUPPORT_ENV = "TWC_SUPPORT_PATH"
+# The submodule's place in the repository, below the repository root.
+TWC_SUPPORT_SUBMODULE = Path("ws/src/tesseract_ros_workcell/twc_support")
 
-def _find_twc_support() -> Path:
-    """Find twc_support path from submodule or environment variable."""
-    # Check env var first (allows override)
-    if env_path := os.environ.get("TWC_SUPPORT_PATH"):
-        return Path(env_path)
 
-    # Default: the submodule, in the repo above this file (src/tesseract_robotics/examples/)
-    for parent in Path(__file__).parents:
-        submodule_path = parent / "ws/src/tesseract_ros_workcell/twc_support"
-        if submodule_path.exists():
-            return submodule_path
+class TwcSupportNotFoundError(FileNotFoundError):
+    """No `twc_support` directory at the given path, the environment variable or the submodule."""
 
-    # Fallback: common development location
-    dev_path = Path.home() / "Code/CADCAM/tesseract_ros_workcell/twc_support"
-    if dev_path.exists():
-        return dev_path
 
-    raise FileNotFoundError(
-        "twc_support not found. Either:\n"
-        "  1. Run 'git submodule update --init' to fetch the submodule\n"
-        "  2. Set TWC_SUPPORT_PATH environment variable\n"
-        "  3. Clone tesseract_ros_workcell to ~/Code/CADCAM/"
+def find_twc_support(explicit: Path | None = None) -> Path:
+    """Locate the `twc_support` directory.
+
+    Looked up in order: `explicit`, the `TWC_SUPPORT_PATH` environment variable, the
+    repository's `ws/src/tesseract_ros_workcell` submodule (above this file).
+
+    Args:
+        explicit: A path given by the caller, for example from `--twc-support`.
+
+    Returns:
+        An existing directory.
+
+    Raises:
+        TwcSupportNotFoundError: the first source that names a path names a missing one,
+            or no source names one.
+    """
+    if explicit is not None:
+        candidates = [("the twc_support argument", explicit)]
+    elif env_path := os.environ.get(TWC_SUPPORT_ENV):
+        candidates = [(f"${TWC_SUPPORT_ENV}", Path(env_path))]
+    else:
+        candidates = [
+            ("the submodule", parent / TWC_SUPPORT_SUBMODULE) for parent in Path(__file__).parents
+        ]
+    for source, path in candidates:
+        if path.is_dir():
+            return path
+        if source != "the submodule":
+            raise TwcSupportNotFoundError(f"{source} names {path}, which is not a directory")
+    raise TwcSupportNotFoundError(
+        f"twc_support not found: pass --twc-support, set {TWC_SUPPORT_ENV}, "
+        "or run 'git submodule update --init'"
     )
 
 
-TWC_SUPPORT_PATH = _find_twc_support()
+class WorkcellInitError(RuntimeError):
+    """`Environment.init` rejected a workcell's URDF/SRDF."""
 
 
 class TwcResourceLocator(ResourceLocator):
@@ -200,20 +219,30 @@ def animation_rows(workcell: str, duration: float = 60.0, fps: float = 30.0):
     return names, np.array(rows)
 
 
-def run(workcell: str = "rail"):
+def run(workcell: str = "rail", twc_support: Path | None = None):
+    """Load a workcell.
+
+    Args:
+        workcell: Key of `WORKCELLS`.
+        twc_support: The `twc_support` directory; see `find_twc_support` for the default.
+
+    Returns:
+        dict with `env`, `locator` and `workcell`.
+    """
     config = WORKCELLS[workcell]
+    support_path = find_twc_support(twc_support)
 
     # --8<-- [start:load_workcell]
-    urdf_path = TWC_SUPPORT_PATH / config["urdf"]
-    srdf_path = TWC_SUPPORT_PATH / config["srdf"]
+    urdf_path = support_path / config["urdf"]
+    srdf_path = support_path / config["srdf"]
 
-    print(f"Using twc_support from: {TWC_SUPPORT_PATH}")
+    print(f"Using twc_support from: {support_path}")
     print(f"Workcell: {workcell}")
     print(f"Loading URDF: {urdf_path}")
     print(f"Loading SRDF: {srdf_path}")
 
     # Create resource locator (must keep reference alive!)
-    locator = TwcResourceLocator(TWC_SUPPORT_PATH)
+    locator = TwcResourceLocator(support_path)
 
     # Load and patch URDF for Tesseract 0.33+ compatibility
     urdf_content = locator.load_urdf(urdf_path)
@@ -226,7 +255,8 @@ def run(workcell: str = "rail"):
     else:
         print("SRDF not found, loading URDF only")
         success = t_env.init(urdf_content, locator)
-    assert success, f"failed to initialize the {workcell} workcell"
+    if not success:
+        raise WorkcellInitError(f"failed to initialize the {workcell} workcell")
     # --8<-- [end:load_workcell]
 
     print(f"Environment initialized: {t_env.getName()}")
@@ -244,8 +274,14 @@ def main() -> int:
         choices=list(WORKCELLS.keys()),
         help="Workcell to load (default: rail)",
     )
+    parser.add_argument(
+        "--twc-support",
+        type=Path,
+        default=None,
+        help=f"twc_support directory (default: ${TWC_SUPPORT_ENV}, then the repository submodule)",
+    )
     args = parser.parse_args()
-    results = run(args.workcell)
+    results = run(args.workcell, args.twc_support)
 
     from tesseract_robotics.viewer import (
         TesseractViewer,

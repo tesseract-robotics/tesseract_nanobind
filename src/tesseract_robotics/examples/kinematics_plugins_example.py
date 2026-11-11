@@ -1,6 +1,5 @@
 """
 Kinematics Plugins Example
-==========================
 
 Builds IIWA forward and inverse kinematics from the kinematics plugin YAML,
 switches the inverse solver, edits the factory and round-trips its config,
@@ -11,8 +10,7 @@ C++ Reference:
     kinematics/test/kinematics_factory_unit.cpp  (PluginFactorAPIUnit)
     support/urdf/lbr_iiwa_14_r820_plugins.yaml
 
-Overview
---------
+**Overview**
 1. `KinematicsPluginFactory(Path, locator)` from the plugin YAML the IIWA SRDF
    names; list its solvers per group.
 2. Create forward and inverse kinematics by group name and by `PluginInfo`.
@@ -23,8 +21,7 @@ Overview
 6. A `KinematicGroup` straight from the factory's solver, solved with a list of
    `KinGroupIKInput`.
 
-Key Concepts
-------------
+**Key Concepts**
 **Convergence check, not a guessed tolerance**:
     Each IK solution is checked with the solver's own stopping rule, evaluated
     on the error twist KDL computes, `diff(FK(q), target)` in the base frame:

@@ -49,7 +49,7 @@ C++ Source: tesseract_planning/tesseract_examples/src/pick_and_place_example.cpp
 
 C++ Parameters (verified):
     - Robot: KUKA IIWA with pick_and_place_plan.urdf workcell
-    - Box: 10cm cube at (-0.2, 0.55) on workcell_base (table z=0.772m)
+    - Box: 20cm cube at (0.15, 0.4) on workcell_base (table z=0.772m)
     - Pick rotation: Ry(180) = gripper pointing down
     - Place location: middle_left_shelf at (-0.149, 0.731, 1.160)
     - Place rotation: Rz(90) = gripper approaching shelf from front
@@ -77,6 +77,7 @@ from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.collision import CollisionEvaluatorType
 from tesseract_robotics.command_language import ProfileDictionary
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
 )
@@ -97,8 +98,14 @@ from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
 
-OFFSET = 0.005
-BOX_SIZE = 0.1
+# Constants of pick_and_place_example.cpp and the PickAndPlaceExample constructor defaults
+# (pick_and_place_example.h): box edge and position on the table, as the low-level port has them.
+OFFSET = 0.005  # clearance between the box and the table [m]
+BOX_SIZE = 0.2  # box edge [m]
+BOX_XY = (0.15, 0.4)  # box position on the table [m]
+TABLE_HEIGHT_M = 0.772
+APPROACH_HEIGHT_M = 0.15  # pick approach, above the grasp pose [m]
+PLACE_APPROACH_BACKOFF_M = 0.25  # place approach, in -Y from the shelf pose [m]
 LINK_BOX = "box"
 LINK_BASE = "world"
 LINK_TCP = "iiwa_tool0"
@@ -166,7 +173,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
             - joint_names: List of 7 KUKA IIWA joint names
     """
     # Box position on table (X, Y relative to workcell_base)
-    box_pos = [-0.2, 0.55]
+    box_pos = BOX_XY
 
     # Load KUKA IIWA workcell from tesseract_support
     # Includes: robot, table (z=0.772m), shelf structure
@@ -190,7 +197,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     create_obstacle(
         robot,
         name=LINK_BOX,
-        geometry=box(BOX_SIZE, BOX_SIZE, BOX_SIZE),  # 10cm cube
+        geometry=box(BOX_SIZE, BOX_SIZE, BOX_SIZE),  # 20cm cube
         transform=Pose.from_xyz(box_pos[0], box_pos[1], BOX_SIZE / 2 + OFFSET),
         parent_link="workcell_base",
     )
@@ -211,16 +218,16 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     print("\n=== PICK ===")
 
     # Pick pose calculation:
-    # - Z = table_height (0.772m) + box_size + offset
+    # - Z = table_height + box_size + offset
     # - Rotation: Ry(180) = gripper pointing down
     # - Rotation matrix: [[-1,0,0], [0,1,0], [0,0,-1]]
-    pick_z = BOX_SIZE + 0.772 + OFFSET
+    pick_z = BOX_SIZE + TABLE_HEIGHT_M + OFFSET
     pick_rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
     pick_pose = Pose.from_matrix_position(pick_rotation, [box_pos[0], box_pos[1], pick_z])
 
-    # Approach pose: 15cm directly above pick pose (same orientation)
+    # Approach pose: APPROACH_HEIGHT_M directly above pick pose (same orientation)
     approach_pose = Pose.from_matrix_position(
-        pick_rotation, [box_pos[0], box_pos[1], pick_z + 0.15]
+        pick_rotation, [box_pos[0], box_pos[1], pick_z + APPROACH_HEIGHT_M]
     )
 
     # Build PICK program:
@@ -236,7 +243,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     )
 
     pick_result = composer.plan(robot, pick_program, pipeline=pipeline, profiles=profiles)
-    assert pick_result.successful, f"PICK failed: {pick_result.message}"
+    require_success(pick_result, "PICK")
     print(f"PICK OK: {len(pick_result)} waypoints")
 
     # ==================== ATTACH BOX TO END EFFECTOR ====================
@@ -279,7 +286,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     place_pose = Pose.from_matrix_position(place_rotation, place_pos)
 
     # Approach: 25cm back from shelf in -Y direction (approach from front)
-    place_approach_pos = [place_pos[0], place_pos[1] - 0.25, place_pos[2]]
+    place_approach_pos = [place_pos[0], place_pos[1] - PLACE_APPROACH_BACKOFF_M, place_pos[2]]
     place_approach_pose = Pose.from_matrix_position(place_rotation, place_approach_pos)
 
     # Build PLACE program:
@@ -297,7 +304,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     )
 
     place_result = composer.plan(robot, place_program, pipeline=pipeline, profiles=profiles)
-    assert place_result.successful, f"PLACE failed: {place_result.message}"
+    require_success(place_result, "PLACE")
     print(f"PLACE OK: {len(place_result)} waypoints")
     # --8<-- [end:full_workflow]
 

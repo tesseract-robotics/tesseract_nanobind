@@ -1,6 +1,5 @@
 """
 Low-Level Kinematics Example (C-API Style)
-===========================================
 
 Demonstrates forward and inverse kinematics using Tesseract's low-level
 C++ bindings without the high-level Robot wrapper class.
@@ -11,23 +10,20 @@ C++ Reference:
 High-Level Alternative:
     examples/tesseract_kinematics_example.py (uses Robot wrapper class)
 
-Overview
---------
+**Overview**
 This example directly uses the C++ API bindings for kinematics operations:
 1. Manually load URDF/SRDF and initialize Environment
 2. Get KinematicGroup from Environment
 3. Compute forward kinematics (FK): joint angles -> Isometry3d pose
 4. Compute inverse kinematics (IK): target pose -> joint angles
 
-Why Use Low-Level API?
-----------------------
+**Why Use Low-Level API?**
 - Access to all IK solver parameters and options
 - Multiple IK inputs for simultaneous multi-chain solving
 - Direct control over working frames and tip links
 - Performance-critical applications requiring minimal overhead
 
-Key Concepts
-------------
+**Key Concepts**
 **Kinematic Groups (KinematicGroup)**:
     Defined in SRDF, groups specify which joints form a kinematic chain.
     Each group has a name (e.g., "manipulator"), base link, and tip link.
@@ -68,9 +64,8 @@ Key Concepts
 **Quaternion Convention**:
     Project canonical order is scalar-last `[qx, qy, qz, qw]`. Use
     `Quaterniond.from_xyzw(qx, qy, qz, qw)` to build; component access via
-    properties (`q.x`, `q.y`, `q.z`, `q.w`). The 4-double `Quaterniond(w, x, y, z)`
-    ctor is Eigen's scalar-first signature — present for direct interop but
-    not preferred in Python code.
+    properties (`q.x`, `q.y`, `q.z`, `q.w`). `Quaterniond([x, y, z, w])` takes the same
+    order; there is no scalar-first constructor.
 
 **Isometry3d**:
     Rigid transformation (rotation + translation, no scaling/shearing).
@@ -78,8 +73,7 @@ Key Concepts
     - Translation3d(x, y, z): Creates translation component
     - Multiply with * to compose transforms (right-to-left)
 
-Pipeline
---------
+**Pipeline**
 1. Environment Setup:
    - GeneralResourceLocator finds URDF/SRDF in the support data passed as `paths`
    - Environment.init() parses robot description and loads kinematic plugins
@@ -96,8 +90,7 @@ Pipeline
    - calcInvKin(inputs, seed_position) returns solution array
    - Iterate results (may be empty if no solution exists)
 
-Related Examples
-----------------
+**Related Examples**
 - tesseract_kinematics_example.py: Same workflow with Robot API
 - basic_cartesian_example.py: Uses IK internally for Cartesian planning
 - freespace_ompl_example.py: Uses FK for trajectory validation
@@ -116,6 +109,7 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import Environment
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
 from tesseract_robotics.kinematics import KinGroupIKInput, KinGroupIKInputs
 
 # Initialize Environment with a robot from URDF file
@@ -158,7 +152,8 @@ def main():
     srdf_path = Path(srdf_path_str)
 
     # init() parses URDF/SRDF and loads configured kinematic plugins
-    assert env.init(urdf_path, srdf_path, locator)
+    if not env.init(urdf_path, srdf_path, locator):
+        raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     # ABB IRB2400 joint naming convention: joint_1 through joint_6
     _robot_joint_names = [f"joint_{i + 1}" for i in range(6)]  # noqa: F841
