@@ -7,14 +7,14 @@ from collections import Counter
 
 import pytest
 
+from tesseract_robotics.command_language import ProfileDictionary
 from tesseract_robotics.planning.profiles import (
     create_descartes_default_profiles,
     create_ompl_default_profiles,
     create_trajopt_default_profiles,
     create_trajopt_ifopt_default_profiles,
 )
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_serialization import (
+from tesseract_robotics.serialization import (
     task_composer_log_from_binary,
     task_composer_log_from_file,
     task_composer_log_from_xml,
@@ -22,7 +22,7 @@ from tesseract_robotics.tesseract_serialization import (
     task_composer_log_to_file,
     task_composer_log_to_xml,
 )
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.task_composer import (
     AnyPoly_as_TaskComposerDataStorage,
     AnyPoly_wrap_ProfileDictionary,
     TaskComposerContext,
@@ -225,7 +225,7 @@ class TestSerialization:
         task_composer_log_to_file(_profiles_log(create_trajopt_default_profiles()), path)
         script = (
             "import sys\n"
-            "from tesseract_robotics.tesseract_serialization import task_composer_log_from_file\n"
+            "from tesseract_robotics.serialization import task_composer_log_from_file\n"
             "log = task_composer_log_from_file(sys.argv[1])\n"
             "print(sorted(log.initial_data.getData()))\n"
         )

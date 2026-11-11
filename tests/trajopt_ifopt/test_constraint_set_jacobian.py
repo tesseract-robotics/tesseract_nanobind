@@ -16,10 +16,10 @@ import numpy as np
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import AddLinkCommand, Environment
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link
 
 # The robot's pose and an obstacle cube centred on its tool: the collision row is active.
 STATE = np.array([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0])

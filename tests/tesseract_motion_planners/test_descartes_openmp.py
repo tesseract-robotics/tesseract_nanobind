@@ -3,14 +3,14 @@
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_descartes import (
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.motion_planners import PlannerRequest
+from tesseract_robotics.motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesLadderGraphSolverProfileD,
     DescartesMotionPlannerD,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+from tesseract_robotics.motion_planners_simple import generateInterpolatedProgram
 
 from . import test_descartes_planner as fixture_source
 from .test_descartes_planner import (

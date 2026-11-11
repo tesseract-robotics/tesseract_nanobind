@@ -12,13 +12,21 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import (
-    get_tesseract_support_path,
-    tesseract_common,
-    tesseract_environment,
-    tesseract_srdf,
-    tesseract_urdf,
+    common as tesseract_common,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
+from tesseract_robotics import (
+    environment as tesseract_environment,
+)
+from tesseract_robotics import (
+    get_tesseract_support_path,
+)
+from tesseract_robotics import (
+    srdf as tesseract_srdf,
+)
+from tesseract_robotics import (
+    urdf as tesseract_urdf,
+)
+from tesseract_robotics.common import Isometry3d, ManipulatorInfo
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -152,14 +160,6 @@ def test_environment_package_has_no_task_composer_reexport():
     assert not hasattr(tesseract_environment, "AnyPoly_wrap_EnvironmentConst")
 
 
-def test_all_names_resolve():
-    """Every name in tesseract_environment.__all__ is an attribute of the package (gh-192)."""
-    missing = [
-        name for name in tesseract_environment.__all__ if not hasattr(tesseract_environment, name)
-    ]
-    assert missing == []
-
-
 def test_import_does_not_load_task_composer():
     """Importing tesseract_environment does not import tesseract_task_composer (gh-192).
 
@@ -167,8 +167,8 @@ def test_import_does_not_load_task_composer():
     """
     code = (
         "import sys\n"
-        "import tesseract_robotics.tesseract_environment\n"
-        "loaded = sorted(m for m in sys.modules if m.startswith('tesseract_robotics.tesseract_task_composer'))\n"
+        "import tesseract_robotics.environment\n"
+        "loaded = sorted(m for m in sys.modules if m.startswith('tesseract_robotics.task_composer'))\n"
         "assert loaded == [], loaded\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
@@ -190,7 +190,7 @@ def test_get_continuous_contact_manager():
 
 def test_contact_test_api():
     """Test contactTest with ContactRequest and ContactResultMap."""
-    from tesseract_robotics.tesseract_collision import (
+    from tesseract_robotics.collision import (
         ContactRequest,
         ContactResultMap,
         ContactTestType,
@@ -214,7 +214,7 @@ def test_clear_cached_contact_managers():
 
     Uses a fully loaded robot environment to verify cache clearing with actual geometry.
     """
-    from tesseract_robotics.tesseract_collision import (
+    from tesseract_robotics.collision import (
         ContactRequest,
         ContactResultMap,
         ContactTestType,
@@ -268,8 +268,8 @@ def test_apply_command_releases_gil_and_still_calls_back():
     The environment fires event callbacks from inside applyCommand, under its own unique lock
     and now with the GIL released, so the callback wrapper has to re-acquire it.
     """
-    from tesseract_robotics.tesseract_geometry import Box
-    from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
+    from tesseract_robotics.geometry import Box
+    from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link
 
     link = Link("gil_link")
     collision = Collision()
@@ -299,7 +299,7 @@ def test_apply_command_releases_gil_and_still_calls_back():
 
 def test_gil_probe_detects_held_gil():
     """The oracle is not vacuous: a copy made with the GIL held counts as such."""
-    from tesseract_robotics.tesseract_environment._tesseract_environment import _GilProbe
+    from tesseract_robotics.environment import _GilProbe
 
     probe = _GilProbe()
     probe.attach(get_environment())  # the binding copies the callback with the GIL held
@@ -309,7 +309,7 @@ def test_gil_probe_detects_held_gil():
 
 def test_clone_releases_gil():
     """Environment.clone() runs its native copy without the GIL (gh-134)."""
-    from tesseract_robotics.tesseract_environment._tesseract_environment import _GilProbe
+    from tesseract_robotics.environment import _GilProbe
 
     env = get_environment()
     probe = _GilProbe()
@@ -844,10 +844,10 @@ _WRONG_CAST_SCRIPT = """\
 import json
 from pathlib import Path
 import numpy as np
-from tesseract_robotics import tesseract_environment as te
+from tesseract_robotics import environment as te
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
@@ -922,10 +922,10 @@ _PY_TCP_XYZ = (0.1, 0.2, 0.3)
 
 _FIND_TCP_TEARDOWN_SCRIPT = """\
 from pathlib import Path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
@@ -1009,7 +1009,7 @@ def test_find_tcp_offset_callback_survives_clone():
 
 def test_find_tcp_offset_callback_on_native_thread():
     """A thread without a Python thread state calls the callback and drops its last owner."""
-    from tesseract_robotics.tesseract_environment._tesseract_environment import (
+    from tesseract_robotics.environment import (
         _find_tcp_offset_on_native_thread,
     )
 

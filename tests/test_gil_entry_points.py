@@ -19,12 +19,12 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import (
+    environment,
     get_tesseract_support_path,
-    tesseract_environment,
-    tesseract_kinematics,
-    tesseract_urdf,
+    kinematics,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, ResourceLocator
+from tesseract_robotics import urdf as urdf_api  # `urdf` is a local in the tests below
+from tesseract_robotics.common import Isometry3d, ResourceLocator
 
 from .tesseract_support_resource_locator import TesseractSupportResourceLocator
 from .tesseract_time_parameterization.test_time_parameterization import (
@@ -97,7 +97,7 @@ class _PythonLocator(ResourceLocator):
 
 @pytest.fixture(scope="module")
 def iiwa_group():
-    env = tesseract_environment.Environment()
+    env = environment.Environment()
     assert env.init(
         _support_urdf("lbr_iiwa_14_r820.urdf"),
         _support_urdf("lbr_iiwa_14_r820.srdf"),
@@ -109,7 +109,7 @@ def iiwa_group():
 def test_kinematic_group_calc_inv_kin_releases_gil(iiwa_group):
     # Out of reach: the numerical solver (KDL LMA) runs to its iteration limit every call.
     pose = Isometry3d.Identity().translate([10.0, 0.0, 0.0])
-    ik_input = tesseract_kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkId(), "tool0")
+    ik_input = kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkId(), "tool0")
     seed = np.zeros(7)
 
     assert_releases_gil(lambda: iiwa_group.calcInvKin(ik_input, seed))
@@ -119,7 +119,7 @@ def test_kinematic_group_calc_inv_kin_releases_gil(iiwa_group):
 def test_kinematic_group_calc_inv_kin_still_solves(iiwa_group):
     q = np.array([0.1, 0.2, -0.1, -0.5, 0.2, 0.3, 0.0])
     pose = iiwa_group.calcFwdKin(q)["tool0"]
-    ik_input = tesseract_kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkId(), "tool0")
+    ik_input = kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkId(), "tool0")
 
     solutions = iiwa_group.calcInvKin([ik_input], q)
 
@@ -134,8 +134,8 @@ def test_parse_urdf_file_releases_gil():
     path = str(_support_urdf("lbr_iiwa_14_r820.urdf"))
     locator = _PythonLocator()
 
-    assert_releases_gil(lambda: tesseract_urdf.parseURDFFile(path, locator))
-    assert len(tesseract_urdf.parseURDFFile(path, locator).getLinks()) > 0
+    assert_releases_gil(lambda: urdf_api.parseURDFFile(path, locator))
+    assert len(urdf_api.parseURDFFile(path, locator).getLinks()) > 0
     # The mesh URLs went through Python while the GIL was released around the parse.
     assert any(url.startswith("package://") for url in locator.urls)
 
@@ -144,12 +144,12 @@ def test_parse_urdf_string_releases_gil():
     urdf = _support_urdf("lbr_iiwa_14_r820.urdf").read_text()
     locator = _PythonLocator()
 
-    assert_releases_gil(lambda: tesseract_urdf.parseURDFString(urdf, locator))
+    assert_releases_gil(lambda: urdf_api.parseURDFString(urdf, locator))
 
 
 def test_time_parameterization_compute_releases_gil(abb_env):  # noqa: F811
-    from tesseract_robotics.tesseract_command_language import ProfileDictionary
-    from tesseract_robotics.tesseract_time_parameterization import (
+    from tesseract_robotics.command_language import ProfileDictionary
+    from tesseract_robotics.time_parameterization import (
         TimeOptimalTrajectoryGeneration,
         TimeOptimalTrajectoryGenerationCompositeProfile,
     )
@@ -168,7 +168,7 @@ def test_time_parameterization_compute_releases_gil(abb_env):  # noqa: F811
 
 
 def test_generate_interpolated_program_releases_gil(abb_env):  # noqa: F811
-    from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+    from tesseract_robotics.motion_planners_simple import generateInterpolatedProgram
 
     program = _abb_program(num=20)
     # 0.001 rad segments: hundreds of interpolated states, each with its own state solve.
@@ -179,7 +179,7 @@ def test_generate_interpolated_program_releases_gil(abb_env):  # noqa: F811
 
 
 def test_environment_serialization_releases_gil(abb_env, tmp_path):  # noqa: F811
-    from tesseract_robotics import tesseract_serialization as ts
+    from tesseract_robotics import serialization as ts
 
     xml = ts.environment_to_xml(abb_env)
     data = ts.environment_to_binary(abb_env)
@@ -200,7 +200,7 @@ def test_environment_serialization_releases_gil(abb_env, tmp_path):  # noqa: F81
 
 @pytest.mark.parametrize("kind", ["Mesh", "ConvexMesh"])
 def test_create_mesh_releases_gil(kind):
-    from tesseract_robotics import tesseract_geometry as tg
+    from tesseract_robotics import geometry as tg
 
     path = str(get_tesseract_support_path() / "meshes" / "sphere_p25m.dae")
     from_path = getattr(tg, f"create{kind}FromPath")

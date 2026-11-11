@@ -7,7 +7,7 @@ separately are unequal until their UUIDs are copied over (#262).
 
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -27,7 +27,7 @@ from tesseract_robotics.tesseract_command_language import (
     WaitInstruction,
     WaypointPoly,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
+from tesseract_robotics.common import Isometry3d, Translation3d
 
 NIL_UUID = "00000000-0000-0000-0000-000000000000"
 SHIFTED = Isometry3d.Identity() * Translation3d(0.0, 0.0, 1.0)

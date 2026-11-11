@@ -5,7 +5,7 @@ Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 
 from tests.audit._load import audit
 
-COLLISION = "tesseract_collision"
+COLLISION = "collision"
 FLATTEN_WRAPPER = "ContactResultMap.flattenWrapperResults"
 REFERENCE_WRAPPER_OUT_PARAM = "reference-wrapper-out-param"
 

@@ -24,9 +24,9 @@ flowchart LR
     ledger --> verify
 ```
 
-1. **Coverage** (`audit_ownership.check_coverage`): every `src/<m>/<m>_bindings.cpp` is in exactly one module table. Each header is assigned its owning module.
+1. **Coverage** (`audit_ownership.check_coverage`): every `src/bindings/<m>.cpp` (except the helper sources linked into a module) is in exactly one module table. Each header is assigned its owning module.
 2. **Parse** (`audit_parse.parse_tu`, `cpp_api`): libclang parses the binding TU, plus one synthetic TU per owned header that the binding does not include, and builds the C++ API. Each symbol is keyed by its dotted name and carries its overloads, its arity, its qualified class and any structural `absent_ok` rule.
-3. **Stub** (`audit_stub.py_api`): reads the committed `.pyi`, including `@overload`s, `@staticmethod`s and base classes.
+3. **Stub** (`audit_stub.py_api`): reads the committed `.pyi`, including `@overload`s, `@staticmethod`s and base classes. A module that is itself the compiled extension has its stub at `src/tesseract_robotics/<m>.pyi`; a wrapped package (`common`, `scene_graph`, `motion_planners`, `motion_planners_simple`, `motion_planners_descartes`, `motion_planners_trajopt_ifopt`) keeps `<m>/_<m>.pyi` beside its `__init__.py`, which the audit also reads.
 4. **Match** (`audit_match.match`): compares the two APIs symbol by symbol and overload by overload. Each difference becomes a covered row, an accepted row (with its rule), a gap or a deviation.
 5. **Report** (`audit_report.render_markdown`, `to_json`): writes `docs/developer/binding-api-audit.md` with provenance, coverage and per-module tables. Each open row gets an `issue` column read from the ledger.
 6. **Ledger verify** (`test_audit_ledger`): one audit of every audited module, in CI the findings of `audit-bindings --json`, run on its own a fresh audit. It finds no open row without an outcome and no ledger entry without a row.
@@ -45,28 +45,28 @@ Other changes (rebases, tests, CI, a stub edit that only moves lines) leave it c
 
 | module | owned prefixes | group | gaps | deviations | accepted | ledger: issue | ledger: won't fix |
 |---|---|---|---|---|---|---|---|
-| tesseract_collision | `tesseract/collision/` | core | 4 | 1 | 14 | 0 | 5 |
-| tesseract_common | `tesseract/common/` | core | 46 | 3 | 50 | 2 | 47 |
-| tesseract_environment | `tesseract/environment/` | core | 9 | 6 | 55 | 0 | 15 |
-| tesseract_geometry | `tesseract/geometry/` | core | 3 | 1 | 23 | 0 | 4 |
-| tesseract_kinematics | `tesseract/kinematics/` | core | 3 | 2 | 16 | 0 | 5 |
-| tesseract_scene_graph | `tesseract/scene_graph/` | core | 4 | 0 | 22 | 0 | 4 |
-| tesseract_serialization | `tesseract/serialization/` | core | 1 | 0 | 24 | 0 | 1 |
-| tesseract_srdf | `tesseract/srdf/` | core | 2 | 0 | 1 | 0 | 2 |
-| tesseract_state_solver | `tesseract/state_solver/` | core | 1 | 2 | 7 | 0 | 3 |
-| tesseract_urdf | `tesseract/urdf/` | core | 5 | 0 | 0 | 0 | 5 |
-| tesseract_command_language | `tesseract/command_language/` | 1 | 1 | 25 | 128 | 26 | 0 |
-| tesseract_time_parameterization | `tesseract/time_parameterization/` | 1 | 0 | 4 | 10 | 4 | 0 |
+| collision | `tesseract/collision/` | core | 4 | 1 | 14 | 0 | 5 |
+| common | `tesseract/common/` | core | 46 | 3 | 50 | 2 | 47 |
+| environment | `tesseract/environment/` | core | 9 | 6 | 55 | 0 | 15 |
+| geometry | `tesseract/geometry/` | core | 3 | 1 | 23 | 0 | 4 |
+| kinematics | `tesseract/kinematics/` | core | 3 | 2 | 16 | 0 | 5 |
+| scene_graph | `tesseract/scene_graph/` | core | 4 | 0 | 22 | 0 | 4 |
+| serialization | `tesseract/serialization/` | core | 1 | 0 | 24 | 0 | 1 |
+| srdf | `tesseract/srdf/` | core | 2 | 0 | 1 | 0 | 2 |
+| state_solver | `tesseract/state_solver/` | core | 1 | 2 | 7 | 0 | 3 |
+| urdf | `tesseract/urdf/` | core | 5 | 0 | 0 | 0 | 5 |
+| command_language | `tesseract/command_language/` | 1 | 1 | 25 | 128 | 26 | 0 |
+| time_parameterization | `tesseract/time_parameterization/` | 1 | 0 | 4 | 10 | 4 | 0 |
 | trajopt_ifopt | `trajopt_ifopt/`, `trajopt_common/` | 2 | 5 | 0 | 41 | 4 | 1 |
 | trajopt_sqp | `trajopt_sqp/` | 2 | 6 | 6 | 21 | 12 | 0 |
-| tesseract_motion_planners | `tesseract/motion_planners/` | 3 | 3 | 0 | 6 | 3 | 0 |
-| tesseract_motion_planners_simple | `tesseract/motion_planners/simple/` | 3 | 0 | 0 | 29 | 0 | 0 |
-| tesseract_motion_planners_ompl | `tesseract/motion_planners/ompl/` | 3 | 2 | 6 | 25 | 8 | 0 |
-| tesseract_motion_planners_trajopt | `tesseract/motion_planners/trajopt/`, `trajopt_sco/`, `trajopt/` | 3 | 0 | 6 | 34 | 6 | 0 |
-| tesseract_motion_planners_trajopt_ifopt | `tesseract/motion_planners/trajopt_ifopt/` | 3 | 0 | 6 | 17 | 6 | 0 |
-| tesseract_motion_planners_descartes | `tesseract/motion_planners/descartes/`, `descartes_light/` | 3 | 0 | 5 | 24 | 5 | 0 |
-| tesseract_task_composer | `tesseract/task_composer/` | 4 | 0 | 0 | 45 | 0 | 0 |
-| tesseract_task_composer_planning | `tesseract/task_composer/planning/` | 4 | 0 | 0 | 21 | 0 | 0 |
+| motion_planners | `tesseract/motion_planners/` | 3 | 3 | 0 | 6 | 3 | 0 |
+| motion_planners_simple | `tesseract/motion_planners/simple/` | 3 | 0 | 0 | 29 | 0 | 0 |
+| motion_planners_ompl | `tesseract/motion_planners/ompl/` | 3 | 2 | 6 | 25 | 8 | 0 |
+| motion_planners_trajopt | `tesseract/motion_planners/trajopt/`, `trajopt_sco/`, `trajopt/` | 3 | 0 | 6 | 34 | 6 | 0 |
+| motion_planners_trajopt_ifopt | `tesseract/motion_planners/trajopt_ifopt/` | 3 | 0 | 6 | 17 | 6 | 0 |
+| motion_planners_descartes | `tesseract/motion_planners/descartes/`, `descartes_light/` | 3 | 0 | 5 | 24 | 5 | 0 |
+| task_composer | `tesseract/task_composer/` | 4 | 0 | 0 | 45 | 0 | 0 |
+| task_composer_planning | `tesseract/task_composer/planning/` | 4 | 0 | 0 | 21 | 0 | 0 |
 
 The report is the source of these numbers. This table is copied from it once per regeneration that changes a count.
 
@@ -75,7 +75,7 @@ The report is the source of these numbers. This table is copied from it once per
 Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the typed key, the listing rule and the telemetry ran green cold and warm at 06c5ff2a. The cost that was left then (§ Telemetry: the synthetic TUs of unincluded headers, `cpp_api`, the declarations parse) is now cached too (§ Include structure and API).
 
 !!! note "Status"
-    Confirmed on a cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43035541479), 47a5133f): 1073 contract tests passed, "Report is current" green, and the audit step, which reads what the contract tests stored, took 0:13 with no miss. Under verification: the contract tests on a warm cache (the run after this one).
+    Confirmed on a cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43035541479), 47a5133f): 1073 contract tests passed, "Report is current" green, and the audit step, which reads what the contract tests stored, took 0:13 with no miss. Confirmed on a warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43038657462), da0f6bac): the same, and the contract tests took 1:54.
 
 | step | main, no cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42889787253)) | cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42937052432)) | warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42946926141)) | warm cache, main at 16a89e46 ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43003311837)) |
 |---|---|---|---|---|
@@ -130,12 +130,12 @@ A contract test that patches a table and audits builds another `Selection` or an
 
 Measured at 47a5133f on a cold cache (`ENTRY_FORMAT` 3 matched no stored entry), same job as the tables in § Telemetry, which are the "before":
 
-| step | before, cold (06c5ff2a) | before, warm (06c5ff2a) | after, cold (47a5133f) |
-|---|---|---|---|
-| contract tests | 9:56 | 14:15 | 9:00 |
-| GIL list | 6:13 | 0:01 | 8:37 |
-| audit | 2:52 | 5:03 | 0:13 |
-| job | 19:18 | 21:08 | 18:16 |
+| step | before, cold (06c5ff2a) | before, warm (06c5ff2a) | after, cold (47a5133f) | after, warm (da0f6bac) |
+|---|---|---|---|---|
+| contract tests | 9:56 | 14:15 | 9:00 | 1:54 |
+| GIL list | 6:13 | 0:01 | 8:37 | < 0:01 |
+| audit | 2:52 | 5:03 | 0:13 | 0:13 |
+| job | 19:18 | 21:08 | 18:16 | 2:43 |
 
 | audit step, 22 modules | before, cold s | before, warm s | after s |
 |---|---|---|---|
@@ -144,7 +144,8 @@ Measured at 47a5133f on a cold cache (`ENTRY_FORMAT` 3 matched no stored entry),
 | `decl-parse` | 17.3 (22 calls) | 37.8 (22 calls) | 4.3 (3 calls) |
 | `match` | 0.6 | 1.1 | 0.8 |
 
-In the audit step every fetch hit: `api` 41, `includes` 41, `bound` 22, `decl` 22. The contract tests computed them: `api` 75 misses (235.0 s), `includes` 67 (138.5 s), over 120 `audit_tu` calls in 7 processes, with `cpp-api` at 205.0 s and `unincluded-headers` at 245.7 s against 422.1 s and 465.7 s before. The GIL list was all-cold (22 misses, 516.4 s) and is unchanged by this work; warm it takes a second. The job on a warm cache is therefore the contract tests plus under a minute.
+In the audit step every fetch hit: `api` 41, `includes` 41, `bound` 22, `decl` 22. The contract tests computed them: `api` 75 misses (235.0 s), `includes` 67 (138.5 s), over 120 `audit_tu` calls in 7 processes, with `cpp-api` at 205.0 s and `unincluded-headers` at 245.7 s against 422.1 s and 465.7 s before. The GIL list was all-cold (22 misses, 516.4 s) and is unchanged by this work; warm it takes a second. 
+Warm, the contract tests' timed phases fall from 2337 s to 56 s over 7 processes (`unincluded-headers` 1072.7 → 10.8, `cpp-api` 960.9 → 4.2, `decl-parse` 295.1 → 32.5 in 16 parses, `match` 8.2 → 8.7), and the audit step is unchanged from the cold run's. The misses left there (`api` 13, `includes` 7, `decl` 21, `bound` 5, `gil` 1; 47 s of compute) are all tests of the cache itself: the miss-sources table names only `tests/audit/fixtures/` TUs audited against a fresh cache and files under pytest's temp directory. No real module misses.
 
 `cpp-api` times the fetch and `resolve_bound`. When `include_facts` hits and `api_facts` misses (a table edit that changes a `Selection` and no header), the parse runs inside that fetch and its seconds count under `decl-parse` as well.
 
@@ -283,11 +284,11 @@ Every other declaration in the TU is used only to resolve Python names.
 | `AUDITED_HEADER_PREFIX` | module → prefixes | audited |
 | `UNAUDITED_MODULES` | module → (reason, prefixes) | not audited; listed in the report with the reason. Empty since #258 removed `ompl_base` |
 
-Every prefix ends with `/`. A module may own several prefixes. `trajopt_ifopt` also owns `trajopt_common/`, because it registers `TrajOptCollisionConfig`. `tesseract_motion_planners_trajopt` owns classic TrajOpt's `trajopt_sco/` and `trajopt/`, and `tesseract_motion_planners_descartes` owns `descartes_light/`: Python reaches each of these libraries only through that planner.
+Every prefix ends with `/`. A module may own several prefixes. `trajopt_ifopt` also owns `trajopt_common/`, because it registers `TrajOptCollisionConfig`. `motion_planners_trajopt` owns classic TrajOpt's `trajopt_sco/` and `trajopt/`, and `motion_planners_descartes` owns `descartes_light/`: Python reaches each of these libraries only through that planner.
 
 Only the tesseract-robotics libraries are owned: `tesseract/`, `trajopt*/` and `descartes_light/`. Third-party roots (`ompl-<version>/ompl/`, `OsqpEigen/`, `osqp/`, `octomap/`, `cereal/`, `yaml-cpp/`, `boost/`) belong to no module and are never audited.
 
-**Longest prefix wins.** `tesseract/motion_planners/planner.h` belongs to `tesseract_motion_planners`, while `tesseract/motion_planners/simple/simple_motion_planner.h` belongs to `tesseract_motion_planners_simple`. This applies everywhere a header's owner matters: the header walk, direct includes, delegation and not-API patterns.
+**Longest prefix wins.** `tesseract/motion_planners/planner.h` belongs to `motion_planners`, while `tesseract/motion_planners/simple/simple_motion_planner.h` belongs to `motion_planners_simple`. This applies everywhere a header's owner matters: the header walk, direct includes, delegation and not-API patterns.
 
 **Not-API headers are scoped to their prefix.** `UNAUDITED_HEADERS` maps an owning prefix to `{pattern below that prefix: reason}`. A header is checked only against the patterns of the longest prefix that holds it, plus the `ANY_PREFIX` (`*`) patterns (`test_suite/*`, `*_impl.hpp`). Because of this scoping, a broad pattern such as `trajopt_sco/` → `*` hides classic TrajOpt's SQP layer without reaching any other module. A key that is no module's prefix raises `UnknownPrefixError`. The report prints each pattern as `<prefix><pattern>`.
 
@@ -410,10 +411,10 @@ The report's "Accepted deviation rules" note gives the full text of every rule.
 
 ```json
 {
-  "tesseract_common": {
+  "common": {
     "JointTrajectory.insert": {"issue": "#269"}
   },
-  "tesseract_kinematics": {
+  "kinematics": {
     "dampedPInv": {"wont_fix": "numpy covers it."}
   }
 }

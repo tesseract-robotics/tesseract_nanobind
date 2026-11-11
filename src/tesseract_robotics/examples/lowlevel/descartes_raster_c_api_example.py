@@ -33,7 +33,7 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -46,23 +46,23 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_descartes import (
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.motion_planners import PlannerRequest
+from tesseract_robotics.motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesMotionPlannerD,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract_robotics.motion_planners_simple import (
     generateInterpolatedProgram,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
     TrajOptMotionPlanner,

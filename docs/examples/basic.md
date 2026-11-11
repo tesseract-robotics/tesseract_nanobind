@@ -129,7 +129,7 @@ See the source at
     ```python
     import numpy as np
 
-    from tesseract_robotics.tesseract_geometry import createMeshFromPath
+    from tesseract_robotics.geometry import createMeshFromPath
 
     # From file (STL, OBJ, DAE, PLY, glTF): one Mesh per mesh in the file
     meshes = createMeshFromPath("/path/to/model.stl")
@@ -144,7 +144,7 @@ See the source at
 
 --8<-- "docs/demos/players/pointcloud_octree_collision_example.html"
 
-Loads a binary PLY point cloud, builds a `tesseract_geometry.Octree`, attaches
+Loads a binary PLY point cloud, builds a `geometry.Octree`, attaches
 it as a collision obstacle in front of an ABB IRB2400, and then runs **the
 same `MotionProgram` through TrajOpt twice** — once with collision disabled
 (robot tints red, drags through the cloud) and once with the default

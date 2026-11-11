@@ -24,8 +24,8 @@ from typing import Any
 
 import ompl_seed_report as report
 
+from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 from tesseract_robotics.planning import TaskComposer
-from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
 
 example = importlib.import_module(
     "tesseract_robotics.examples.freespace_clearance_objective_example"

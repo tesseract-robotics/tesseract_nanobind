@@ -6,7 +6,7 @@ from typing import Annotated, overload
 import numpy
 from numpy.typing import NDArray
 
-import tesseract_robotics.tesseract_common._tesseract_common
+import tesseract_robotics.common._common
 
 class Item:
     def __init__(self) -> None: ...
@@ -83,11 +83,11 @@ def kinds(
     pair: tuple[str, str],
     shared: Item | None,
     opt: int | None,
-    var: str | tesseract_robotics.tesseract_common._tesseract_common.Isometry3d,
+    var: str | tesseract_robotics.common._common.Isometry3d,
     vec: Annotated[NDArray[numpy.float64], dict(shape=(None,), order="C")],
     ref: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)],
     ivec: Annotated[NDArray[numpy.int32], dict(shape=(None,), order="C")],
-    iso: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d,
+    iso: tesseract_robotics.common._common.Isometry3d,
     mode: Mode,
     fn: Callable[[int], None],
     id: str,

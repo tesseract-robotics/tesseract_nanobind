@@ -11,8 +11,8 @@ import sys
 
 import pytest
 
-from tesseract_robotics import tesseract_common
-from tesseract_robotics.tesseract_common import LogLevel
+from tesseract_robotics import common as tesseract_common
+from tesseract_robotics.common import LogLevel
 
 # GeneralResourceLocator logs TESSERACT_LOG_WARN("Resource not handled: ...") for a
 # relative path and returns None.
@@ -163,7 +163,7 @@ def test_handler_exception_reaches_unraisablehook(monkeypatch, logger):
 
 def test_a_handler_left_registered_is_released_before_interpreter_exit():
     script = (
-        "from tesseract_robotics import tesseract_common as tc\n"
+        "from tesseract_robotics import common as tc\n"
         "records = []\n"
         "tc.addLogRecordHandler(records.append)\n"
         f"tc.GeneralResourceLocator().locateResource({UNHANDLED!r})\n"
@@ -178,7 +178,7 @@ def test_a_python_sink_left_installed_is_released_before_interpreter_exit():
     """The default logger outlives Python, so the sink it holds must be let go at exit."""
     script = (
         "import logging\n"
-        "from tesseract_robotics import tesseract_common as tc\n"
+        "from tesseract_robotics import common as tc\n"
         "logging.basicConfig()\n"
         "tc.getLogger().sinks = [tc.PythonLoggingSink('tesseract.cpp')]\n"
         f"tc.GeneralResourceLocator().locateResource({UNHANDLED!r})\n"
@@ -195,7 +195,7 @@ def test_a_python_sink_does_not_deadlock_a_thread_holding_the_gil():
     """A record in flight lets the GIL go in Python; another thread then calls into the sink."""
     script = (
         "import logging, threading, time\n"
-        "from tesseract_robotics import tesseract_common as tc\n"
+        "from tesseract_robotics import common as tc\n"
         "entered = threading.Event()\n"
         "class Slow(logging.Handler):\n"
         "    def emit(self, record):\n"
@@ -221,7 +221,7 @@ def test_a_python_logging_handler_can_call_code_that_logs():
     """A handler that reaches tesseract logs again on the thread already inside the sink."""
     script = (
         "import logging\n"
-        "from tesseract_robotics import tesseract_common as tc\n"
+        "from tesseract_robotics import common as tc\n"
         "seen = []\n"
         "class Reenter(logging.Handler):\n"
         "    def emit(self, record):\n"

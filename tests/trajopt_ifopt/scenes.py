@@ -13,10 +13,10 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import JointGroup, KinematicGroup
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import JointGroup, KinematicGroup
 
 # m: edge of each box; at slider x the boxes overlap by BOX_SIZE - |x| along x
 BOX_SIZE = 0.2

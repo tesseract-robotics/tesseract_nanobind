@@ -57,13 +57,13 @@ from typing import Any
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AngleAxisd,
     GeneralResourceLocator,
     Isometry3d,
     Resource,
 )
-from tesseract_robotics.tesseract_geometry import (
+from tesseract_robotics.geometry import (
     ConvexMesh,
     GeometryType,
     Mesh,
@@ -78,7 +78,7 @@ from tesseract_robotics.tesseract_geometry import (
     createMeshFromResource,
     createOctree,
 )
-from tesseract_robotics.tesseract_urdf import writeMeshToFile
+from tesseract_robotics.urdf import writeMeshToFile
 
 BOX_URL = "package://tesseract/support/meshes/box_2m.ply"
 GLB_URL = "package://tesseract/support/meshes/tesseract_material_mesh.glb"

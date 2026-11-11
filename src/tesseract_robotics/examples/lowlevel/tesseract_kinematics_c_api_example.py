@@ -109,14 +109,14 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput, KinGroupIKInputs
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import KinGroupIKInput, KinGroupIKInputs
 
 # Initialize Environment with a robot from URDF file
 # The URDF and SRDF file must be configured. The kinematics solver also requires plugin configuration,

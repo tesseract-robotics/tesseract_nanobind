@@ -66,13 +66,13 @@ from typing import Any
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     BytesResource,
     CalibrationInfo,
     GeneralResourceLocator,
     Isometry3d,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddContactManagersPluginInfoCommand,
     ChangeJointOriginCommand,
     ChangeLinkVisibilityCommand,
@@ -81,9 +81,9 @@ from tesseract_robotics.tesseract_environment import (
     EventCallbackFn,
     Events,
 )
-from tesseract_robotics.tesseract_srdf import SRDFModel
-from tesseract_robotics.tesseract_state_solver import SceneState
-from tesseract_robotics.tesseract_urdf import parseURDFFile
+from tesseract_robotics.srdf import SRDFModel
+from tesseract_robotics.state_solver import SceneState
+from tesseract_robotics.urdf import parseURDFFile
 
 URDF_URL = "package://tesseract/support/urdf/abb_irb2400.urdf"
 SRDF_URL = "package://tesseract/support/urdf/abb_irb2400.srdf"

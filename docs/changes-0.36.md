@@ -28,11 +28,16 @@
 Each section below names what was removed or renamed and shows the 0.35 call next to
 its 0.36 replacement.
 
+!!! note "Module names"
+    The Python modules lost their `tesseract_` prefix: `tesseract_robotics.tesseract_collision` is
+    now `tesseract_robotics.collision`. The old names are gone (no aliases). The 0.35 snippets below keep the names 0.35 used. Full table:
+    [0.36 module names](breaking-changes.md#036-module-names).
+
 ## Links and joints: names → ids
 
 Upstream now addresses links and joints by a typed id derived from the name
 (upstream `IDENTITY_DESIGN.md`, full rename table in `IDENTITY_MIGRATION.md`). The
-bindings mirror it: `LinkId`, `JointId` and `LinkIdPair` in `tesseract_common`. A
+bindings mirror it: `LinkId`, `JointId` and `LinkIdPair` in `common`. A
 `str` converts to an id implicitly, so most call sites that pass names keep working;
 what changes is what getters return and what they are called.
 
@@ -124,7 +129,7 @@ key = makeOrderedLinkPair("b", "a")            # ("a", "b")
 contacts.addContactResult(key, result)         # ("b", "a") raised UnorderedLinkPairError
 
 # 0.36
-from tesseract_robotics.tesseract_common import LinkIdPair
+from tesseract_robotics.common import LinkIdPair
 key = LinkIdPair("b", "a")                     # the same pair as LinkIdPair("a", "b")
 contacts.addContactResult(key, result)         # ("b", "a") works too
 key.orderedNameView()                          # ("a", "b")
@@ -218,7 +223,7 @@ from tesseract_robotics.tesseract_geometry import createSDFMeshFromPath
 geom = createSDFMeshFromPath("part.stl")
 
 # 0.36: a field, sampled from a distance function (negative inside)
-from tesseract_robotics.tesseract_geometry import createDiscreteSignedDistanceField
+from tesseract_robotics.geometry import createDiscreteSignedDistanceField
 geom = createDiscreteSignedDistanceField(
     lambda p: float(np.linalg.norm(p)) - 0.1,  # a 10 cm sphere
     [-0.2, -0.2, -0.2], [0.2, 0.2, 0.2], [32, 32, 32],
@@ -318,7 +323,7 @@ setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_ERROR)
 useOutputHandler(Collect())
 
 # 0.36
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     LogLevel, addLogRecordHandler, getLogger, removeLogRecordHandler,
 )
 
@@ -345,7 +350,7 @@ descartes_light 0.36 still logs through console_bridge (`ladder_graph_solver.hpp
 `bgl_solver.hpp`): its output goes to stderr and never reaches `addLogRecordHandler` until
 [swri-robotics/descartes_light#130](https://github.com/swri-robotics/descartes_light/issues/130).
 
-See [tesseract_common logging](api/tesseract_common.md#logging).
+See [common logging](api/common.md#logging).
 
 ## trajopt_sqp: constraint violations carry raw and weighted forms
 
@@ -374,7 +379,7 @@ gradient = lvs_evaluator.calcGradientData(dof_vals0, dof_vals1, contact)
 
 # 0.36
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import LinkIdPair
+from tesseract_robotics.common import LinkIdPair
 
 pair = LinkIdPair(*contact.link_ids)
 margin = evaluator.getCollisionMarginData().getCollisionMargin(pair)
@@ -389,7 +394,7 @@ gradient = ti.getGradient(dof_vals0, dof_vals1, contact, margin, buffer, group)
 Saving a log whose data storage holds planner profiles raised `RuntimeError` ("Trying to save an
 unregistered polymorphic type") on macOS and Windows. On Linux it saved, but a process without that
 planner's library in it could not load the result. Now it round-trips on every platform, in any
-process: `tesseract_serialization` links the planner libraries and registers their types, so
+process: `serialization` links the planner libraries and registers their types, so
 importing it loads OMPL, Descartes and TrajOpt too.
 
 ```python
@@ -410,10 +415,10 @@ Additions, not changes: 0.35 code keeps working. Each was a 0.36 API with no bin
 
 | Module | New |
 |---|---|
-| `tesseract_collision` | `CollisionObjectSpec`; `addCollisionObjects`, `removeCollisionObjects`, `setCollisionObjectsEnabled`, `getCollisionObjectsTransform`, `setCollisionObjectsTransform(ids, state)` on both managers; `setCollisionObjectsTransform(ids, state0, state1)` on `ContinuousContactManager`; `collideImplicitSDF`, `makeImplicitSDFShape` and their types |
-| `tesseract_kinematics` | `PositionerSampleResolution`, `gatherJointLimits`, `buildSampleGrid`, `computeChainReachUpperBound` |
-| `tesseract_task_composer` | `schema()` on graphs, pipelines, tasks and the Taskflow executor; `TaskComposerNodePorts.inputSchema` / `outputSchema`; `ValidationError.toString` |
-| `tesseract_common` | `PropertyTree` (YAML as text), `PluginDiscoveryInfo` |
+| `collision` | `CollisionObjectSpec`; `addCollisionObjects`, `removeCollisionObjects`, `setCollisionObjectsEnabled`, `getCollisionObjectsTransform`, `setCollisionObjectsTransform(ids, state)` on both managers; `setCollisionObjectsTransform(ids, state0, state1)` on `ContinuousContactManager`; `collideImplicitSDF`, `makeImplicitSDFShape` and their types |
+| `kinematics` | `PositionerSampleResolution`, `gatherJointLimits`, `buildSampleGrid`, `computeChainReachUpperBound` |
+| `task_composer` | `schema()` on graphs, pipelines, tasks and the Taskflow executor; `TaskComposerNodePorts.inputSchema` / `outputSchema`; `ValidationError.toString` |
+| `common` | `PropertyTree` (YAML as text), `PluginDiscoveryInfo` |
 | `trajopt_ifopt` | `CartAxisKinematics`; `calcJacobianBlock` on the CartAxis constraints; `CollisionCoeffData.hasZeroCoeff` |
 | planners | `==`, `!=` and `from_yaml` on the PIQP solver profiles; `checkPIQPSettings`; `==` / `!=` on `trajopt_sqp.PIQPSettings` (#393) |
 

@@ -14,12 +14,12 @@ from tests.audit._load import audit, load
 
 own = load("audit_ownership")
 
-MP = "tesseract_motion_planners"
-SIMPLE = "tesseract_motion_planners_simple"
-OMPL = "tesseract_motion_planners_ompl"
-TRAJOPT = "tesseract_motion_planners_trajopt"
-IFOPT = "tesseract_motion_planners_trajopt_ifopt"
-DESCARTES = "tesseract_motion_planners_descartes"
+MP = "motion_planners"
+SIMPLE = "motion_planners_simple"
+OMPL = "motion_planners_ompl"
+TRAJOPT = "motion_planners_trajopt"
+IFOPT = "motion_planners_trajopt_ifopt"
+DESCARTES = "motion_planners_descartes"
 G3 = (MP, SIMPLE, OMPL, TRAJOPT, IFOPT)
 
 
@@ -43,6 +43,16 @@ def open_names(report):
 
 def accepted_pairs(report):
     return {(a.symbol, a.rule) for a in report.accepted}
+
+
+def test_piqp_settings_equality_is_bound_as_a_method_in_trajopt_sqp(g3_reports):
+    """#393: the free `operator==` of piqp/settings_utils.h is `PIQPSettings.__eq__`, bound
+    in trajopt_sqp with the class; here it is an accepted row, not a gap."""
+    report = g3_reports[MP]
+    assert ("operator==", "free-function-as-method") in accepted_pairs(report)
+    assert "operator==" not in gap_symbols(report)
+    sqp = audit.py_api(audit.load_stub(audit.committed_stub("trajopt_sqp")), "trajopt_sqp")
+    assert "PIQPSettings.__eq__" in sqp.symbols
 
 
 # Task 1: the five non-Descartes modules are audited.

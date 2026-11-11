@@ -15,10 +15,10 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_srdf import SRDFModel
-from tesseract_robotics.tesseract_urdf import parseURDFFile
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.srdf import SRDFModel
+from tesseract_robotics.urdf import parseURDFFile
 
 IIWA_URDF = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
 

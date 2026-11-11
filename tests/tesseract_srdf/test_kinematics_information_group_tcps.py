@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
-from tesseract_robotics.tesseract_srdf import KinematicsInformation
+from tesseract_robotics.common import Isometry3d, Quaterniond
+from tesseract_robotics.srdf import KinematicsInformation
 
 
 def test_group_tcps_empty_on_default_construction() -> None:

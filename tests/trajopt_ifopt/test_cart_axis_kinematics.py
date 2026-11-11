@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import LinkId
+from tesseract_robotics.common import LinkId
 
 from .scenes import Iiwa
 

@@ -6,9 +6,9 @@ already a dict key, so the dict could no longer find it.
 
 import pytest
 
-from tesseract_robotics.tesseract_common import ManipulatorInfo
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
-from tesseract_robotics.tesseract_scene_graph import Joint, JointMimic
+from tesseract_robotics.common import ManipulatorInfo
+from tesseract_robotics.kinematics import KinGroupIKInput
+from tesseract_robotics.scene_graph import Joint, JointMimic
 from tesseract_robotics.trajopt_ifopt import CartLineInfo, InverseKinematicsInfo
 
 ID_FIELDS = [

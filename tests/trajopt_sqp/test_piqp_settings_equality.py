@@ -70,7 +70,7 @@ def test_equality_needs_no_planner_import():
     code = (
         "import sys\n"
         "from tesseract_robotics import trajopt_sqp as t\n"
-        "assert 'tesseract_robotics.tesseract_motion_planners' not in sys.modules\n"
+        "assert 'tesseract_robotics.motion_planners' not in sys.modules\n"
         "assert t.PIQPSettings() == t.PIQPSettings()\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)

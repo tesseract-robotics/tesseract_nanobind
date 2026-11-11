@@ -4,8 +4,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     JointWaypoint,
     JointWaypointPoly,
@@ -13,7 +12,8 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionPoly,
     MoveInstructionType,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.planning import Robot
 from tesseract_robotics.viewer.poses import link_poses
 from tesseract_robotics.viewer.tcp_path import tcp_path
 from tesseract_robotics.viewer.trajectory import Trajectory

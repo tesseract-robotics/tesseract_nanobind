@@ -7,9 +7,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import ModuleType
 
+from tesseract_robotics.command_language import CompositeInstruction
+from tesseract_robotics.environment import Environment
 from tesseract_robotics.planning import TaskComposer
-from tesseract_robotics.tesseract_command_language import CompositeInstruction
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import RecordingPhase, TesseractViewer, Trajectory
 
 # The TWC cell the demo shows.

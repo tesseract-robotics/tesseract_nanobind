@@ -13,7 +13,7 @@ Leave it out if you only load your own robots.
 
 ```python
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])

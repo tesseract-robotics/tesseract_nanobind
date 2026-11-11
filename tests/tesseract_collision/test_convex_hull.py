@@ -13,9 +13,9 @@ import itertools
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_collision import ConvexHullError, createConvexHull, makeConvexMesh
-from tesseract_robotics.tesseract_common import BytesResource
-from tesseract_robotics.tesseract_geometry import ConvexMesh, Mesh
+from tesseract_robotics.collision import ConvexHullError, createConvexHull, makeConvexMesh
+from tesseract_robotics.common import BytesResource
+from tesseract_robotics.geometry import ConvexMesh, Mesh
 
 # Unit cube corners (m), plus its centre, which is not a hull vertex.
 CUBE_CORNERS = [np.array(c, dtype=float) for c in itertools.product((0.0, 1.0), repeat=3)]

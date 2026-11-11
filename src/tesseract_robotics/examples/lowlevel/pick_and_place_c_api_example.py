@@ -22,13 +22,8 @@ import sys
 
 import numpy as np
 
-from tesseract_robotics.examples.lowlevel.example_support import (
-    add_fixed_link,
-    load_support_environment,
-    run_pipeline,
-)
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -39,32 +34,37 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     ChangeCollisionMarginsCommand,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
     MoveLinkCommand,
 )
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.examples.lowlevel.example_support import (
+    add_fixed_link,
+    load_support_environment,
+    run_pipeline,
+)
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType
-from tesseract_robotics.tesseract_task_composer_planning import ContactCheckProfile
+from tesseract_robotics.scene_graph import Joint, JointType
+from tesseract_robotics.task_composer_planning import ContactCheckProfile
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"

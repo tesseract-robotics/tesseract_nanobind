@@ -7,7 +7,7 @@
     "**/.pixi",
     "**/ws",
     "**/*.pyi",
-    "**/tesseract_serialization"
+    "**/serialization"
   ],
 
   "reportMissingModuleSource": false,

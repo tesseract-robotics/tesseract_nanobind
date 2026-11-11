@@ -5,13 +5,13 @@ Reference: tesseract_planning 0.35.0, examples/src/car_seat_example.cpp, `if (if
 
 from importlib import import_module
 
-from tesseract_robotics.planning.profiles import TRAJOPT_IFOPT_DEFAULT_NAMESPACE
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
 )
+from tesseract_robotics.planning.profiles import TRAJOPT_IFOPT_DEFAULT_NAMESPACE
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 # `tesseract_robotics.examples` re-exports each example's entry point under the module's

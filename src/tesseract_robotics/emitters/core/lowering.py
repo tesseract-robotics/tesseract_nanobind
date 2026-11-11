@@ -14,8 +14,7 @@ from collections.abc import Iterator
 import numpy as np
 from numpy.typing import ArrayLike
 
-from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypointPoly,
     CompositeInstruction,
     InstructionPoly,
@@ -24,6 +23,7 @@ from tesseract_robotics.tesseract_command_language import (
     TimerInstructionType,
     WaitInstructionType,
 )
+from tesseract_robotics.planning import Pose
 
 from .errors import EmptyProgramError, UncoordinatedTargetError, UnsupportedInstructionError
 from .events import (

@@ -11,15 +11,25 @@ import numpy.testing as nptest
 import pytest
 
 from tesseract_robotics import (
+    command_language as tesseract_command_language,
+)
+from tesseract_robotics import (
+    common as tesseract_common,
+)
+from tesseract_robotics import (
+    environment as tesseract_environment,
+)
+from tesseract_robotics import (
+    geometry as tesseract_geometry,
+)
+from tesseract_robotics import (
     get_tesseract_resource_path,
     get_tesseract_support_path,
-    tesseract_command_language,
-    tesseract_common,
-    tesseract_environment,
-    tesseract_geometry,
-    tesseract_kinematics,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics import (
+    kinematics as tesseract_kinematics,
+)
+from tesseract_robotics.common import (
     AngleAxisd,
     GeneralResourceLocator,
     Isometry3d,

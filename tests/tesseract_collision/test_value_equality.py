@@ -7,7 +7,7 @@ from typing import override
 
 import pytest
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     CollisionCheckConfig,
     ContactManagerConfig,
     ContactRequest,

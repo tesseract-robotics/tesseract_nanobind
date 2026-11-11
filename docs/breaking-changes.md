@@ -8,10 +8,11 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | Python modules lose the `tesseract_` prefix (`tesseract_robotics.tesseract_collision` → `tesseract_robotics.collision`, 20 in all); the old names warn for one release | [The new names](#036-module-names) |
 | Unreleased | `TaskComposer.plan` raises `ProfileTypeMismatchError` when a Descartes node's namespace holds a profile only as the other scalar type (`D` for a Cartesian or raster pipeline); `create_descartes_default_profiles(move_profile=…)` refuses a Python subclass of `DescartesMoveProfileD` / `F` | [Register the type the node reads](#descartes-profiles-match-the-nodes-scalar-type) |
 | Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
 | Unreleased | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
-| Unreleased | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/tesseract_common.md#logging) |
+| Unreleased | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/common.md#logging) |
 | Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
 | Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | A collision constraint on a `Var` outside a `NodesVariables` raises `VarNotInVariableSetError` (a `ValueError`) at construction instead of segfaulting on its first `update()` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
@@ -30,23 +31,23 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `TaskComposerNode.saveDotgraph` raises `OSError` instead of returning `False`, and returns `None` | [Catch `OSError`](#taskcomposernodesavedotgraph-raises-oserror) |
 | Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | `tesseract_command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
+| Unreleased | `command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
 | Unreleased | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
 | Unreleased | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
 | Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
 | Unreleased | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
-| Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `tesseract_motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
+| Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
 | Unreleased | `create_time_optimal_parameterization(path_tolerance, min_angle_change)`, `create_iterative_spline_parameterization(add_points)`: the ignored arguments are removed | [Set the composite profile's fields](#time-parameterization-factories-take-no-arguments) |
 | Unreleased | `tesseract_robotics.ompl_base` and `tesseract_reeds_shepp_example` removed | [`ompl_base` removed](#ompl_base-removed) |
 | Unreleased | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | Unreleased | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
-| Unreleased | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
-| Unreleased | `tesseract_scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
+| Unreleased | `geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
+| Unreleased | `scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
 | Unreleased | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
 | Unreleased | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
 | Unreleased | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
-| Unreleased | `tesseract_environment.AnyPoly_wrap_EnvironmentConst`, `tesseract_command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`tesseract_task_composer.AnyPoly_*`](#anypoly-helpers-only-in-tesseract_task_composer) |
+| Unreleased | `environment.AnyPoly_wrap_EnvironmentConst`, `command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`task_composer.AnyPoly_*`](#anypoly-helpers-only-in-task_composer) |
 | Unreleased | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
 | Unreleased | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `QPSolutionSizeError` (a `ValueError`) on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
 | Unreleased | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
@@ -55,6 +56,59 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### 0.36 module names
+
+The `tesseract_` prefix is gone from 20 Python module names (issue #42). It repeated the package name
+(`tesseract_robotics.tesseract_collision`).
+
+| Old (deprecated) | New |
+|---|---|
+| `tesseract_robotics.tesseract_collision` | `tesseract_robotics.collision` |
+| `tesseract_robotics.tesseract_command_language` | `tesseract_robotics.command_language` |
+| `tesseract_robotics.tesseract_common` | `tesseract_robotics.common` |
+| `tesseract_robotics.tesseract_environment` | `tesseract_robotics.environment` |
+| `tesseract_robotics.tesseract_geometry` | `tesseract_robotics.geometry` |
+| `tesseract_robotics.tesseract_kinematics` | `tesseract_robotics.kinematics` |
+| `tesseract_robotics.tesseract_motion_planners` | `tesseract_robotics.motion_planners` |
+| `tesseract_robotics.tesseract_motion_planners_descartes` | `tesseract_robotics.motion_planners_descartes` |
+| `tesseract_robotics.tesseract_motion_planners_ompl` | `tesseract_robotics.motion_planners_ompl` |
+| `tesseract_robotics.tesseract_motion_planners_simple` | `tesseract_robotics.motion_planners_simple` |
+| `tesseract_robotics.tesseract_motion_planners_trajopt` | `tesseract_robotics.motion_planners_trajopt` |
+| `tesseract_robotics.tesseract_motion_planners_trajopt_ifopt` | `tesseract_robotics.motion_planners_trajopt_ifopt` |
+| `tesseract_robotics.tesseract_scene_graph` | `tesseract_robotics.scene_graph` |
+| `tesseract_robotics.tesseract_serialization` | `tesseract_robotics.serialization` |
+| `tesseract_robotics.tesseract_srdf` | `tesseract_robotics.srdf` |
+| `tesseract_robotics.tesseract_state_solver` | `tesseract_robotics.state_solver` |
+| `tesseract_robotics.tesseract_task_composer` | `tesseract_robotics.task_composer` |
+| `tesseract_robotics.tesseract_task_composer_planning` | `tesseract_robotics.task_composer_planning` |
+| `tesseract_robotics.tesseract_time_parameterization` | `tesseract_robotics.time_parameterization` |
+| `tesseract_robotics.tesseract_urdf` | `tesseract_robotics.urdf` |
+
+`trajopt_ifopt`, `trajopt_sqp`, `planning`, `viewer` and `emitters` keep their names.
+
+```python
+# before
+from tesseract_robotics.tesseract_collision import ContactRequest
+from tesseract_robotics.tesseract_common import Isometry3d
+
+# after
+from tesseract_robotics.collision import ContactRequest
+from tesseract_robotics.common import Isometry3d
+```
+
+**No aliases.** 0.36 is a breaking release: the old names are gone, and importing one raises
+`ModuleNotFoundError`. Every class, enum and function keeps its name; only the module path changes.
+
+**Layout.** Sixteen modules (14 of the renamed ones, plus `trajopt_ifopt` and `trajopt_sqp`) are the compiled extension itself, installed as
+`tesseract_robotics/<name>.abi3.so` with a `<name>.pyi` stub and no `__init__.py` wrapper. The other
+six keep a Python package around a compiled `_<name>` module because they hold Python code:
+`common` (axis constants), `scene_graph` (lazy `SceneState` re-export), and `motion_planners`,
+`motion_planners_simple`, `motion_planners_descartes` and `motion_planners_trajopt_ifopt` (profile-override
+guards). Both layouts import the same way. The C++ binding sources moved from
+`src/tesseract_<name>/tesseract_<name>_bindings.cpp` to `src/bindings/<name>.cpp`; build
+scripts and forks that name the old paths need the new ones. Upstream C++ names (the
+`tesseract_collision::` namespaces, `find_package(tesseract_collision)`, the headers) did not change.
 
 ### Descartes profiles match the node's scalar type
 
@@ -220,9 +274,9 @@ and set `__hash__ = None` (#261). `hash()`, `set` members and `dict` keys raise 
 
 | module | classes |
 | --- | --- |
-| `tesseract_motion_planners_ompl` | `OMPLSolverConfig`, `OMPLRealVectorMoveProfile` |
-| `tesseract_motion_planners_trajopt` | `TrajOptCartesianWaypointConfig`, `TrajOptJointWaypointConfig`, `TrajOptDefaultMoveProfile`, `TrajOptDefaultCompositeProfile`, `TrajOptOSQPSolverProfile`, `BasicTrustRegionSQPParameters` (and the new `OSQPSettings`) |
-| `tesseract_task_composer_planning` | `ContactCheckProfile`, `FixStateBoundsProfile`, `FixStateCollisionProfile`, `KinematicLimitsCheckProfile`, `MinLengthProfile`, `ProfileSwitchProfile`, `UpsampleTrajectoryProfile` |
+| `motion_planners_ompl` | `OMPLSolverConfig`, `OMPLRealVectorMoveProfile` |
+| `motion_planners_trajopt` | `TrajOptCartesianWaypointConfig`, `TrajOptJointWaypointConfig`, `TrajOptDefaultMoveProfile`, `TrajOptDefaultCompositeProfile`, `TrajOptOSQPSolverProfile`, `BasicTrustRegionSQPParameters` (and the new `OSQPSettings`) |
+| `task_composer_planning` | `ContactCheckProfile`, `FixStateBoundsProfile`, `FixStateCollisionProfile`, `KinematicLimitsCheckProfile`, `MinLengthProfile`, `ProfileSwitchProfile`, `UpsampleTrajectoryProfile` |
 
 Key on a field, or on `id(obj)` where identity is meant, as in
 [the value-types entry](#value-types-compare-by-value-and-are-unhashable).
@@ -245,8 +299,8 @@ still accepted (`goal_bias` with `["RRTConnect", "RRTstar"]` sets it on the RRTs
 These classes bind `__eq__`/`__ne__` from their C++ `operator==` and set `__hash__ = None`, as the
 [collision, common and environment value types](#value-types-compare-by-value-and-are-unhashable) do (#261):
 
-| `tesseract_motion_planners_trajopt_ifopt` | `TrajOptIfoptCartesianWaypointConfig`, `TrajOptIfoptJointWaypointConfig`, `TrajOptIfoptDefaultMoveProfile`, `TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile` |
-| `tesseract_motion_planners_descartes` | `DescartesDefaultMoveProfileD`, `DescartesLadderGraphSolverProfileD` |
+| `motion_planners_trajopt_ifopt` | `TrajOptIfoptCartesianWaypointConfig`, `TrajOptIfoptJointWaypointConfig`, `TrajOptIfoptDefaultMoveProfile`, `TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile` |
+| `motion_planners_descartes` | `DescartesDefaultMoveProfileD`, `DescartesLadderGraphSolverProfileD` |
 
 `hash(profile)`, `{profile}` and `d[profile] = …` raise `TypeError: unhashable type`. Key on the
 profile's name in the `ProfileDictionary`, or on `id(profile)` where identity is what you mean:
@@ -300,7 +354,7 @@ under its own name (#313, #314, #336, #338):
 | `infos.getAbortingNodeInfo()` | `infos.getInfo(infos.getAbortingNode())` (`None` when nothing aborted) |
 | `node.getDotgraph(infos)` | `node.getDotgraph(infos.getInfoMap())` |
 | `node.saveDotgraph(path, infos)` | `node.saveDotgraph(path, infos.getInfoMap())` |
-| `tesseract_task_composer.__all__` | the module's attributes (`from … import *` still works) |
+| `task_composer.__all__` | the module's attributes (`from … import *` still works) |
 
 ### `TaskComposerNode.saveDotgraph` raises `OSError`
 
@@ -328,20 +382,20 @@ part in its equality.
 
 ### SWIG-era `MoveInstructionType_*` constants removed
 
-`tesseract_command_language` no longer exports a module constant per `MoveInstructionType` value.
+`command_language` no longer exports a module constant per `MoveInstructionType` value.
 The three constants were copies kept from the SWIG bindings; C++ has none of them, and
 `MoveInstructionType` is bound as an enum whose members are the same objects (#275, as #176 and
 #214 did for the other modules). Importing one now raises
-`ImportError: cannot import name 'MoveInstructionType_LINEAR' from 'tesseract_robotics.tesseract_command_language'`;
+`ImportError: cannot import name 'MoveInstructionType_LINEAR' from 'tesseract_robotics.command_language'`;
 reading one as an attribute raises `AttributeError`.
 
-The package's `__all__` list is gone as well: `from tesseract_robotics.tesseract_command_language import *`
+The package's `__all__` list is gone as well: `from tesseract_robotics.command_language import *`
 now exports every public name of the extension instead of a hand-kept subset.
 
 | before | after |
 | --- | --- |
 | `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
-| `from tesseract_robotics.tesseract_command_language import MoveInstructionType_LINEAR` | `from tesseract_robotics.tesseract_command_language import MoveInstructionType` |
+| `from tesseract_robotics.command_language import MoveInstructionType_LINEAR` | `from tesseract_robotics.command_language import MoveInstructionType` |
 
 ### `assign*Waypoint` and `ProfileDictionary_addProfile` removed
 
@@ -358,7 +412,7 @@ from any planner module, including a Python subclass of a trampolined profile.
 
 ### SWIG-era Poly helpers and `appendMoveInstruction` removed
 
-`tesseract_command_language` kept 15 Python-only names from the SWIG bindings (#328). Each
+`command_language` kept 15 Python-only names from the SWIG bindings (#328). Each
 duplicated a constructor or method; C++ has none of them. Importing one raises `ImportError`,
 calling `appendMoveInstruction` raises `AttributeError`.
 
@@ -391,7 +445,7 @@ snapshot = copy.copy(mi.getWaypoint().asCartesianWaypoint())  # an independent c
 
 The four time-parameterization profiles were bound under abbreviated names. They now carry
 their C++ names, as every other planner profile does (#329, following #187). There is no
-alias: importing an old name raises `ImportError`. The `tesseract_time_parameterization`
+alias: importing an old name raises `ImportError`. The `time_parameterization`
 package's `__all__` list, which named the old classes, is gone as well.
 
 | before | after |
@@ -454,14 +508,14 @@ were kept as aliases:
 | `DescartesPlanProfileD` | `DescartesMoveProfileD` |
 | `DescartesDefaultPlanProfileD` | `DescartesDefaultMoveProfileD` |
 
-**trajopt's 0.28 re-exports (#335).** `tesseract_motion_planners_trajopt` no longer re-exports
+**trajopt's 0.28 re-exports (#335).** `motion_planners_trajopt` no longer re-exports
 `TrajOptCollisionConfig` or `CollisionEvaluatorType`. Import them from their own modules,
-`tesseract_robotics.trajopt_ifopt` and `tesseract_robotics.tesseract_collision`.
-`tesseract_motion_planners_trajopt_ifopt` keeps its re-exports (`TrajOptCollisionConfig`,
+`tesseract_robotics.trajopt_ifopt` and `tesseract_robotics.collision`.
+`motion_planners_trajopt_ifopt` keeps its re-exports (`TrajOptCollisionConfig`,
 `CollisionEvaluatorType`, `SQPParameters`), so its profile fields are still configured from one
 import.
 
-**`__all__` (#335).** The six `tesseract_motion_planners*` packages lose their hand-kept `__all__`.
+**`__all__` (#335).** The six `motion_planners*` packages lose their hand-kept `__all__`.
 `from … import *` now exports every public name of the extension. The OMPL list had named only
 the legacy aliases, so a star import gave `OMPLRealVectorPlanProfile` but not
 `OMPLRealVectorMoveProfile`.
@@ -499,7 +553,7 @@ Both overloads that take `pair_margin_data` now default to `MODIFY`, as upstream
 | --- | --- |
 | `ChangeCollisionMarginsCommand(pairs)` | `ChangeCollisionMarginsCommand(pairs, CollisionMarginPairOverrideType.REPLACE)` |
 
-`CollisionMarginPairOverrideType` is in `tesseract_common`. The new
+`CollisionMarginPairOverrideType` is in `common`. The new
 `ChangeCollisionMarginsCommand(default_margin, pairs, override_type)` overload defaults to
 `MODIFY` too.
 
@@ -539,20 +593,20 @@ unchanged.
 | before | after |
 | --- | --- |
 | `PointCloudPoint()`, `PointCloudPoint(x, y, z)` | `PointCloud.Point()`, `PointCloud.Point(x, y, z)` |
-| `from tesseract_robotics.tesseract_geometry import PointCloudPoint` | `from tesseract_robotics.tesseract_geometry import PointCloud`, then `PointCloud.Point` |
+| `from tesseract_robotics.geometry import PointCloudPoint` | `from tesseract_robotics.geometry import PointCloud`, then `PointCloud.Point` |
 
 ### SWIG-era `JointType_*` constants removed
 
-`tesseract_scene_graph` no longer exports a module constant per `JointType` value. The seven
+`scene_graph` no longer exports a module constant per `JointType` value. The seven
 constants were copies kept from the SWIG bindings; C++ has none of them, and `JointType` is bound
 as an enum whose members are the same objects (#214, finishing #176). Importing one now raises
-`ImportError: cannot import name 'JointType_FIXED' from 'tesseract_robotics.tesseract_scene_graph'`;
+`ImportError: cannot import name 'JointType_FIXED' from 'tesseract_robotics.scene_graph'`;
 reading one as an attribute raises `AttributeError`.
 
 | before | after |
 | --- | --- |
 | `JointType_FIXED` (also `_UNKNOWN`, `_REVOLUTE`, `_CONTINUOUS`, `_PRISMATIC`, `_FLOATING`, `_PLANAR`) | `JointType.FIXED` (`.UNKNOWN`, `.REVOLUTE`, …) |
-| `from tesseract_robotics.tesseract_scene_graph import JointType_FIXED` | `from tesseract_robotics.tesseract_scene_graph import JointType` |
+| `from tesseract_robotics.scene_graph import JointType_FIXED` | `from tesseract_robotics.scene_graph import JointType` |
 
 ### Value types compare by value and are unhashable
 
@@ -563,9 +617,9 @@ was `env == env.clone()`. These classes now bind `__eq__`/`__ne__` from the C++ 
 
 | module | classes |
 | --- | --- |
-| `tesseract_collision` | `ContactResult`, `ContactResultMap`, `ContactRequest`, `ContactManagerConfig`, `CollisionCheckConfig` |
-| `tesseract_common` | `AllowedCollisionMatrix`, `BytesResource`, `CollisionMarginData`, `CollisionMarginPairData`, `GeneralResourceLocator`, `JointState`, `KinematicLimits`, `KinematicsPluginInfo`, `ManipulatorInfo`, `PluginInfo`, `PluginInfoContainer`, `SimpleLocatedResource` |
-| `tesseract_environment` | `Environment`, `Command`, `AddKinematicsInformationCommand`, `AddLinkCommand`, `AddSceneGraphCommand`, `ChangeCollisionMarginsCommand`, `ChangeJointAccelerationLimitsCommand`, `ChangeJointOriginCommand`, `ChangeJointPositionLimitsCommand`, `ChangeJointVelocityLimitsCommand`, `ChangeLinkCollisionEnabledCommand`, `ChangeLinkOriginCommand`, `ChangeLinkVisibilityCommand`, `ModifyAllowedCollisionsCommand`, `MoveJointCommand`, `MoveLinkCommand`, `RemoveAllowedCollisionLinkCommand`, `RemoveJointCommand`, `RemoveLinkCommand`, `ReplaceJointCommand` |
+| `collision` | `ContactResult`, `ContactResultMap`, `ContactRequest`, `ContactManagerConfig`, `CollisionCheckConfig` |
+| `common` | `AllowedCollisionMatrix`, `BytesResource`, `CollisionMarginData`, `CollisionMarginPairData`, `GeneralResourceLocator`, `JointState`, `KinematicLimits`, `KinematicsPluginInfo`, `ManipulatorInfo`, `PluginInfo`, `PluginInfoContainer`, `SimpleLocatedResource` |
+| `environment` | `Environment`, `Command`, `AddKinematicsInformationCommand`, `AddLinkCommand`, `AddSceneGraphCommand`, `ChangeCollisionMarginsCommand`, `ChangeJointAccelerationLimitsCommand`, `ChangeJointOriginCommand`, `ChangeJointPositionLimitsCommand`, `ChangeJointVelocityLimitsCommand`, `ChangeLinkCollisionEnabledCommand`, `ChangeLinkOriginCommand`, `ChangeLinkVisibilityCommand`, `ModifyAllowedCollisionsCommand`, `MoveJointCommand`, `MoveLinkCommand`, `RemoveAllowedCollisionLinkCommand`, `RemoveJointCommand`, `RemoveLinkCommand`, `ReplaceJointCommand` |
 
 They join the classes that already compared by value (`JointTrajectory`, the plugin-info structs,
 `AddTrajectoryLinkCommand`, `AddContactManagersPluginInfoCommand` and the two
@@ -656,11 +710,11 @@ and does the same thing.
 
 ### SWIG-era enum constants removed
 
-`tesseract_collision`, `tesseract_environment` and `tesseract_common` no longer export a module
+`collision`, `environment` and `common` no longer export a module
 constant per enum value. The 14 constants were copies kept from the SWIG bindings; C++ has
 none of them, and every enum is bound as a class whose members are the same objects (#176).
 Importing one now raises
-`ImportError: cannot import name 'ContactTestType_ALL' from 'tesseract_robotics.tesseract_collision'`;
+`ImportError: cannot import name 'ContactTestType_ALL' from 'tesseract_robotics.collision'`;
 reading one as an attribute raises `AttributeError`.
 
 | before | after |
@@ -672,15 +726,15 @@ reading one as an attribute raises `AttributeError`.
 
 ```python
 # before
-from tesseract_robotics.tesseract_collision import ContactRequest, ContactTestType_ALL
-from tesseract_robotics.tesseract_common import CONSOLE_BRIDGE_LOG_WARN, setLogLevel
+from tesseract_robotics.collision import ContactRequest, ContactTestType_ALL
+from tesseract_robotics.common import CONSOLE_BRIDGE_LOG_WARN, setLogLevel
 
 request = ContactRequest(ContactTestType_ALL)
 setLogLevel(CONSOLE_BRIDGE_LOG_WARN)
 
 # after
-from tesseract_robotics.tesseract_collision import ContactRequest, ContactTestType
-from tesseract_robotics.tesseract_common import LogLevel, setLogLevel
+from tesseract_robotics.collision import ContactRequest, ContactTestType
+from tesseract_robotics.common import LogLevel, setLogLevel
 
 request = ContactRequest(ContactTestType.ALL)
 setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_WARN)
@@ -689,25 +743,25 @@ setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_WARN)
 The `CONSOLE_BRIDGE_LOG_*` names keep their prefix because they are the C++ enumerator names of
 console_bridge's unscoped `LogLevel`; only the module-level copies are gone.
 
-### `AnyPoly` helpers only in `tesseract_task_composer`
+### `AnyPoly` helpers only in `task_composer`
 
-`tesseract_environment` re-exported `AnyPoly_wrap_EnvironmentConst`, and
-`tesseract_command_language` re-exported `AnyPoly_wrap_CompositeInstruction`,
+`environment` re-exported `AnyPoly_wrap_EnvironmentConst`, and
+`command_language` re-exported `AnyPoly_wrap_CompositeInstruction`,
 `AnyPoly_wrap_ProfileDictionary` and `AnyPoly_as_CompositeInstruction`, from
-`tesseract_task_composer` inside a `try: … except ImportError: pass`. An install whose
+`task_composer` inside a `try: … except ImportError: pass`. An install whose
 task-composer extension failed to load lost the names without an error, and importing either
-package loaded the task composer. The re-exports and `tesseract_command_language._HAS_TASK_COMPOSER`
-are removed (#192); the functions are defined in, and imported from, `tesseract_task_composer`.
+package loaded the task composer. The re-exports and `command_language._HAS_TASK_COMPOSER`
+are removed (#192); the functions are defined in, and imported from, `task_composer`.
 Code that imports them from the old place now fails with `ImportError: cannot import name …`.
 
 | before | after |
 | --- | --- |
-| `from tesseract_robotics.tesseract_environment import AnyPoly_wrap_EnvironmentConst` | `from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_EnvironmentConst` |
-| `from tesseract_robotics.tesseract_command_language import AnyPoly_wrap_CompositeInstruction` (also `AnyPoly_wrap_ProfileDictionary`, `AnyPoly_as_CompositeInstruction`) | `from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_CompositeInstruction` (…) |
+| `from tesseract_robotics.environment import AnyPoly_wrap_EnvironmentConst` | `from tesseract_robotics.task_composer import AnyPoly_wrap_EnvironmentConst` |
+| `from tesseract_robotics.command_language import AnyPoly_wrap_CompositeInstruction` (also `AnyPoly_wrap_ProfileDictionary`, `AnyPoly_as_CompositeInstruction`) | `from tesseract_robotics.task_composer import AnyPoly_wrap_CompositeInstruction` (…) |
 
 ### A `str` is content, `pathlib.Path` is a file
 
-`tesseract_common.FilesystemPath` was a `str` subclass, so `Environment.init` had to guess
+`common.FilesystemPath` was a `str` subclass, so `Environment.init` had to guess
 whether a string was a path or URDF content, and `init(str, str, locator)` loaded *files* where
 the C++ `std::string` overload parses *content*. `std::filesystem::path` now converts with
 nanobind's caster (`str | os.PathLike` in, `pathlib.Path` out), and `Environment.init` binds the

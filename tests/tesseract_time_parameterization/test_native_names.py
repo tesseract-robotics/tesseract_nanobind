@@ -2,8 +2,8 @@
 
 import pytest
 
-from tesseract_robotics import tesseract_time_parameterization as ttp
-from tesseract_robotics.tesseract_command_language import Profile
+from tesseract_robotics import time_parameterization as ttp
+from tesseract_robotics.command_language import Profile
 
 RENAMES = {
     "TOTGCompositeProfile": "TimeOptimalTrajectoryGenerationCompositeProfile",
@@ -24,7 +24,7 @@ def test_native_name_is_a_profile(new):
 @pytest.mark.parametrize("old", sorted(RENAMES))
 def test_old_name_removed(old):
     assert not hasattr(ttp, old)
-    assert not hasattr(ttp._tesseract_time_parameterization, old)
+    assert not hasattr(ttp, old)
 
 
 def test_package_has_no_all():

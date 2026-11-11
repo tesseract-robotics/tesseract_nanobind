@@ -25,12 +25,12 @@ import gc
 import numpy as np
 import tesseract_robotics
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import JointTarget, MotionProgram, Robot
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.task_composer import (
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
     AnyPoly_wrap_ProfileDictionary,
@@ -73,13 +73,13 @@ def make_storage(node):
 _GATED = """
 import threading
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning.profiles import (
     TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
     TRAJOPT_PROFILE_NAMES,
     create_trajopt_ifopt_default_profiles,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
 )
@@ -219,9 +219,9 @@ print("SUCCESS", context.isSuccessful())
             else 'executor.run(node, TaskComposerContext("run", make_storage(node)))'
         )
         out = _run(f"""
-from tesseract_robotics.tesseract_task_composer import TaskComposerContext
+from tesseract_robotics.task_composer import TaskComposerContext
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 node = factory.createTaskComposerNode("TrajOptPipeline")
 future = {run}
@@ -235,7 +235,7 @@ print("SUCCESS", future.context.isSuccessful())
     def test_server_dropped_future_then_dropped_node(self):
         out = _run("""
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 import time
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
@@ -273,10 +273,10 @@ print("RELEASED")
 _WORKER_HANDLER = """
 import threading
 import time
-from tesseract_robotics import tesseract_common
+from tesseract_robotics import common as tesseract_common
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_common import LogLevel
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.common import LogLevel
 MAIN = threading.get_ident()
 tesseract_common.getLogger().set_level(LogLevel.debug)
 
@@ -402,9 +402,9 @@ atexit.register(lambda: print("NESTED TASKS", report["executor"].getTaskCount(),
             + """
 exiting = []
 atexit.register(lambda: exiting.append(True))
-from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+from tesseract_robotics.task_composer import TaskflowTaskComposerExecutor
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 # One worker, four runs: the nested runs outlast the run the drain is waiting for.
 nested = TaskflowTaskComposerExecutor("nested", 1)
 report["executor"] = nested
@@ -443,9 +443,9 @@ class TestServerTaskReplacement:
         out = _run(
             _GATED
             + """
-from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+from tesseract_robotics.task_composer import TaskComposerServerBusyError
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 node = factory.createTaskComposerNode(GATED)
@@ -469,9 +469,9 @@ print("SUCCESS", future.context.isSuccessful())
         out = _run(
             _GATED
             + """
-from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+from tesseract_robotics.task_composer import TaskComposerServerBusyError
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 node = factory.createTaskComposerNode(GATED)
@@ -495,9 +495,9 @@ print("SUCCESS", future.context.isSuccessful())
         out = _run(
             _GATED
             + """
-from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+from tesseract_robotics.task_composer import TaskComposerServerBusyError
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 task = server.getTask(GATED)
@@ -525,9 +525,9 @@ print("RELOADED")
     def test_get_task_reference_blocks_reload_until_deleted(self):
         """With no run at all, a getTask() result dangled after a reload."""
         out = _run("""
-from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+from tesseract_robotics.task_composer import TaskComposerServerBusyError
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 task = server.getTask("TrajOptPipeline")
@@ -604,9 +604,9 @@ faulthandler.dump_traceback_later({dump_after_s}, exit=True)
 """
         script += """
 import threading
-from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+from tesseract_robotics.task_composer import TaskComposerServerBusyError
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 node = factory.createTaskComposerNode("TrajOptPipeline")
@@ -652,10 +652,10 @@ print("SUCCESS", all(results), len(results), stats["reloads"] > 0)
         # leaves `/C:/...` on Windows, not an absolute path there.
         including = f"task_composer_plugins: !include {included}"
         out = _run(f"""
-from tesseract_robotics.tesseract_common import ResourceLocator
+from tesseract_robotics.common import ResourceLocator
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.task_composer import TaskComposerServerBusyError
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 node = factory.createTaskComposerNode("TrajOptPipeline")
@@ -699,10 +699,10 @@ print("LOADED", server.hasTask("TrajOptPipeline"))
         including = f"task_composer_plugins: !include {included}"
         out = _run(f"""
 import threading
-from tesseract_robotics.tesseract_common import ResourceLocator
+from tesseract_robotics.common import ResourceLocator
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.task_composer import TaskComposerServerBusyError
 a, b = TaskComposerServer(), TaskComposerServer()
 a.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 b.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
@@ -783,8 +783,8 @@ print("SUCCESS", future.context.isSuccessful())
 _CONTAINER = """
 import gc
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.task_composer import (
     TaskComposerGraph,
     TaskComposerNodeInfo,
     TaskComposerNodeInfoContainer,
@@ -845,9 +845,9 @@ print("GREEN", all(i.color == "green" for i in infos.getInfoMap().values()))
         out = _run(
             _CONTAINER
             + """
-from tesseract_robotics.tesseract_task_composer import TaskComposerPruneConflictError
+from tesseract_robotics.task_composer import TaskComposerPruneConflictError
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 target = next(iter(infos.getInfoMap()))
 
 def update_then_edit(info):
@@ -891,9 +891,9 @@ print("STORED", infos.getInfo(target).name)
         out = _run(
             _CONTAINER
             + """
-from tesseract_robotics.tesseract_task_composer import TaskComposerPruneConflictError
+from tesseract_robotics.task_composer import TaskComposerPruneConflictError
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 
 def clear_then_edit(info):
     infos.clear()
