@@ -7,6 +7,7 @@
  */
 
 #include <cerrno>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <nanobind/nanobind.h>
@@ -47,6 +48,83 @@ using tesseract::task_composer::TaskComposerLog;
 // hand-rolled mirror that 0.34 needed is now redundant; re-issuing the macros
 // triggers "redefinition of binding_name<...>" compile errors.
 
+namespace {
+
+// File I/O is the binding's own, for every type alike: upstream's toArchiveFileXML appends a
+// suffix to a path without one and ignores a file that fails to open (an ofstream does not
+// throw), and fromArchiveFileXML only asserts the open. These write and read exactly `path` and
+// report a failure as OSError, with the errno of the failing call. They run without the GIL;
+// the error is raised once it is back.
+
+// 0, or the errno of the failure.
+int write_text(const std::filesystem::path& path, const std::string& text) {
+    errno = 0;
+    std::ofstream out(path, std::ios::binary);
+    if (out) out << text;
+    if (out) out.close();
+    return out ? 0 : (errno != 0 ? errno : EIO);
+}
+
+int read_text(const std::filesystem::path& path, std::string& text) {
+    errno = 0;
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return errno != 0 ? errno : EIO;
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    text = buffer.str();
+    return 0;
+}
+
+// Raise OSError(err, strerror, path). Needs the GIL.
+[[noreturn]] void raise_os_error(int err, const std::filesystem::path& path) {
+    errno = err;
+    PyErr_SetFromErrnoWithFilename(PyExc_OSError, path.string().c_str());
+    throw nb::python_error();
+}
+
+// Write already serialized `xml` to `path` without the GIL.
+void write_file(const std::string& xml, const std::filesystem::path& path) {
+    int err = 0;
+    {
+        nb::gil_scoped_release release;
+        err = write_text(path, xml);
+    }
+    if (err != 0) raise_os_error(err, path);
+}
+
+// Serialize `object` with the GIL held (another Python thread may be changing it), then write.
+template <typename T>
+void to_file(const T& object, const std::filesystem::path& path) {
+    write_file(Serialization::toArchiveStringXML(object), path);
+}
+
+// Read and parse `path` without the GIL: the result is a new object no other thread sees.
+
+template <typename T>
+T from_file(const std::filesystem::path& path) {
+    std::string xml;
+    int err = 0;
+    {
+        nb::gil_scoped_release release;
+        err = read_text(path, xml);
+    }
+    if (err != 0) raise_os_error(err, path);
+    nb::gil_scoped_release release;
+    return Serialization::fromArchiveStringXML<T>(xml);
+}
+
+// Binary archives are Python bytes.
+nb::bytes to_bytes(const std::vector<std::uint8_t>& data) {
+    return nb::bytes(reinterpret_cast<const char*>(data.data()), data.size());
+}
+
+std::vector<std::uint8_t> from_bytes(const nb::bytes& data) {
+    const auto* begin = static_cast<const std::uint8_t*>(data.data());
+    return std::vector<std::uint8_t>(begin, begin + data.size());
+}
+
+}  // namespace
+
 NB_MODULE(serialization, m)
 {
     m.doc() = "Tesseract serialization bindings (XML/binary via Cereal)";
@@ -77,33 +155,23 @@ NB_MODULE(serialization, m)
         nb::arg("xml"),
         "Deserialize CompositeInstruction from XML string.");
 
-    m.def("composite_instruction_to_file",
-        [](const CompositeInstruction& ci, const std::string& path) {
-            return Serialization::toArchiveFileXML(ci, path);
-        },
-        nb::arg("instruction"), nb::arg("path"),
-        "Save CompositeInstruction to XML file.");
+    m.def("composite_instruction_to_file", &to_file<CompositeInstruction>, nb::arg("instruction"), nb::arg("path"),
+        "Save CompositeInstruction as XML to `path`, as named. Raises OSError if it cannot be written.");
 
-    m.def("composite_instruction_from_file",
-        [](const std::string& path) {
-            return Serialization::fromArchiveFileXML<CompositeInstruction>(path);
-        },
-        nb::arg("path"),
-        "Load CompositeInstruction from XML file.");
+    m.def("composite_instruction_from_file", &from_file<CompositeInstruction>, nb::arg("path"),
+        "Load CompositeInstruction from the XML file `path`. Raises OSError if it cannot be read.");
 
     m.def("composite_instruction_to_binary",
-        [](const CompositeInstruction& ci) {
-            return Serialization::toArchiveBinaryData(ci);
-        },
+        [](const CompositeInstruction& ci) { return to_bytes(Serialization::toArchiveBinaryData(ci)); },
         nb::arg("instruction"),
-        "Serialize CompositeInstruction to binary data (faster, smaller than XML).");
+        "Serialize CompositeInstruction to binary data (bytes; faster, smaller than XML).");
 
     m.def("composite_instruction_from_binary",
-        [](const std::vector<uint8_t>& data) {
-            return Serialization::fromArchiveBinaryData<CompositeInstruction>(data);
+        [](const nb::bytes& data) {
+            return Serialization::fromArchiveBinaryData<CompositeInstruction>(from_bytes(data));
         },
         nb::arg("data"),
-        "Deserialize CompositeInstruction from binary data.");
+        "Deserialize CompositeInstruction from binary data (bytes).");
 
     // ============================================================
     // Environment - Full Scene State
@@ -121,7 +189,8 @@ NB_MODULE(serialization, m)
     };
 
     // GIL released (scripts/nogil_entry_points.yaml): serializing reads the environment under its
-    // shared lock; deserializing replays the commands into a new one, which has no event callbacks.
+    // lock, which no thread may wait for with the GIL (docs/developer/threading.md); deserializing
+    // replays the commands into a new one, which has no event callbacks.
     m.def("environment_to_xml",
         [as_shared](const Environment& env) {
             return Serialization::toArchiveStringXML(as_shared(env));
@@ -138,32 +207,40 @@ NB_MODULE(serialization, m)
         "Deserialize Environment from XML string. Returns shared_ptr.");
 
     m.def("environment_to_file",
-        [as_shared](const Environment& env, const std::string& path) {
-            return Serialization::toArchiveFileXML(as_shared(env), path);
+        [as_shared](const Environment& env, const std::filesystem::path& path) {
+            std::string xml;
+            {
+                nb::gil_scoped_release release;
+                xml = Serialization::toArchiveStringXML(as_shared(env));
+            }
+            write_file(xml, path);
         },
-        nb::arg("environment"), nb::arg("path"), nb::call_guard<nb::gil_scoped_release>(),
-        "Save Environment to XML file.");
+        nb::arg("environment"), nb::arg("path"),
+        "Save Environment as XML to `path`, as named. Raises OSError if it cannot be written.");
 
-    m.def("environment_from_file",
-        [](const std::string& path) {
-            return Serialization::fromArchiveFileXML<std::shared_ptr<Environment>>(path);
-        },
-        nb::arg("path"), nb::call_guard<nb::gil_scoped_release>(),
-        "Load Environment from XML file. Returns shared_ptr.");
+    m.def("environment_from_file", &from_file<std::shared_ptr<Environment>>, nb::arg("path"),
+        "Load Environment from the XML file `path`. Raises OSError if it cannot be read.");
 
     m.def("environment_to_binary",
         [as_shared](const Environment& env) {
-            return Serialization::toArchiveBinaryData(as_shared(env));
+            std::vector<std::uint8_t> data;
+            {
+                nb::gil_scoped_release release;
+                data = Serialization::toArchiveBinaryData(as_shared(env));
+            }
+            return to_bytes(data);
         },
-        nb::arg("environment"), nb::call_guard<nb::gil_scoped_release>(),
-        "Serialize Environment to binary data.");
+        nb::arg("environment"),
+        "Serialize Environment to binary data (bytes).");
 
     m.def("environment_from_binary",
-        [](const std::vector<uint8_t>& data) {
-            return Serialization::fromArchiveBinaryData<std::shared_ptr<Environment>>(data);
+        [](const nb::bytes& data) {
+            std::vector<std::uint8_t> buffer = from_bytes(data);
+            nb::gil_scoped_release release;
+            return Serialization::fromArchiveBinaryData<std::shared_ptr<Environment>>(buffer);
         },
-        nb::arg("data"), nb::call_guard<nb::gil_scoped_release>(),
-        "Deserialize Environment from binary data. Returns shared_ptr.");
+        nb::arg("data"),
+        "Deserialize Environment from binary data (bytes).");
 
     // ============================================================
     // SceneState - State Snapshot
@@ -183,33 +260,21 @@ NB_MODULE(serialization, m)
         nb::arg("xml"),
         "Deserialize SceneState from XML string.");
 
-    m.def("scene_state_to_file",
-        [](const SceneState& state, const std::string& path) {
-            return Serialization::toArchiveFileXML(state, path);
-        },
-        nb::arg("state"), nb::arg("path"),
-        "Save SceneState to XML file.");
+    m.def("scene_state_to_file", &to_file<SceneState>, nb::arg("state"), nb::arg("path"),
+        "Save SceneState as XML to `path`, as named. Raises OSError if it cannot be written.");
 
-    m.def("scene_state_from_file",
-        [](const std::string& path) {
-            return Serialization::fromArchiveFileXML<SceneState>(path);
-        },
-        nb::arg("path"),
-        "Load SceneState from XML file.");
+    m.def("scene_state_from_file", &from_file<SceneState>, nb::arg("path"),
+        "Load SceneState from the XML file `path`. Raises OSError if it cannot be read.");
 
     m.def("scene_state_to_binary",
-        [](const SceneState& state) {
-            return Serialization::toArchiveBinaryData(state);
-        },
+        [](const SceneState& state) { return to_bytes(Serialization::toArchiveBinaryData(state)); },
         nb::arg("state"),
-        "Serialize SceneState to binary data.");
+        "Serialize SceneState to binary data (bytes).");
 
     m.def("scene_state_from_binary",
-        [](const std::vector<uint8_t>& data) {
-            return Serialization::fromArchiveBinaryData<SceneState>(data);
-        },
+        [](const nb::bytes& data) { return Serialization::fromArchiveBinaryData<SceneState>(from_bytes(data)); },
         nb::arg("data"),
-        "Deserialize SceneState from binary data.");
+        "Deserialize SceneState from binary data (bytes).");
 
     // ============================================================
     // TaskComposerLog - a run recorded for replay
@@ -229,50 +294,19 @@ NB_MODULE(serialization, m)
         nb::arg("xml"),
         "Deserialize TaskComposerLog from XML string.");
 
-    // Upstream's toArchiveFileXML appends `.tclx` to a path without a suffix and ignores a file
-    // that fails to open (an ofstream does not throw); fromArchiveFileXML only asserts the open.
-    // Write and read exactly `path` instead, raising OSError as saveDotgraph does.
-    m.def("task_composer_log_to_file",
-        [](const TaskComposerLog& log, const std::filesystem::path& path) {
-            const std::string xml = Serialization::toArchiveStringXML(log);
-            errno = 0;
-            std::ofstream out(path);
-            if (out) out << xml;
-            if (out) out.close();
-            if (!out) {
-                PyErr_SetFromErrnoWithFilename(PyExc_OSError, path.string().c_str());
-                throw nb::python_error();
-            }
-        },
-        nb::arg("log"), nb::arg("path"),
+    m.def("task_composer_log_to_file", &to_file<TaskComposerLog>, nb::arg("log"), nb::arg("path"),
         "Save TaskComposerLog as XML to `path`, as named. Raises OSError if it cannot be written.");
 
-    m.def("task_composer_log_from_file",
-        [](const std::filesystem::path& path) {
-            errno = 0;
-            std::ifstream in(path);
-            if (!in) {
-                PyErr_SetFromErrnoWithFilename(PyExc_OSError, path.string().c_str());
-                throw nb::python_error();
-            }
-            std::ostringstream xml;
-            xml << in.rdbuf();
-            return Serialization::fromArchiveStringXML<TaskComposerLog>(xml.str());
-        },
-        nb::arg("path"),
+    m.def("task_composer_log_from_file", &from_file<TaskComposerLog>, nb::arg("path"),
         "Load TaskComposerLog from the XML file `path`. Raises OSError if it cannot be read.");
 
     m.def("task_composer_log_to_binary",
-        [](const TaskComposerLog& log) {
-            return Serialization::toArchiveBinaryData(log);
-        },
+        [](const TaskComposerLog& log) { return to_bytes(Serialization::toArchiveBinaryData(log)); },
         nb::arg("log"),
-        "Serialize TaskComposerLog to binary data.");
+        "Serialize TaskComposerLog to binary data (bytes).");
 
     m.def("task_composer_log_from_binary",
-        [](const std::vector<uint8_t>& data) {
-            return Serialization::fromArchiveBinaryData<TaskComposerLog>(data);
-        },
+        [](const nb::bytes& data) { return Serialization::fromArchiveBinaryData<TaskComposerLog>(from_bytes(data)); },
         nb::arg("data"),
-        "Deserialize TaskComposerLog from binary data.");
+        "Deserialize TaskComposerLog from binary data (bytes).");
 }

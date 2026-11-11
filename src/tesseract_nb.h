@@ -20,6 +20,10 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/string_generator.hpp>
 
+// ResourceLocator (require_located_file)
+#include <tesseract/common/resource_locator.h>
+#include <cerrno>
+
 // Eigen
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -378,6 +382,39 @@ static void register_python_error_translator() {
     });
 }
 
-// Note: Eigen::Isometry3d is bound as an explicit class in tesseract_common_bindings.cpp
-// for SWIG API compatibility (tests expect .matrix() method etc.)
-// No type caster is needed since we have explicit bindings.
+// Upstream's config loaders (tesseract::common::loadYamlFile, behind every plugin factory's and
+// the task composer server's path overloads) dereference the resource the locator returns for the
+// path without a null check, and YAML::LoadFile then fails on a missing file with a bare
+// runtime_error. A path the locator does not resolve (a relative path, for
+// GeneralResourceLocator) crashed the interpreter. Resolve it first and raise FileNotFoundError
+// naming the path. Called with the GIL held (a Python locator's override runs here).
+static void require_located_file(const std::filesystem::path& path, const tesseract::common::ResourceLocator& locator) {
+    const auto resource = locator.locateResource(path.string());
+    std::error_code ec;
+    if (resource && std::filesystem::is_regular_file(resource->getFilePath(), ec))
+        return;
+    errno = ENOENT;
+    PyErr_SetFromErrnoWithFilename(PyExc_FileNotFoundError, path.string().c_str());
+    throw nb::python_error();
+}
+
+// A Python object that C++ may copy, call and drop on any thread. Copies only bump the
+// shared_ptr's atomic count, so C++ copies a callback without the GIL; the last owner drops the
+// object under the GIL. That owner may be a C++ thread or static that outlives the interpreter:
+// the decref is skipped then, as nanobind's own shared_ptr deleter does
+// (nanobind/stl/shared_ptr.h). Module globals are cleared before nanobind marks itself dead, so
+// they still decref. A call through it must take the GIL itself (and check nb::is_alive()).
+static std::shared_ptr<nb::object> gil_safe_object(nb::object object) {
+    return std::shared_ptr<nb::object>(new nb::object(std::move(object)), [](nb::object* p) {
+        if (!nb::is_alive()) {
+            (void)p->release();
+            delete p;
+            return;
+        }
+        nb::gil_scoped_acquire gil;
+        delete p;
+    });
+}
+
+// Eigen::Isometry3d is a bound class (src/bindings/common_eigen.cpp), not a type caster, so a
+// transform keeps its rigidity checks and its methods in Python.

@@ -1,11 +1,6 @@
 /**
  * @file motion_planners_descartes.cpp
  * @brief nanobind bindings for tesseract_motion_planners Descartes
- *
- * NOTE: 0.33 API changes:
- * - DescartesPlanProfile -> DescartesMoveProfile
- * - DescartesDefaultPlanProfile -> DescartesDefaultMoveProfile
- * - Profile/ProfileDictionary moved to tesseract_common
  */
 
 #include "tesseract_nb.h"
@@ -16,7 +11,7 @@
 #include <tesseract/motion_planners/types.h>
 #include <tesseract/motion_planners/planner.h>
 
-// tesseract_common (Profile and ProfileDictionary moved here in 0.33)
+// tesseract_common (Profile, ProfileDictionary)
 #include <tesseract/common/profile.h>
 #include <tesseract/common/profile_dictionary.h>
 
@@ -50,9 +45,6 @@ namespace tcl = tesseract::command_language;
 namespace tc = tesseract::common;
 namespace dl = descartes_light;
 
-// tesseract_common binds VectorIsometry3d as an opaque class; without this the stl/vector caster
-// would return the tool-pose samples as a plain list.
-NB_MAKE_OPAQUE(tc::VectorIsometry3d)
 
 // The library instantiates every Descartes type for both scalar types. DescartesMotionPlanner<float>
 // is what the shipped task-composer config runs for every Cartesian and raster task; only
@@ -94,68 +86,74 @@ public:
     }
 };
 
+// A Python DescartesMoveProfile's create* returned something that is not the interface the
+// planner calls (EdgeEvaluator, WaypointSampler, StateEvaluator). Checked when create* returns,
+// on the thread that builds the problem, not later on an OpenMP worker as an AttributeError.
+struct ProfileReturnTypeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+template <typename Interface>
+nb::object require_instance(nb::object result, const char* method) {
+    if (!nb::isinstance<Interface>(result))
+        throw ProfileReturnTypeError(std::string("DescartesMoveProfile.") + method + " returned " +
+                                     nb::type_name(result.type()).c_str() + ", not a " +
+                                     nb::type_name(nb::type<Interface>()).c_str());
+    return result;
+}
+
 // Shim C++ EdgeEvaluator/WaypointSampler/StateEvaluator that hold a Python
 // reference and forward calls. These exist so that when a Python-side
 // DescartesMoveProfile subclass returns a Python object from createXxx,
 // we can hand back a `std::unique_ptr<...>` to C++ without trying to
 // transfer ownership of a Python-allocated instance (which nanobind cannot
-// do with the default deleter).
+// do with the default deleter). The planner calls and destroys them on its own threads,
+// possibly after interpreter exit: the object is held through gil_safe_object, and each call
+// takes the GIL.
 template <typename FloatType>
 class PyHeldEdgeEvaluator : public dl::EdgeEvaluator<FloatType> {
 public:
-    explicit PyHeldEdgeEvaluator(nb::object obj) : obj_(std::move(obj)) {}
-    ~PyHeldEdgeEvaluator() override {
-        nb::gil_scoped_acquire gil;
-        obj_.reset();
-    }
+    explicit PyHeldEdgeEvaluator(nb::object obj) : obj_(gil_safe_object(std::move(obj))) {}
 
     std::pair<bool, FloatType>
     evaluate(const dl::State<FloatType>& start, const dl::State<FloatType>& end) const override {
         nb::gil_scoped_acquire gil;
         return nb::cast<std::pair<bool, FloatType>>(
-            obj_.attr("evaluate")(nb::cast(&start, nb::rv_policy::reference),
-                                  nb::cast(&end, nb::rv_policy::reference)));
+            obj_->attr("evaluate")(nb::cast(&start, nb::rv_policy::reference),
+                                   nb::cast(&end, nb::rv_policy::reference)));
     }
 
 private:
-    nb::object obj_;
+    std::shared_ptr<nb::object> obj_;
 };
 
 template <typename FloatType>
 class PyHeldWaypointSampler : public dl::WaypointSampler<FloatType> {
 public:
-    explicit PyHeldWaypointSampler(nb::object obj) : obj_(std::move(obj)) {}
-    ~PyHeldWaypointSampler() override {
-        nb::gil_scoped_acquire gil;
-        obj_.reset();
-    }
+    explicit PyHeldWaypointSampler(nb::object obj) : obj_(gil_safe_object(std::move(obj))) {}
 
     std::vector<dl::StateSample<FloatType>> sample() const override {
         nb::gil_scoped_acquire gil;
-        return nb::cast<std::vector<dl::StateSample<FloatType>>>(obj_.attr("sample")());
+        return nb::cast<std::vector<dl::StateSample<FloatType>>>(obj_->attr("sample")());
     }
 
 private:
-    nb::object obj_;
+    std::shared_ptr<nb::object> obj_;
 };
 
 template <typename FloatType>
 class PyHeldStateEvaluator : public dl::StateEvaluator<FloatType> {
 public:
-    explicit PyHeldStateEvaluator(nb::object obj) : obj_(std::move(obj)) {}
-    ~PyHeldStateEvaluator() override {
-        nb::gil_scoped_acquire gil;
-        obj_.reset();
-    }
+    explicit PyHeldStateEvaluator(nb::object obj) : obj_(gil_safe_object(std::move(obj))) {}
 
     std::pair<bool, FloatType> evaluate(const dl::State<FloatType>& solution) const override {
         nb::gil_scoped_acquire gil;
         return nb::cast<std::pair<bool, FloatType>>(
-            obj_.attr("evaluate")(nb::cast(&solution, nb::rv_policy::reference)));
+            obj_->attr("evaluate")(nb::cast(&solution, nb::rv_policy::reference)));
     }
 
 private:
-    nb::object obj_;
+    std::shared_ptr<nb::object> obj_;
 };
 
 // Trampoline for the move profile itself - lets Python supply custom
@@ -178,7 +176,8 @@ public:
         nb::detail::ticket t(nb_trampoline, "createWaypointSampler", true);
         nb::object py_result = nb::borrow<nb::object>(
             nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
-        return std::make_unique<PyHeldWaypointSampler<FloatType>>(std::move(py_result));
+        return std::make_unique<PyHeldWaypointSampler<FloatType>>(
+            require_instance<dl::WaypointSampler<FloatType>>(std::move(py_result), "createWaypointSampler"));
     }
 
     std::unique_ptr<dl::EdgeEvaluator<FloatType>>
@@ -188,7 +187,8 @@ public:
         nb::detail::ticket t(nb_trampoline, "createEdgeEvaluator", true);
         nb::object py_result = nb::borrow<nb::object>(
             nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
-        return std::make_unique<PyHeldEdgeEvaluator<FloatType>>(std::move(py_result));
+        return std::make_unique<PyHeldEdgeEvaluator<FloatType>>(
+            require_instance<dl::EdgeEvaluator<FloatType>>(std::move(py_result), "createEdgeEvaluator"));
     }
 
     std::unique_ptr<dl::StateEvaluator<FloatType>>
@@ -198,7 +198,8 @@ public:
         nb::detail::ticket t(nb_trampoline, "createStateEvaluator", true);
         nb::object py_result = nb::borrow<nb::object>(
             nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
-        return std::make_unique<PyHeldStateEvaluator<FloatType>>(std::move(py_result));
+        return std::make_unique<PyHeldStateEvaluator<FloatType>>(
+            require_instance<dl::StateEvaluator<FloatType>>(std::move(py_result), "createStateEvaluator"));
     }
 };
 
@@ -313,15 +314,20 @@ void bind_descartes(DescartesClasses<FloatType>& c) {
             "The key every Descartes move profile carries")
         // The group's IK solver comes from the environment's kinematics plugins, so the group keeps
         // the environment alive (as Environment.getKinematicGroup keeps its environment).
+        // These read the environment, which they lock without the GIL (Environment's rule,
+        // docs/developer/threading.md); a Python override takes the GIL in its trampoline.
         .def("createKinematicGroup", &MoveProfile::createKinematicGroup,
-             "manip_info"_a, "env"_a, nb::keep_alive<0, 3>(),
+             "manip_info"_a, "env"_a, nb::keep_alive<0, 3>(), nb::call_guard<nb::gil_scoped_release>(),
              "The kinematic group for `manip_info`'s manipulator and IK solver")
         .def("createWaypointSampler", &MoveProfile::createWaypointSampler,
-             "move_instruction"_a, "composite_manip_info"_a, "env"_a)
+             "move_instruction"_a, "composite_manip_info"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(),
+             "The waypoint sampler the planner calls for `move_instruction`")
         .def("createEdgeEvaluator", &MoveProfile::createEdgeEvaluator,
-             "move_instruction"_a, "composite_manip_info"_a, "env"_a)
+             "move_instruction"_a, "composite_manip_info"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(),
+             "The edge evaluator the planner calls into `move_instruction`")
         .def("createStateEvaluator", &MoveProfile::createStateEvaluator,
-             "move_instruction"_a, "composite_manip_info"_a, "env"_a);
+             "move_instruction"_a, "composite_manip_info"_a, "env"_a, nb::call_guard<nb::gil_scoped_release>(),
+             "The state evaluator the planner calls at `move_instruction`");
 
     // ========== DescartesDefaultMoveProfile (was DescartesDefaultPlanProfile) ==========
     c.default_move_profile
@@ -353,6 +359,9 @@ void bind_descartes(DescartesClasses<FloatType>& c) {
 NB_MODULE(_motion_planners_descartes, m) {
     m.doc() = "tesseract_motion_planners_descartes Python bindings";
     register_python_error_translator();  // evaluator, sampler and profile trampolines
+    nb::exception<ProfileReturnTypeError>(m, "ProfileReturnTypeError", PyExc_TypeError)
+        .attr("__doc__") = "A Python DescartesMoveProfile's create* returned an object that is not the "
+                           "EdgeEvaluator / WaypointSampler / StateEvaluator the planner calls.";
 
     // Import Profile type from tesseract_command_language for cross-module inheritance
     nb::module_::import_("tesseract_robotics.command_language");
@@ -363,7 +372,7 @@ NB_MODULE(_motion_planners_descartes, m) {
     // Import MotionPlanner base type (DescartesMotionPlanner's base)
     nb::module_::import_("tesseract_robotics.motion_planners._motion_planners");
 
-    // VectorIsometry3d (tool-pose samplers) and Environment (profile hooks)
+    // Isometry3d (tool-pose samplers) and Environment (profile hooks)
     nb::module_::import_("tesseract_robotics.common._common");
     nb::module_::import_("tesseract_robotics.environment");
     // KinematicGroup (createKinematicGroup)

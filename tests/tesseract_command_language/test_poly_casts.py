@@ -16,6 +16,7 @@ from tesseract_robotics.command_language import (
     MoveInstruction,
     MoveInstructionPoly,
     MoveInstructionType,
+    PolyTypeError,
     StateWaypoint,
     StateWaypointPoly,
     WaypointPoly,
@@ -54,7 +55,7 @@ def test_waypoint_poly_casts_return_typed_polys():
 
 
 def test_wrong_cast_raises():
-    with pytest.raises(RuntimeError):
+    with pytest.raises(PolyTypeError, match="holds a CartesianWaypointPoly"):
         _cartesian_move().getWaypoint().asJointWaypoint()
 
 

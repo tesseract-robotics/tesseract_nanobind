@@ -679,7 +679,7 @@ class TestCommandHistory:
             if evt.type == tesseract_environment.Events.COMMAND_APPLIED:
                 stored.append((evt.commands, evt.revision))
 
-        env.addEventCallback(1, tesseract_environment.EventCallbackFn(on_event))
+        env.addEventCallback(on_event)
         assert env.applyCommand(ChangeLinkVisibilityCommand("link1", False))
         assert env.applyCommand(ChangeLinkVisibilityCommand("link2", False))
         env.clearEventCallbacks()

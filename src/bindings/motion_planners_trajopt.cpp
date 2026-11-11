@@ -1,14 +1,6 @@
 /**
  * @file motion_planners_trajopt.cpp
  * @brief nanobind bindings for tesseract_motion_planners TrajOpt
- *
- * NOTE: 0.33 API changes:
- * - TrajOptPlanProfile -> TrajOptMoveProfile
- * - TrajOptDefaultPlanProfile -> TrajOptDefaultMoveProfile
- * - CollisionCostConfig/CollisionConstraintConfig -> trajopt_common::TrajOptCollisionConfig
- * - Profile/ProfileDictionary moved to tesseract_common
- * - CollisionEvaluatorType moved to tesseract_collision
- * - contact_test_type, longest_valid_segment_* removed from TrajOptDefaultCompositeProfile
  */
 
 #include "tesseract_nb.h"
@@ -17,7 +9,7 @@
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
 
-// tesseract_common (Profile and ProfileDictionary moved here in 0.33)
+// tesseract_common (Profile, ProfileDictionary)
 #include <tesseract/common/profile.h>
 #include <tesseract/common/profile_dictionary.h>
 
@@ -33,10 +25,10 @@
 // trajopt_sco for optimizer parameters
 #include <trajopt_sco/optimizers.hpp>
 
-// trajopt_common for collision config (moved here in 0.33)
+// trajopt_common for the collision config
 #include <trajopt_common/collision_types.h>
 
-// tesseract_collision for CollisionEvaluatorType (moved here in 0.33)
+// tesseract_collision for CollisionEvaluatorType
 #include <tesseract/collision/types.h>
 
 // osqp for OSQPSettings defaults (osqp_set_default_settings)
@@ -52,7 +44,7 @@ NB_MODULE(motion_planners_trajopt, m) {
     // Import Profile type from tesseract_command_language for cross-module inheritance
     auto cl_module = nb::module_::import_("tesseract_robotics.command_language");
 
-    // Import tesseract_collision for CollisionEvaluatorType (moved there in 0.33)
+    // Import tesseract_collision for CollisionEvaluatorType
     nb::module_::import_("tesseract_robotics.collision");
 
     // Import MotionPlanner: base class of TrajOptMotionPlanner and clone() return type
@@ -115,7 +107,6 @@ NB_MODULE(motion_planners_trajopt, m) {
         "(the waypoint config default), where the profile's are disabled.");
 
     // ========== TrajOptDefaultCompositeProfile ==========
-    // Note: contact_test_type, longest_valid_segment_fraction/length removed in 0.33
     nb::class_<tp::TrajOptDefaultCompositeProfile, tp::TrajOptCompositeProfile> default_composite_profile(
         m, "TrajOptDefaultCompositeProfile");
     default_composite_profile

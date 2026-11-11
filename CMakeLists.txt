@@ -174,6 +174,7 @@ add_tesseract_nanobind_extension(
   src/bindings/common.cpp
   tesseract::common
 )
+target_sources(_common PRIVATE src/bindings/common_eigen.cpp src/bindings/common_logging.cpp)
 
 # Add tesseract_geometry module
 add_tesseract_nanobind_extension(
@@ -258,6 +259,7 @@ add_tesseract_nanobind_extension(
   tesseract::scene_graph
   tesseract::common
 )
+target_sources(_environment PRIVATE src/bindings/environment_commands.cpp)
 
 # Add tesseract_command_language module
 add_tesseract_nanobind_extension(
@@ -370,6 +372,7 @@ add_tesseract_nanobind_extension(
   tesseract::collision
   tesseract::common
 )
+target_sources(_trajopt_ifopt PRIVATE src/bindings/trajopt_ifopt_collision.cpp)
 
 # Add trajopt_sqp module (SQP solver with stepSQPSolver for real-time planning)
 add_tesseract_nanobind_extension(
@@ -420,7 +423,8 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_task_composer_taskflow_factories
 )
 # Pins the plugin libraries the task composer loads (macOS, Windows).
-target_sources(_task_composer PRIVATE src/bindings/task_composer_plugin_pinning.cpp)
+target_sources(_task_composer PRIVATE src/bindings/task_composer_plugin_pinning.cpp
+  src/bindings/task_composer_plugin_factory.cpp src/bindings/task_composer_anypoly.cpp)
 
 add_tesseract_nanobind_extension(
   task_composer_planning

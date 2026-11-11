@@ -39,6 +39,15 @@ LONG_SWITCH_INTERVAL = 100.0
 RELEASE_BUDGET_S = 10.0
 
 
+# [s] Per-test bound: ten times the slowest test measured in this file (2.03 s, test_environment_serialization_releases_gil),
+# rounded up to a multiple of 5 s, and never under 60 s: the bound includes fixture setup, and a
+# cold CI worker (Windows above all) spends seconds loading plugins before the first test runs.
+# A deadlock or hang never ends; this fails it instead of
+# waiting for the session-wide timeout.
+TEST_TIMEOUT_S = 60
+pytestmark = pytest.mark.timeout(TEST_TIMEOUT_S)
+
+
 def assert_releases_gil(call):
     """Call `call()` on a worker thread until the main thread has run; fail if it never could."""
     main_ran = threading.Event()

@@ -1,11 +1,6 @@
 /**
  * @file motion_planners_ompl.cpp
  * @brief nanobind bindings for tesseract_motion_planners OMPL
- *
- * NOTE: 0.33 API changes:
- * - OMPLPlanProfile -> OMPLMoveProfile
- * - OMPLRealVectorPlanProfile -> OMPLRealVectorMoveProfile
- * - Profile/ProfileDictionary moved to tesseract_common
  */
 
 #include "tesseract_nb.h"
@@ -14,7 +9,7 @@
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
 
-// tesseract_common (Profile and ProfileDictionary moved here in 0.33)
+// tesseract_common (Profile, ProfileDictionary)
 #include <tesseract/common/profile.h>
 #include <tesseract/common/profile_dictionary.h>
 
@@ -51,9 +46,10 @@ namespace ob = ompl::base;
 
 namespace {
 
-// OMPL's own default for MechanicalWorkOptimizationObjective's path-length weight
-// (dimensionless; MechanicalWorkOptimizationObjective.h), restated for the keyword default.
-constexpr double kMechanicalWorkPathLengthWeight = 0.00001;
+// [dimensionless, work per unit path length] OMPL's default path-length weight of
+// MechanicalWorkOptimizationObjective (MechanicalWorkOptimizationObjective.h constructor default):
+// a default argument, which C++ exposes as no symbol, so it is restated here for the keyword.
+constexpr double MECHANICAL_WORK_PATH_LENGTH_WEIGHT_DEFAULT = 0.00001;
 
 // A Python override of createOptimizationObjective returned something other than an
 // OptimizationObjective (or None).
@@ -245,7 +241,7 @@ NB_MODULE(motion_planners_ompl, m) {
 
     nb::class_<ob::MechanicalWorkOptimizationObjective, ob::OptimizationObjective>(
         m, "MechanicalWorkOptimizationObjective", "Mechanical work along the path, plus a small path-length term")
-        .def(nb::init<const ob::SpaceInformationPtr&, double>(), "si"_a, "path_length_weight"_a = kMechanicalWorkPathLengthWeight);
+        .def(nb::init<const ob::SpaceInformationPtr&, double>(), "si"_a, "path_length_weight"_a = MECHANICAL_WORK_PATH_LENGTH_WEIGHT_DEFAULT);
 
     nb::class_<ob::StateCostIntegralObjective, ob::OptimizationObjective, PyStateCostIntegralObjective>(
         m, "StateCostIntegralObjective",

@@ -18,6 +18,8 @@ import re
 import subprocess
 import sys
 
+import pytest
+
 from tests.trajopt_sqp.child_stderr import child_stderr
 
 N_NODES = 4
@@ -115,6 +117,15 @@ kept_match = all(
 print(f"SNAPSHOT trials={len(snapshots.kept)} moved={moved} kept_match={kept_match}")
 """
 )
+
+
+# [s] Per-test bound: ten times the slowest test measured in this file (0.19 s, test_a_callback_on_trajopt_qp_problem_lets_the_solve_converge),
+# rounded up to a multiple of 5 s, and never under 60 s: the bound includes fixture setup, and a
+# cold CI worker (Windows above all) spends seconds loading plugins before the first test runs.
+# A deadlock or hang never ends; this fails it instead of
+# waiting for the session-wide timeout.
+TEST_TIMEOUT_S = 60
+pytestmark = pytest.mark.timeout(TEST_TIMEOUT_S)
 
 
 def _run_child(script: str) -> subprocess.CompletedProcess:

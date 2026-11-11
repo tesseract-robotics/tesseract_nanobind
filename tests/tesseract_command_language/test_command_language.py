@@ -327,7 +327,7 @@ class TestNestedCompositeInstruction:
         move_ip = outer[0]
         assert move_ip.isMoveInstruction()
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(tesseract_command_language.PolyTypeError, match="holds a"):
             move_ip.asCompositeInstruction()
 
     def test_raster_like_dispatch_structure(self):
@@ -611,9 +611,9 @@ class TestWaitInstruction:
         composite.push_back(WaitInstruction(0.5))
         wait_ip = composite[0]
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(tesseract_command_language.PolyTypeError, match="holds a"):
             wait_ip.asMoveInstruction()
-        with pytest.raises(RuntimeError):
+        with pytest.raises(tesseract_command_language.PolyTypeError, match="holds a"):
             wait_ip.asTimerInstruction()
 
     def test_scan_program_interleaves_moves_and_waits(self):
@@ -691,7 +691,7 @@ class TestTimerInstruction:
         composite.push_back(TimerInstruction(TimerInstructionType.DIGITAL_OUTPUT_HIGH, 1.0, 0))
         ip = composite[0]
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(tesseract_command_language.PolyTypeError, match="holds a"):
             ip.asWaitInstruction()
 
 
@@ -734,7 +734,7 @@ class TestSetAnalogInstruction:
         composite.push_back(SetAnalogInstruction("k", 0, 0.0))
         ip = composite[0]
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(tesseract_command_language.PolyTypeError, match="holds a"):
             ip.asSetDigitalInstruction()
 
 
@@ -777,7 +777,7 @@ class TestSetDigitalInstruction:
         composite.push_back(SetDigitalInstruction("k", 0, True))
         ip = composite[0]
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(tesseract_command_language.PolyTypeError, match="holds a"):
             ip.asSetAnalogInstruction()
 
 
@@ -814,5 +814,5 @@ class TestSetToolInstruction:
         composite.push_back(SetToolInstruction(5))
         ip = composite[0]
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(tesseract_command_language.PolyTypeError, match="holds a"):
             ip.asMoveInstruction()

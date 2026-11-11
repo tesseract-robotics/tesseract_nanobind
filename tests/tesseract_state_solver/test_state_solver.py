@@ -122,33 +122,23 @@ def solver(request):
     return _solver(request.param)
 
 
-# --- native overloads vs aliases --------------------------------------------------------------
+# --- native overloads ------------------------------------------------------------------------
 
 
-def test_set_state_map_matches_alias_and_moves_links(solver):
-    """Review focus: setState({name: float}) reaches the joint-value map overload."""
+def test_set_state_map_moves_links(solver):
+    """setState({name: float}) reaches the joint-value map overload."""
     before = solver.getState().link_transforms[TIP_LINK].translation.copy()
-    alias = solver.clone()
     joints = dict(zip(ACTIVE_JOINTS, JOINT_VALUES))
-
     solver.setState(joints)
-    alias.setStateByMap(joints)
-
     assert solver.getState().joints == pytest.approx(joints)
     assert not np.allclose(solver.getState().link_transforms[TIP_LINK].translation, before)
-    _assert_states_equal(solver.getState(), alias.getState())
 
 
-def test_set_state_names_values_matches_alias(solver):
-    alias = solver.clone()
+def test_set_state_ids_values_in_any_order(solver):
     names = list(reversed(ACTIVE_JOINTS))
     values = JOINT_VALUES[::-1].copy()
-
     solver.setState(names, values)
-    alias.setStateByNamesAndValues(names, values)
-
     assert solver.getState().joints == pytest.approx(dict(zip(ACTIVE_JOINTS, JOINT_VALUES)))
-    _assert_states_equal(solver.getState(), alias.getState())
 
 
 def test_set_state_vector_matches_map(solver):
@@ -177,8 +167,6 @@ def _ids_values(joint_map):
 UNKNOWN_NAME_CALLS = {
     "setState-map": lambda s: s.setState({"nope": 1.0}),
     "setState-names": lambda s: s.setState(["nope"], np.array([1.0])),
-    "setStateByMap": lambda s: s.setStateByMap({"nope": 1.0}),
-    "setStateByNamesAndValues": lambda s: s.setStateByNamesAndValues(["nope"], np.array([1.0])),
     "getState-map": lambda s: s.getState({"nope": 1.0}),
     "getState-names": lambda s: s.getState(["nope"], np.array([1.0])),
     # 0.36 has no {name: value} getJacobian (state_solver.h:171-189): the map goes in as ids + values
@@ -193,8 +181,7 @@ UNKNOWN_NAME_CALLS = {
 
 @pytest.mark.parametrize("call", sorted(UNKNOWN_NAME_CALLS))
 def test_unknown_joint_name_raises_value_error(solver, call):
-    """Every alias shares its native lambda, so the aliases are in the table too. Before the
-    fix these ran in a subprocess: on OFKT the aliases died with SIGSEGV."""
+    """Before the fix these ran in a subprocess: on OFKT some died with SIGSEGV."""
     before = solver.getState()
     with pytest.raises(ValueError, match="nope"):
         UNKNOWN_NAME_CALLS[call](solver)
@@ -206,9 +193,6 @@ def test_unknown_joint_name_raises_value_error(solver, call):
 WRONG_LENGTH_CALLS = {
     "setState-vector": lambda s: s.setState(np.zeros(len(ACTIVE_JOINTS) + 1)),
     "setState-names": lambda s: s.setState(ACTIVE_JOINTS, JOINT_VALUES[:-1]),
-    "setStateByNamesAndValues": lambda s: s.setStateByNamesAndValues(
-        ACTIVE_JOINTS, JOINT_VALUES[:-1]
-    ),
     "getState-vector": lambda s: s.getState(np.zeros(len(ACTIVE_JOINTS) + 1)),
     "getState-names": lambda s: s.getState(ACTIVE_JOINTS, JOINT_VALUES[:-1]),
     "getJacobian-vector": lambda s: s.getJacobian(np.zeros(len(ACTIVE_JOINTS) + 1), TIP_LINK),

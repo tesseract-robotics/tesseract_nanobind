@@ -1,11 +1,6 @@
 /**
  * @file motion_planners_trajopt_ifopt.cpp
  * @brief nanobind bindings for tesseract_motion_planners TrajOpt IFOPT
- *
- * NOTE: 0.33 API changes:
- * - TrajOptIfoptPlanProfile -> TrajOptIfoptMoveProfile
- * - TrajOptIfoptDefaultPlanProfile -> TrajOptIfoptDefaultMoveProfile
- * - Profile/ProfileDictionary moved to tesseract_common
  */
 
 #include "tesseract_nb.h"
@@ -15,7 +10,7 @@
 #include <tesseract/motion_planners/types.h>
 #include <tesseract/motion_planners/planner.h>
 
-// tesseract_common (Profile and ProfileDictionary moved here in 0.33)
+// tesseract_common (Profile, ProfileDictionary)
 #include <tesseract/common/profile.h>
 #include <tesseract/common/profile_dictionary.h>
 
@@ -46,8 +41,8 @@
 // trajopt_sqp for SQPParameters (TrajOptIfoptSolverProfile::opt_params)
 #include <trajopt_sqp/types.h>
 
-// OsqpEigen settings (forwarded setters on TrajOptIfoptOSQPSolverProfile)
-#include <OsqpEigen/Settings.hpp>
+// OsqpEigen settings (forwarded set*/get* on TrajOptIfoptOSQPSolverProfile)
+#include "osqp_settings_bindings.h"
 
 namespace tp = tesseract::motion_planners;
 namespace tc = tesseract::common;
@@ -287,6 +282,7 @@ NB_MODULE(_motion_planners_trajopt_ifopt, m) {
                 if (dynamic_cast<const PyTrajOptIfoptMoveProfile*>(&self) != nullptr)
                     throw PureVirtualCallError("TrajOptIfoptMoveProfile.create is pure virtual: a Python "
                                                "profile cannot delegate to it with super().create(...)");
+                nb::gil_scoped_release release;  // reads env, which it locks without the GIL
                 return self.create(move_instruction, composite_manip_info, env, index);
             },
             "move_instruction"_a, "composite_manip_info"_a, "env"_a, "index"_a,
@@ -307,9 +303,9 @@ NB_MODULE(_motion_planners_trajopt_ifopt, m) {
                 if (dynamic_cast<const PyTrajOptIfoptCompositeProfile*>(&self) != nullptr)
                     throw PureVirtualCallError("TrajOptIfoptCompositeProfile.create is pure virtual: a Python "
                                                "profile cannot delegate to it with super().create(...)");
-                return self.create(composite_manip_info, env,
-                                   require_non_null(nodes, "TrajOptIfoptCompositeProfile.create", "nodes", "Node"),
-                                   fixed_indices);
+                require_non_null(nodes, "TrajOptIfoptCompositeProfile.create", "nodes", "Node");
+                nb::gil_scoped_release release;  // reads env, which it locks without the GIL
+                return self.create(composite_manip_info, env, nodes, fixed_indices);
             },
             "composite_manip_info"_a, "env"_a, "nodes"_a, "fixed_indices"_a,
             "Build the trajectory-wide terms the planner adds over all waypoint nodes. `nodes` are the "
@@ -356,7 +352,6 @@ NB_MODULE(_motion_planners_trajopt_ifopt, m) {
     bind_from_yaml(default_move_profile);
 
     // ========== TrajOptIfoptDefaultCompositeProfile ==========
-    // Note: longest_valid_segment_fraction/length removed in 0.33, collision config via TrajOptCollisionConfig.
     // The two collision configs carry max_num_cnt, which ONLY trajopt_ifopt honours
     // (trajopt_common/collision_types.h: "only used by trajopt_ifopt because the
     // constraints size must be fixed") -- it caps the collision constraint at that
@@ -379,39 +374,13 @@ NB_MODULE(_motion_planners_trajopt_ifopt, m) {
     bind_from_yaml(default_composite_profile);
 
     // ========== TrajOptIfoptOSQPSolverProfile ==========
-    // qp_settings is a unique_ptr<OsqpEigen::Settings>; expose setters that forward into it
-    // (same pattern as trajopt_sqp.OSQPEigenSolver). Defaults via setDefaultOSQPSettings:
-    // polish=true, warmStart=true, adaptiveRho=true, maxIter=8192, absTol=1e-4, relTol=1e-6
+    // qp_settings is a unique_ptr<OsqpEigen::Settings>; the set*/get* pairs forward into it
+    // (osqp_settings_bindings.h, shared with trajopt_sqp.OSQPEigenSolver).
     nb::class_<tp::TrajOptIfoptOSQPSolverProfile, tp::TrajOptIfoptSolverProfile> osqp_solver_profile(
         m, "TrajOptIfoptOSQPSolverProfile");
-    osqp_solver_profile
-        .def(nb::init<>())
-        .def("setPolish", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
-            self.qp_settings->setPolish(v); }, "polish"_a,
-            "Enable solution polishing (default: true)")
-        .def("setWarmStart", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
-            self.qp_settings->setWarmStart(v); }, "warm_start"_a,
-            "Enable warm-starting (default: true)")
-        .def("setAdaptiveRho", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
-            self.qp_settings->setAdaptiveRho(v); }, "adaptive_rho"_a,
-            "Enable adaptive step size (default: true)")
-        .def("setAdaptiveRhoInterval", [](tp::TrajOptIfoptOSQPSolverProfile& self, int v) {
-            self.qp_settings->setAdaptiveRhoInterval(v); }, "interval"_a,
-            "Adapt rho every N iterations. OSQP's default 0 adapts on wall-clock timing,\n"
-            "making solutions nondeterministic run-to-run; set a fixed interval (e.g. 25)\n"
-            "for reproducible optimization.")
-        .def("setMaxIteration", [](tp::TrajOptIfoptOSQPSolverProfile& self, int v) {
-            self.qp_settings->setMaxIteration(v); }, "max_iter"_a,
-            "Max OSQP iterations per QP solve (default: 8192)")
-        .def("setAbsoluteTolerance", [](tp::TrajOptIfoptOSQPSolverProfile& self, double v) {
-            self.qp_settings->setAbsoluteTolerance(v); }, "abs_tol"_a,
-            "Absolute convergence tolerance (default: 1e-4)")
-        .def("setRelativeTolerance", [](tp::TrajOptIfoptOSQPSolverProfile& self, double v) {
-            self.qp_settings->setRelativeTolerance(v); }, "rel_tol"_a,
-            "Relative convergence tolerance (default: 1e-6)")
-        .def("setVerbosity", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
-            self.qp_settings->setVerbosity(v); }, "verbose"_a,
-            "Enable OSQP console output (default: false)");
+    osqp_solver_profile.def(nb::init<>());
+    bind_osqp_settings(osqp_solver_profile,
+                       [](tp::TrajOptIfoptOSQPSolverProfile& self) -> OsqpEigen::Settings& { return *self.qp_settings; });
     // operator== also compares qp_settings, through upstream's free OsqpEigen::Settings operator==.
     bind_value_equality(osqp_solver_profile);
     bind_from_yaml(osqp_solver_profile);
@@ -439,8 +408,9 @@ NB_MODULE(_motion_planners_trajopt_ifopt, m) {
           [](const ConstVars& vars, const std::shared_ptr<const tesseract::environment::Environment>& env,
              const tc::ManipulatorInfo& manip_info, const trajopt_common::TrajOptCollisionConfig& config,
              const std::vector<int>& fixed_indices, bool fixed_sparsity) {
-              return tp::createCollisionConstraints(require_vars(vars, "createCollisionConstraints"), env,
-                                                    manip_info, config, fixed_indices, fixed_sparsity);
+              require_vars(vars, "createCollisionConstraints");
+              nb::gil_scoped_release release;  // reads env, which it locks without the GIL
+              return tp::createCollisionConstraints(vars, env, manip_info, config, fixed_indices, fixed_sparsity);
           },
           "vars"_a, "env"_a, "manip_info"_a, "config"_a, "fixed_indices"_a, "fixed_sparsity"_a,
           "Collision constraint sets of config's collision check type: one per unfixed step (DISCRETE)\n"

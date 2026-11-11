@@ -60,8 +60,9 @@ def test_calc_axis_and_jacobian(kin: ti.CartAxisKinematics):
 
 def test_static_helpers():
     np.testing.assert_allclose(ti.CartAxisKinematics.toUnitAxis([0.0, 0.0, 2.0], "axis"), TOOL_Z)
-    with pytest.raises(RuntimeError, match="axis"):
+    with pytest.raises(ti.DegenerateAxisError, match="axis must be finite and non-zero"):
         ti.CartAxisKinematics.toUnitAxis(np.zeros(3), "axis")
+    assert issubclass(ti.DegenerateAxisError, ValueError)
     direction = ti.CartAxisKinematics.mostReachableDirection(np.array([[1.0, 0.0], [0.0, 0.0]]))
     assert direction.shape == (2,)
     assert np.linalg.norm(direction) == pytest.approx(1.0)

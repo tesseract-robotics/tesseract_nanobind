@@ -6,7 +6,9 @@ module cannot be left without a stub. Each stub is rendered by
 depends on what is imported, and a shared process would make one module's
 stub depend on the modules rendered before it. Its id parameters are then
 widened to the implicit `str` / `tuple` conversions (`widen_implicit_id_stubs.py`),
-which stubgen does not record.
+which stubgen does not record, and cross references to a wrapped package's private
+extension (`tesseract_robotics.common._common.Isometry3d`) are rewritten to the
+public path (`tesseract_robotics.common.Isometry3d`).
 
 Usage:
     pixi run stubs         # rewrite the committed stubs
@@ -21,6 +23,7 @@ import importlib.machinery
 import importlib.util
 import os
 import pkgutil
+import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -46,6 +49,18 @@ sg = StubGen(module=mod, quiet=True)
 sg.put(mod)
 sys.stdout.write(sg.get())
 """
+
+
+# A wrapped package `tesseract_robotics.<pkg>` holds its extension as `_<pkg>` and star-imports
+# it in `__init__.py`, so `tesseract_robotics.<pkg>.X` and `tesseract_robotics.<pkg>._<pkg>.X`
+# name the same object. nanobind records the defining (private) module; the stubs show the
+# public one.
+_PRIVATE_EXTENSION_PATH = re.compile(r"\btesseract_robotics\.(\w+)\._\1\b")
+
+
+def publish_paths(stub: str) -> str:
+    """Rewrite references to a wrapped package's private extension module to the package."""
+    return _PRIVATE_EXTENSION_PATH.sub(r"tesseract_robotics.\1", stub)
 
 
 class StubRenderError(RuntimeError):
@@ -91,7 +106,7 @@ def render(module: str) -> str:
     )
     if proc.returncode != 0:
         raise StubRenderError(f"stubgen failed for {module}:\n{proc.stderr}")
-    return widen(proc.stdout)
+    return publish_paths(widen(proc.stdout))
 
 
 def render_all(modules: list[str]) -> dict[str, str]:

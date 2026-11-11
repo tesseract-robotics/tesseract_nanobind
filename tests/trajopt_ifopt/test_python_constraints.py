@@ -17,9 +17,12 @@ from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
 from tesseract_robotics.planning import Robot
 from tesseract_robotics.trajopt_ifopt.python_constraints import (
+    BoundsShapeError,
     Clearance,
+    ClearanceMarginError,
     ElbowUp,
     HoldAxis,
+    InvertedBoundsError,
     PointsDown,
     PyConstraint,
     StayDexterous,
@@ -145,9 +148,20 @@ def test_a_range_row_is_split_into_two_one_sided_rows(manip):
 
 
 def test_mismatched_bounds_raise(manip):
-    nodes = _nodes(manip, [Q])
-    with pytest.raises(ValueError):
-        PyConstraint("bad", nodes.getNodes()[0].getVar("joints"), [0.0, 1.0], [1.0])
+    var = _nodes(manip, [Q]).getNodes()[0].getVar("joints")
+    with pytest.raises(BoundsShapeError, match="lower has 2 rows, upper 1"):
+        PyConstraint("bad", var, [0.0, 1.0], [1.0])
+    with pytest.raises(
+        InvertedBoundsError, match="row 1: lower bound 2.0 is above upper bound 1.0"
+    ):
+        PyConstraint("bad", var, [0.0, 2.0], [1.0, 1.0])
+    assert issubclass(BoundsShapeError, ValueError) and issubclass(InvertedBoundsError, ValueError)
+
+
+def test_clearance_margin_must_exceed_d_max(manip, robot):
+    var = _nodes(manip, [Q]).getNodes()[0].getVar("joints")
+    with pytest.raises(ClearanceMarginError, match="must be below the margin"):
+        Clearance(var, robot.env, _joint_names(manip), ["link_6"], 0.0, 0.3, margin=0.3)
 
 
 def _solve_one_waypoint(manip, start, extra):

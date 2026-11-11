@@ -1,8 +1,6 @@
 /**
  * @file time_parameterization.cpp
  * @brief nanobind bindings for tesseract_time_parameterization
- *
- * NOTE: 0.33 API change - TimeParameterization now uses profiles and Environment
  */
 
 #include "tesseract_nb.h"
@@ -24,7 +22,6 @@
 
 // tesseract_command_language
 #include <tesseract/command_language/composite_instruction.h>
-// Note: ProfileDictionary moved to tesseract_common in 0.33
 #include <tesseract/common/profile_dictionary.h>
 
 // tesseract_environment
@@ -114,22 +111,22 @@ NB_MODULE(time_parameterization, m) {
              "    IndexError: an index method got `i` outside `[0, size())`; negative `i` is not wrapped.")
         .def("getPosition", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
             return std::as_const(self.checkedAt(i)).getPosition(i);
-        }, "i"_a)
+        }, "i"_a, "Joint positions of waypoint `i`.")
         .def("getVelocity", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
             return std::as_const(self.checkedAt(i)).getVelocity(i);
-        }, "i"_a)
+        }, "i"_a, "Joint velocities of waypoint `i`.")
         .def("getAcceleration", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
             return std::as_const(self.checkedAt(i)).getAcceleration(i);
-        }, "i"_a)
-        .def("getTimeFromStart", [](GIT& self, Eigen::Index i) { return self.checkedAt(i).getTimeFromStart(i); }, "i"_a)
+        }, "i"_a, "Joint accelerations of waypoint `i`.")
+        .def("getTimeFromStart", [](GIT& self, Eigen::Index i) { return self.checkedAt(i).getTimeFromStart(i); }, "i"_a, "Time of waypoint `i` from the start [s].")
         .def("setData", [](GIT& self, Eigen::Index i, const Eigen::VectorXd& velocity,
                            const Eigen::VectorXd& acceleration, double time) {
             self.checkedAt(i).setData(i, velocity, acceleration, time);
-        }, "i"_a, "velocity"_a, "acceleration"_a, "time"_a)
-        .def("size", [](GIT& self) { return self.checked().size(); })
-        .def("dof", [](GIT& self) { return self.checked().dof(); })
-        .def("empty", [](GIT& self) { return self.checked().empty(); })
-        .def("isTimeStrictlyIncreasing", [](GIT& self) { return self.checked().isTimeStrictlyIncreasing(); });
+        }, "i"_a, "velocity"_a, "acceleration"_a, "time"_a, "Write velocity, acceleration and time from start [s] into waypoint `i`.")
+        .def("size", [](GIT& self) { return self.checked().size(); }, "The number of waypoints.")
+        .def("dof", [](GIT& self) { return self.checked().dof(); }, "The number of joints per waypoint.")
+        .def("empty", [](GIT& self) { return self.checked().empty(); }, "True if there is no waypoint.")
+        .def("isTimeStrictlyIncreasing", [](GIT& self) { return self.checked().isTimeStrictlyIncreasing(); }, "True if every waypoint's time is above the previous one's.");
 
     // ========== TimeOptimalTrajectoryGenerationCompositeProfile ==========
     auto totg_composite_profile = nb::class_<tp::TimeOptimalTrajectoryGenerationCompositeProfile, tc::Profile>(m, "TimeOptimalTrajectoryGenerationCompositeProfile")
@@ -137,14 +134,14 @@ NB_MODULE(time_parameterization, m) {
         .def(nb::init<double, double, double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a,
              "path_tolerance"_a, "min_angle_change"_a)
-        .def_rw("override_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::override_limits)
-        .def_rw("velocity_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::velocity_limits)
-        .def_rw("acceleration_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::acceleration_limits)
-        .def_rw("max_velocity_scaling_factor", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::max_velocity_scaling_factor)
-        .def_rw("max_acceleration_scaling_factor", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::max_acceleration_scaling_factor)
-        .def_rw("path_tolerance", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::path_tolerance)
-        .def_rw("min_angle_change", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::min_angle_change)
-        .def_static("createKey", &tc::Profile::createKey<tp::TimeOptimalTrajectoryGenerationCompositeProfile>);
+        .def_rw("override_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::override_limits, "Use `velocity_limits` / `acceleration_limits` (/ `jerk_limits`) instead of the joint group's.")
+        .def_rw("velocity_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::velocity_limits, "Per-joint (lower, upper) velocity limits [m/s or rad/s], used when `override_limits`.")
+        .def_rw("acceleration_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::acceleration_limits, "Per-joint (lower, upper) acceleration limits [m/s² or rad/s²], used when `override_limits`.")
+        .def_rw("max_velocity_scaling_factor", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::max_velocity_scaling_factor, "Fraction of the velocity limits to plan with, in (0, 1].")
+        .def_rw("max_acceleration_scaling_factor", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::max_acceleration_scaling_factor, "Fraction of the acceleration limits to plan with, in (0, 1].")
+        .def_rw("path_tolerance", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::path_tolerance, "How far the path may deviate from the waypoints where TOTG blends them [rad or m, joint space].")
+        .def_rw("min_angle_change", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::min_angle_change, "Smallest direction change [rad] TOTG treats as a corner to blend.")
+        .def_static("createKey", &tc::Profile::createKey<tp::TimeOptimalTrajectoryGenerationCompositeProfile>, "The key every profile of this class carries in a ProfileDictionary.");
     bind_value_equality(totg_composite_profile);
 
     // ========== IterativeSplineParameterizationCompositeProfile ==========
@@ -152,14 +149,14 @@ NB_MODULE(time_parameterization, m) {
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
-        .def_rw("add_points", &tp::IterativeSplineParameterizationCompositeProfile::add_points)
-        .def_rw("override_limits", &tp::IterativeSplineParameterizationCompositeProfile::override_limits)
-        .def_rw("velocity_limits", &tp::IterativeSplineParameterizationCompositeProfile::velocity_limits)
-        .def_rw("acceleration_limits", &tp::IterativeSplineParameterizationCompositeProfile::acceleration_limits)
-        .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_velocity_scaling_factor)
-        .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_acceleration_scaling_factor)
-        .def_rw("minimum_time_delta", &tp::IterativeSplineParameterizationCompositeProfile::minimum_time_delta)
-        .def_static("createKey", &tc::Profile::createKey<tp::IterativeSplineParameterizationCompositeProfile>);
+        .def_rw("add_points", &tp::IterativeSplineParameterizationCompositeProfile::add_points, "Add points between the first two and the last two waypoints for smoother start and end.")
+        .def_rw("override_limits", &tp::IterativeSplineParameterizationCompositeProfile::override_limits, "Use `velocity_limits` / `acceleration_limits` (/ `jerk_limits`) instead of the joint group's.")
+        .def_rw("velocity_limits", &tp::IterativeSplineParameterizationCompositeProfile::velocity_limits, "Per-joint (lower, upper) velocity limits [m/s or rad/s], used when `override_limits`.")
+        .def_rw("acceleration_limits", &tp::IterativeSplineParameterizationCompositeProfile::acceleration_limits, "Per-joint (lower, upper) acceleration limits [m/s² or rad/s²], used when `override_limits`.")
+        .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_velocity_scaling_factor, "Fraction of the velocity limits to plan with, in (0, 1].")
+        .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_acceleration_scaling_factor, "Fraction of the acceleration limits to plan with, in (0, 1].")
+        .def_rw("minimum_time_delta", &tp::IterativeSplineParameterizationCompositeProfile::minimum_time_delta, "Smallest time step between waypoints [s].")
+        .def_static("createKey", &tc::Profile::createKey<tp::IterativeSplineParameterizationCompositeProfile>, "The key every profile of this class carries in a ProfileDictionary.");
     bind_value_equality(isp_composite_profile);
 
     // ========== IterativeSplineParameterizationMoveProfile ==========
@@ -167,15 +164,14 @@ NB_MODULE(time_parameterization, m) {
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
-        .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_velocity_scaling_factor)
-        .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_acceleration_scaling_factor)
-        .def_static("createKey", &tc::Profile::createKey<tp::IterativeSplineParameterizationMoveProfile>);
+        .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_velocity_scaling_factor, "Fraction of the velocity limits to plan with, in (0, 1].")
+        .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_acceleration_scaling_factor, "Fraction of the acceleration limits to plan with, in (0, 1].")
+        .def_static("createKey", &tc::Profile::createKey<tp::IterativeSplineParameterizationMoveProfile>, "The key every profile of this class carries in a ProfileDictionary.");
     bind_value_equality(isp_move_profile);
 
     // ========== TimeParameterization (base) ==========
-    // Note: 0.33 API change - now uses profiles and Environment
     nb::class_<tp::TimeParameterization>(m, "TimeParameterization")
-        .def("getName", &tp::TimeParameterization::getName)
+        .def("getName", &tp::TimeParameterization::getName, "The name this parameterization registers its profiles under.")
         // GIL released: scales with trajectory length, and only reads env, so it never fires an
         // Environment event callback (scripts/nogil_entry_points.yaml).
         .def("compute", &tp::TimeParameterization::compute,
@@ -199,13 +195,13 @@ NB_MODULE(time_parameterization, m) {
              "max_rotational_acceleration"_a,
              "max_velocity_scaling_factor"_a = 1.0,
              "max_acceleration_scaling_factor"_a = 1.0)
-        .def_rw("max_translational_velocity", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_translational_velocity)
-        .def_rw("max_rotational_velocity", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_rotational_velocity)
-        .def_rw("max_translational_acceleration", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_translational_acceleration)
-        .def_rw("max_rotational_acceleration", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_rotational_acceleration)
-        .def_rw("max_velocity_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_velocity_scaling_factor)
-        .def_rw("max_acceleration_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_acceleration_scaling_factor)
-        .def_static("createKey", &tc::Profile::createKey<tp::ConstantTCPSpeedParameterizationCompositeProfile>);
+        .def_rw("max_translational_velocity", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_translational_velocity, "TCP speed limit [m/s].")
+        .def_rw("max_rotational_velocity", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_rotational_velocity, "TCP angular speed limit [rad/s].")
+        .def_rw("max_translational_acceleration", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_translational_acceleration, "TCP acceleration limit [m/s²].")
+        .def_rw("max_rotational_acceleration", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_rotational_acceleration, "TCP angular acceleration limit [rad/s²].")
+        .def_rw("max_velocity_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_velocity_scaling_factor, "Fraction of the velocity limits to plan with, in (0, 1].")
+        .def_rw("max_acceleration_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_acceleration_scaling_factor, "Fraction of the acceleration limits to plan with, in (0, 1].")
+        .def_static("createKey", &tc::Profile::createKey<tp::ConstantTCPSpeedParameterizationCompositeProfile>, "The key every profile of this class carries in a ProfileDictionary.");
     bind_value_equality(constant_tcp_speed_composite_profile);
 
     // ========== ConstantTCPSpeedParameterization ==========
@@ -216,13 +212,13 @@ NB_MODULE(time_parameterization, m) {
     auto ruckig_composite_profile = nb::class_<tp::RuckigTrajectorySmoothingCompositeProfile, tc::Profile>(m, "RuckigTrajectorySmoothingCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double>(), "duration_extension_fraction"_a, "max_duration_extension_factor"_a)
-        .def_rw("duration_extension_fraction", &tp::RuckigTrajectorySmoothingCompositeProfile::duration_extension_fraction)
-        .def_rw("max_duration_extension_factor", &tp::RuckigTrajectorySmoothingCompositeProfile::max_duration_extension_factor)
-        .def_rw("override_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::override_limits)
-        .def_rw("velocity_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::velocity_limits)
-        .def_rw("acceleration_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::acceleration_limits)
-        .def_rw("jerk_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::jerk_limits)
-        .def_static("createKey", &tc::Profile::createKey<tp::RuckigTrajectorySmoothingCompositeProfile>);
+        .def_rw("duration_extension_fraction", &tp::RuckigTrajectorySmoothingCompositeProfile::duration_extension_fraction, "Fraction by which each retry stretches the segment durations.")
+        .def_rw("max_duration_extension_factor", &tp::RuckigTrajectorySmoothingCompositeProfile::max_duration_extension_factor, "Largest total stretch before smoothing gives up.")
+        .def_rw("override_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::override_limits, "Use `velocity_limits` / `acceleration_limits` (/ `jerk_limits`) instead of the joint group's.")
+        .def_rw("velocity_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::velocity_limits, "Per-joint (lower, upper) velocity limits [m/s or rad/s], used when `override_limits`.")
+        .def_rw("acceleration_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::acceleration_limits, "Per-joint (lower, upper) acceleration limits [m/s² or rad/s²], used when `override_limits`.")
+        .def_rw("jerk_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::jerk_limits, "Per-joint (lower, upper) jerk limits [m/s³ or rad/s³], used when `override_limits`.")
+        .def_static("createKey", &tc::Profile::createKey<tp::RuckigTrajectorySmoothingCompositeProfile>, "The key every profile of this class carries in a ProfileDictionary.");
     bind_value_equality(ruckig_composite_profile);
 
     // ========== RuckigTrajectorySmoothing ==========

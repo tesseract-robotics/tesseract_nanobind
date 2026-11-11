@@ -215,16 +215,15 @@ class TestConfig:
             factory.saveConfig(tmp_path / "missing" / "config.yaml")
 
 
+@pytest.fixture(scope="module")
+def server(config_path):
+    server = TaskComposerServer()
+    server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
+    return server
+
+
 class TestServer:
     """Upstream's top-level entry point (#323)."""
-
-    @pytest.fixture(scope="class")
-    def server(self, config_path):
-        server = TaskComposerServer()
-        server.loadConfig(
-            config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
-        )
-        return server
 
     def test_loads_tasks_and_executors(self, server):
         assert PIPELINE in server.getAvailableTasks()

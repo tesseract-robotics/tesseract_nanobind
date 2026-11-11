@@ -796,7 +796,7 @@ def test_override_error_is_a_type_error():
 
 
 def test_planner_never_runs_a_concrete_profile_override():
-    """The review's probe: before the refusal, this override ran zero times and the plan succeeded."""
+    """Probe: before the refusal, this override ran zero times and the plan succeeded."""
     with pytest.raises(
         ProfileOverrideNotDispatchedError, match="SimplePlannerFixedSizeMoveProfile"
     ):

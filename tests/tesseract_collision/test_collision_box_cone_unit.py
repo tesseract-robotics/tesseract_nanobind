@@ -26,7 +26,7 @@ def addCollisionObjects(checker):
     box_pose = np.eye(4)
     obj1_shapes = tesseract_geometry.GeometriesConst()
     obj1_shapes.append(box)
-    obj1_poses = tesseract_common.VectorIsometry3d()
+    obj1_poses = []
     obj1_poses.append(tesseract_common.Isometry3d(box_pose))
 
     checker.addCollisionObject("box_link", 0, obj1_shapes, obj1_poses, False)
@@ -38,7 +38,7 @@ def addCollisionObjects(checker):
 
     obj2_shapes = tesseract_geometry.GeometriesConst()
     obj2_shapes.append(thin_box)
-    obj2_poses = tesseract_common.VectorIsometry3d()
+    obj2_poses = []
     obj2_poses.append(tesseract_common.Isometry3d(thin_box_pose))
 
     checker.addCollisionObject("thin_box_link", 0, obj2_shapes, obj2_poses)
@@ -50,7 +50,7 @@ def addCollisionObjects(checker):
 
     obj3_shapes = tesseract_geometry.GeometriesConst()
     obj3_shapes.append(cone)
-    obj3_poses = tesseract_common.VectorIsometry3d()
+    obj3_poses = []
     obj3_poses.append(tesseract_common.Isometry3d(cone_pose))
 
     checker.addCollisionObject("cone_link", 0, obj3_shapes, obj3_poses)
@@ -61,7 +61,7 @@ def addCollisionObjects(checker):
 
     obj4_shapes = tesseract_geometry.GeometriesConst()
     obj4_shapes.append(remove_box)
-    obj4_poses = tesseract_common.VectorIsometry3d()
+    obj4_poses = []
     obj4_poses.append(tesseract_common.Isometry3d(remove_box_pose))
 
     checker.addCollisionObject("remove_box_link", 0, obj4_shapes, obj4_poses)
@@ -76,9 +76,7 @@ def addCollisionObjects(checker):
     assert not checker.disableCollisionObject("link_does_not_exist")
 
     # Try to add empty Collision Object
-    assert not checker.addCollisionObject(
-        "empty_link", 0, tesseract_geometry.GeometriesConst(), tesseract_common.VectorIsometry3d()
-    )
+    assert not checker.addCollisionObject("empty_link", 0, tesseract_geometry.GeometriesConst(), [])
 
     # Check sizes
 

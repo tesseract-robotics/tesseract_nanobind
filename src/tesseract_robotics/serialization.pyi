@@ -1,6 +1,5 @@
 """Tesseract serialization bindings (XML/binary via Cereal)"""
 
-from collections.abc import Sequence
 import os
 
 import tesseract_robotics.command_language
@@ -17,19 +16,23 @@ def composite_instruction_to_xml(instruction: tesseract_robotics.command_languag
 def composite_instruction_from_xml(xml: str) -> tesseract_robotics.command_language.CompositeInstruction:
     """Deserialize CompositeInstruction from XML string."""
 
-def composite_instruction_to_file(instruction: tesseract_robotics.command_language.CompositeInstruction, path: str) -> bool:
-    """Save CompositeInstruction to XML file."""
-
-def composite_instruction_from_file(path: str) -> tesseract_robotics.command_language.CompositeInstruction:
-    """Load CompositeInstruction from XML file."""
-
-def composite_instruction_to_binary(instruction: tesseract_robotics.command_language.CompositeInstruction) -> list[int]:
+def composite_instruction_to_file(instruction: tesseract_robotics.command_language.CompositeInstruction, path: str | os.PathLike) -> None:
     """
-    Serialize CompositeInstruction to binary data (faster, smaller than XML).
+    Save CompositeInstruction as XML to `path`, as named. Raises OSError if it cannot be written.
     """
 
-def composite_instruction_from_binary(data: Sequence[int]) -> tesseract_robotics.command_language.CompositeInstruction:
-    """Deserialize CompositeInstruction from binary data."""
+def composite_instruction_from_file(path: str | os.PathLike) -> tesseract_robotics.command_language.CompositeInstruction:
+    """
+    Load CompositeInstruction from the XML file `path`. Raises OSError if it cannot be read.
+    """
+
+def composite_instruction_to_binary(instruction: tesseract_robotics.command_language.CompositeInstruction) -> bytes:
+    """
+    Serialize CompositeInstruction to binary data (bytes; faster, smaller than XML).
+    """
+
+def composite_instruction_from_binary(data: bytes) -> tesseract_robotics.command_language.CompositeInstruction:
+    """Deserialize CompositeInstruction from binary data (bytes)."""
 
 def environment_to_xml(environment: tesseract_robotics.environment.Environment) -> str:
     """
@@ -39,17 +42,21 @@ def environment_to_xml(environment: tesseract_robotics.environment.Environment) 
 def environment_from_xml(xml: str) -> tesseract_robotics.environment.Environment:
     """Deserialize Environment from XML string. Returns shared_ptr."""
 
-def environment_to_file(environment: tesseract_robotics.environment.Environment, path: str) -> bool:
-    """Save Environment to XML file."""
+def environment_to_file(environment: tesseract_robotics.environment.Environment, path: str | os.PathLike) -> None:
+    """
+    Save Environment as XML to `path`, as named. Raises OSError if it cannot be written.
+    """
 
-def environment_from_file(path: str) -> tesseract_robotics.environment.Environment:
-    """Load Environment from XML file. Returns shared_ptr."""
+def environment_from_file(path: str | os.PathLike) -> tesseract_robotics.environment.Environment:
+    """
+    Load Environment from the XML file `path`. Raises OSError if it cannot be read.
+    """
 
-def environment_to_binary(environment: tesseract_robotics.environment.Environment) -> list[int]:
-    """Serialize Environment to binary data."""
+def environment_to_binary(environment: tesseract_robotics.environment.Environment) -> bytes:
+    """Serialize Environment to binary data (bytes)."""
 
-def environment_from_binary(data: Sequence[int]) -> tesseract_robotics.environment.Environment:
-    """Deserialize Environment from binary data. Returns shared_ptr."""
+def environment_from_binary(data: bytes) -> tesseract_robotics.environment.Environment:
+    """Deserialize Environment from binary data (bytes)."""
 
 def scene_state_to_xml(state: tesseract_robotics.state_solver.SceneState) -> str:
     """
@@ -59,17 +66,21 @@ def scene_state_to_xml(state: tesseract_robotics.state_solver.SceneState) -> str
 def scene_state_from_xml(xml: str) -> tesseract_robotics.state_solver.SceneState:
     """Deserialize SceneState from XML string."""
 
-def scene_state_to_file(state: tesseract_robotics.state_solver.SceneState, path: str) -> bool:
-    """Save SceneState to XML file."""
+def scene_state_to_file(state: tesseract_robotics.state_solver.SceneState, path: str | os.PathLike) -> None:
+    """
+    Save SceneState as XML to `path`, as named. Raises OSError if it cannot be written.
+    """
 
-def scene_state_from_file(path: str) -> tesseract_robotics.state_solver.SceneState:
-    """Load SceneState from XML file."""
+def scene_state_from_file(path: str | os.PathLike) -> tesseract_robotics.state_solver.SceneState:
+    """
+    Load SceneState from the XML file `path`. Raises OSError if it cannot be read.
+    """
 
-def scene_state_to_binary(state: tesseract_robotics.state_solver.SceneState) -> list[int]:
-    """Serialize SceneState to binary data."""
+def scene_state_to_binary(state: tesseract_robotics.state_solver.SceneState) -> bytes:
+    """Serialize SceneState to binary data (bytes)."""
 
-def scene_state_from_binary(data: Sequence[int]) -> tesseract_robotics.state_solver.SceneState:
-    """Deserialize SceneState from binary data."""
+def scene_state_from_binary(data: bytes) -> tesseract_robotics.state_solver.SceneState:
+    """Deserialize SceneState from binary data (bytes)."""
 
 def task_composer_log_to_xml(log: tesseract_robotics.task_composer.TaskComposerLog) -> str:
     """
@@ -89,8 +100,8 @@ def task_composer_log_from_file(path: str | os.PathLike) -> tesseract_robotics.t
     Load TaskComposerLog from the XML file `path`. Raises OSError if it cannot be read.
     """
 
-def task_composer_log_to_binary(log: tesseract_robotics.task_composer.TaskComposerLog) -> list[int]:
-    """Serialize TaskComposerLog to binary data."""
+def task_composer_log_to_binary(log: tesseract_robotics.task_composer.TaskComposerLog) -> bytes:
+    """Serialize TaskComposerLog to binary data (bytes)."""
 
-def task_composer_log_from_binary(data: Sequence[int]) -> tesseract_robotics.task_composer.TaskComposerLog:
-    """Deserialize TaskComposerLog from binary data."""
+def task_composer_log_from_binary(data: bytes) -> tesseract_robotics.task_composer.TaskComposerLog:
+    """Deserialize TaskComposerLog from binary data (bytes)."""

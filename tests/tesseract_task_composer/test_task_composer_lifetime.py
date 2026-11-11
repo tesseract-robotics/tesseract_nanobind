@@ -76,7 +76,7 @@ from tesseract_robotics import get_tesseract_resource_path, get_tesseract_suppor
 from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning.profiles import (
     TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
-    TRAJOPT_PROFILE_NAMES,
+    STANDARD_PROFILE_NAMES,
     create_trajopt_ifopt_default_profiles,
 )
 from tesseract_robotics.motion_planners_trajopt_ifopt import (
@@ -104,7 +104,7 @@ class Gate(TrajOptIfoptCompositeProfile):
 
 
 gated_profiles = create_trajopt_ifopt_default_profiles()
-for name in TRAJOPT_PROFILE_NAMES:
+for name in STANDARD_PROFILE_NAMES:
     gated_profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, Gate())
 
 
@@ -113,6 +113,15 @@ def gated_storage(node):
     storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(gated_profiles))
     return storage
 """
+
+
+# [s] Per-test bound: ten times the slowest test measured in this file (1.96 s, test_reloads_whose_locators_reach_each_others_server_raise; the reload race is excluded and carries its own bound),
+# rounded up to a multiple of 5 s, and never under 60 s: the bound includes fixture setup, and a
+# cold CI worker (Windows above all) spends seconds loading plugins before the first test runs.
+# A deadlock or hang never ends; this fails it instead of
+# waiting for the session-wide timeout.
+TEST_TIMEOUT_S = 60
+pytestmark = pytest.mark.timeout(TEST_TIMEOUT_S)
 
 
 def _run(script: str, *, planning: bool = True, timeout_s: int = TIMEOUT_S) -> str:
@@ -593,6 +602,7 @@ print("REPLACED", server.hasTask("Child"))
 """)
         assert "REPLACED True" in out, out
 
+    @pytest.mark.timeout(RELOAD_RACE_TIMEOUT_S + TIMEOUT_S)  # the child's own bound plus its setup
     def test_reload_racing_by_name_runs(self):
         """A run registered only after releasing the GIL: a reload on another thread could free
         the task between the lookup and the registration. Runs and reads on this thread wait for

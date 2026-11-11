@@ -158,8 +158,8 @@ _NAN = np.array([np.nan, 0.0, 1.0])
     [
         ("cone", {"source_axis": _ZERO}, "source axis must be finite and non-zero"),
         ("align", {"source_axis": _NAN}, "source axis must be finite and non-zero"),
-        ("cone", {"target_axis": _ZERO}, "finite and non-zero"),
-        ("align", {"target_axis": _NAN}, "finite and non-zero"),
+        ("cone", {"target_axis": _ZERO}, "target axis must be finite and non-zero"),
+        ("align", {"target_axis": _NAN}, "target axis must be finite and non-zero"),
         ("cone", {"coeff": -1.0}, "coeff must be finite and non-negative"),
         ("align", {"coeff": np.inf}, "coeff must be finite and non-negative"),
         ("cone", {"source_frame": "no_such_link"}, "source link 'no_such_link' does not exist"),
@@ -176,7 +176,9 @@ def test_invalid_arguments_raise(axes: AxisFixture, kind, kwargs, message):
         "target_axis": BASE_X,
         "coeff": 1.0,
     } | kwargs
-    with pytest.raises(RuntimeError, match=message):
+    # A degenerate axis is a ValueError (DegenerateAxisError); the rest are upstream's RuntimeError.
+    error = ti.DegenerateAxisError if "axis must" in message else RuntimeError
+    with pytest.raises(error, match=message):
         if kind == "cone":
             ti.CartAxisConeConstraint(
                 axes.var,

@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 import tesseract_robotics.collision
 import tesseract_robotics.command_language
-import tesseract_robotics.common._common
+import tesseract_robotics.common
 import tesseract_robotics.environment
 import tesseract_robotics.kinematics
 import tesseract_robotics.state_solver
@@ -97,7 +97,7 @@ class MotionPlanner:
         """
 
     @staticmethod
-    def assignSolution(mi: tesseract_robotics.command_language.MoveInstructionPoly, joint_names: Sequence[tesseract_robotics.common._common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], format_result_as_input: bool) -> None:
+    def assignSolution(mi: tesseract_robotics.command_language.MoveInstructionPoly, joint_names: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], format_result_as_input: bool) -> None:
         """
         Write a joint solution into `mi` in place: a state waypoint, or with `format_result_as_input` the seed of a Cartesian / the position of a joint waypoint.
         """
@@ -115,17 +115,17 @@ def formatProgram(composite_instructions: tesseract_robotics.command_language.Co
     """
 
 @overload
-def toToolpath(ci: tesseract_robotics.command_language.CompositeInstruction, env: tesseract_robotics.environment.Environment) -> list[tesseract_robotics.common._common.VectorIsometry3d]:
+def toToolpath(ci: tesseract_robotics.command_language.CompositeInstruction, env: tesseract_robotics.environment.Environment) -> list[list[tesseract_robotics.common.Isometry3d]]:
     """
-    World-frame TCP poses of a program, one VectorIsometry3d per sub-composite.
+    World-frame TCP poses of a program, one list of Isometry3d per sub-composite.
     """
 
 @overload
-def toToolpath(mi: tesseract_robotics.command_language.MoveInstructionPoly, env: tesseract_robotics.environment.Environment) -> list[tesseract_robotics.common._common.VectorIsometry3d]:
+def toToolpath(mi: tesseract_robotics.command_language.MoveInstructionPoly, env: tesseract_robotics.environment.Environment) -> list[list[tesseract_robotics.common.Isometry3d]]:
     """World-frame TCP pose of a move instruction."""
 
 @overload
-def toToolpath(instruction: tesseract_robotics.command_language.InstructionPoly, env: tesseract_robotics.environment.Environment) -> list[tesseract_robotics.common._common.VectorIsometry3d]:
+def toToolpath(instruction: tesseract_robotics.command_language.InstructionPoly, env: tesseract_robotics.environment.Environment) -> list[list[tesseract_robotics.common.Isometry3d]]:
     """World-frame TCP poses of a composite or move instruction."""
 
 @overload
@@ -161,7 +161,7 @@ class RobotConfig(enum.Enum):
 
     FUB = 7
 
-def getRobotConfig(joint_group: tesseract_robotics.kinematics.JointGroup, base_link: tesseract_robotics.common._common.LinkId | str, tcp_frame: tesseract_robotics.common._common.LinkId | str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], sign_correction: Annotated[NDArray[numpy.int32], dict(shape=(2), order='C')] | Sequence[int] = [1, 1]) -> RobotConfig:
+def getRobotConfig(joint_group: tesseract_robotics.kinematics.JointGroup, base_link: tesseract_robotics.common.LinkId | str, tcp_frame: tesseract_robotics.common.LinkId | str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], sign_correction: Annotated[NDArray[numpy.int32], dict(shape=(2), order='C')] | Sequence[int] = [1, 1]) -> RobotConfig:
     """
     Configuration of a six-axis arm. The last six joint values are the arm's; `sign_correction` flips the sign of joint 3 and joint 5 for the manufacturer's convention.
     """
@@ -179,7 +179,7 @@ def checkPIQPSettings(settings: tesseract_robotics.trajopt_sqp.PIQPSettings, pro
     Raise RuntimeError, naming `profile_name`, unless `settings` has a KKT solver of PIQP's sparse backend and passes piqp::Settings::verify_settings().
     """
 
-def isValidState(joint_group: tesseract_robotics.kinematics.JointGroup, base_link: tesseract_robotics.common._common.LinkId | str, tcp_frame: tesseract_robotics.common._common.LinkId | str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')] | Sequence[Sequence[float]]) -> bool:
+def isValidState(joint_group: tesseract_robotics.kinematics.JointGroup, base_link: tesseract_robotics.common.LinkId | str, tcp_frame: tesseract_robotics.common.LinkId | str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')] | Sequence[Sequence[float]]) -> bool:
     """
     True if `joint_values` are within `limits` and the arm's configuration, read with sign correction (-1, 1), is FUT or NUT; any other configuration is invalid. The last six joint values are the arm's.
     """

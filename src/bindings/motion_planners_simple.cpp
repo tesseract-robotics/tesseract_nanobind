@@ -8,9 +8,6 @@
 
 #include <tesseract/common/eigen_types.h>
 
-// interpolate() returns, and getInterpolatedInstructions() takes, the opaque VectorIsometry3d
-// bound in tesseract_common.
-NB_MAKE_OPAQUE(tesseract::common::VectorIsometry3d)
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
@@ -27,7 +24,7 @@ NB_MAKE_OPAQUE(tesseract::common::VectorIsometry3d)
 #include <tesseract/motion_planners/simple/profile/simple_planner_lvs_assign_move_profile.h>
 #include <tesseract/motion_planners/simple/profile/simple_planner_lvs_assign_no_ik_move_profile.h>
 
-// tesseract_common (Profile/ProfileDictionary moved here in 0.33)
+// tesseract_common (Profile, ProfileDictionary)
 #include <tesseract/common/profile.h>
 #include <tesseract/common/profile_dictionary.h>
 
@@ -219,7 +216,8 @@ template <typename Info, typename Group>
 void bind_instruction_info(nb::class_<Info>& cls) {
     cls.def(nb::init<const tcl::MoveInstructionPoly&, const te::Environment&, const tc::ManipulatorInfo&>(),
             nb::arg("plan_instruction").noconvert(), "env"_a, "manip_info"_a,
-            nb::keep_alive<1, 2>(), nb::keep_alive<1, 3>())
+            nb::keep_alive<1, 2>(), nb::keep_alive<1, 3>(),
+            nb::call_guard<nb::gil_scoped_release>())  // reads env, which it locks without the GIL
         .def_prop_ro("instruction", [](const Info& self) -> const tcl::MoveInstructionPoly& { return self.instruction; },
             nb::rv_policy::reference_internal, "The move instruction this info describes (not a copy)")
         .def_prop_ro("manip", [](const Info& self) -> std::shared_ptr<const Group> { return self.manip; },

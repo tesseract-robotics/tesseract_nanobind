@@ -12,9 +12,12 @@ from tesseract_robotics.common import (
     Y_AXIS,
     Z_AXIS,
     AngleAxisd,
+    DegenerateGeometryError,
+    DegenerateRotationError,
     Hyperplane3d,
     Isometry3d,
     NonFiniteMatrixError,
+    NotRotationError,
     ParametrizedLine3d,
     Quaterniond,
     Translation3d,
@@ -551,28 +554,35 @@ def test_hyperplane_normal_point_ctor():
     assert plane.signedDistance(np.array([0.0, 0.0, 5.0]) + Z_AXIS) == pytest.approx(1.0)
 
 
-def test_hyperplane_through_three_points_right_hand_rule():
-    """Through(p0, p1, p2) MUST follow the right-hand rule: (p1 − p0) × (p2 − p0).
+def test_hyperplane_through_matches_eigen():
+    """Through(p0, p1, p2) is Eigen's: normal = (p2 − p0) × (p1 − p0), normalized.
 
-    The binding swaps Eigen's internal operand order to enforce this
-    convention. Locking it down so a future binding refactor can't quietly
-    re-expose the upstream quirk.
+    A port of C++ code that builds a plane with Eigen's Through gets the same plane, normal
+    sign included.
     """
-    # XY plane traversed counter-clockwise from origin → normal = +Z.
     plane = Hyperplane3d.Through(np.zeros(3), X_AXIS, Y_AXIS)
-    nptest.assert_allclose(plane.normal, Z_AXIS, atol=DEFAULT_PREC)
-    # Reversing the last two points flips the normal.
+    nptest.assert_allclose(plane.normal, -Z_AXIS, atol=DEFAULT_PREC)
     plane_flipped = Hyperplane3d.Through(np.zeros(3), Y_AXIS, X_AXIS)
-    nptest.assert_allclose(plane_flipped.normal, -Z_AXIS, atol=DEFAULT_PREC)
-    # General case: normal direction matches (p1 − p0) × (p2 − p0).
+    nptest.assert_allclose(plane_flipped.normal, Z_AXIS, atol=DEFAULT_PREC)
     p0 = np.array([1.0, 1.0, 1.0])
     p1 = np.array([2.0, 1.0, 1.0])
     p2 = np.array([1.0, 2.0, 1.0])
-    expected_normal = np.cross(p1 - p0, p2 - p0)
+    expected_normal = np.cross(p2 - p0, p1 - p0)
     expected_normal /= np.linalg.norm(expected_normal)
-    nptest.assert_allclose(
-        Hyperplane3d.Through(p0, p1, p2).normal, expected_normal, atol=DEFAULT_PREC
-    )
+    plane = Hyperplane3d.Through(p0, p1, p2)
+    nptest.assert_allclose(plane.normal, expected_normal, atol=DEFAULT_PREC)
+    assert plane.offset == pytest.approx(-expected_normal @ p0)
+
+
+def test_degenerate_checks_are_scale_free():
+    """Small but nonzero inputs have a direction: the checks used to compare a length (and a
+    length squared) with 1e-12, so a 1e-7 m triangle was 'collinear'."""
+    tiny = 1e-7
+    plane = Hyperplane3d.Through(np.zeros(3), tiny * X_AXIS, tiny * Y_AXIS)
+    nptest.assert_allclose(plane.normal, -Z_AXIS, atol=DEFAULT_PREC)
+    assert Hyperplane3d(1e-13 * Z_AXIS, 0.0).normal[2] > 0.0
+    line = ParametrizedLine3d.Through(np.zeros(3), 1e-13 * X_AXIS)
+    nptest.assert_allclose(line.direction, X_AXIS, atol=DEFAULT_PREC)
 
 
 def test_hyperplane_signed_vs_abs_distance():
@@ -730,9 +740,9 @@ def test_parametrized_line_repr():
 
 
 def test_hyperplane_rejects_zero_normal():
-    with pytest.raises(ValueError, match="zero-magnitude"):
+    with pytest.raises(DegenerateGeometryError, match="normal .* has no direction"):
         Hyperplane3d(np.zeros(3), 1.0)
-    with pytest.raises(ValueError, match="zero-magnitude"):
+    with pytest.raises(DegenerateGeometryError, match="normal .* has no direction"):
         Hyperplane3d(np.zeros(3), np.array([1.0, 2.0, 3.0]))
 
 
@@ -748,18 +758,58 @@ def test_hyperplane_rejects_zero_normal():
     ],
 )
 def test_hyperplane_through_rejects_collinear_points(p0, p1, p2):
-    with pytest.raises(ValueError, match="collinear"):
+    with pytest.raises(DegenerateGeometryError, match="collinear|no direction"):
         Hyperplane3d.Through(p0, p1, p2)
 
 
 def test_parametrized_line_rejects_zero_direction():
-    with pytest.raises(ValueError, match="zero-magnitude"):
+    with pytest.raises(DegenerateGeometryError, match="direction .* has no direction"):
         ParametrizedLine3d(np.zeros(3), np.zeros(3))
 
 
 def test_parametrized_line_through_rejects_coincident_points():
-    with pytest.raises(ValueError, match="coincident"):
+    with pytest.raises(DegenerateGeometryError, match="p1 - p0 .* has no direction"):
         ParametrizedLine3d.Through(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+
+
+def test_rotation_inputs_are_validated():
+    """Isometry3d / AngleAxisd hold rotations only, as Quaterniond(rotation_matrix) does."""
+    scaled = np.eye(4)
+    scaled[:3, :3] *= 2.0
+    with pytest.raises(NotRotationError, match="not orthonormal"):
+        Isometry3d(scaled)
+    projective = np.eye(4)
+    projective[3, 0] = 1.0
+    with pytest.raises(NotRotationError, match="bottom row"):
+        Isometry3d(projective)
+    with pytest.raises(NotRotationError, match="not orthonormal"):
+        AngleAxisd(np.eye(3) * 2.0)
+    with pytest.raises(DegenerateRotationError, match="no rotation"):
+        Isometry3d(np.zeros(3), Quaterniond([0.0, 0.0, 0.0, 0.0]))
+    with pytest.raises(DegenerateRotationError, match="no direction"):
+        AngleAxisd(0.5, np.zeros(3))
+    assert issubclass(NotRotationError, ValueError)
+    assert issubclass(DegenerateRotationError, ValueError)
+
+
+def test_non_unit_inputs_name_their_rotation():
+    """A quaternion's rotation is that of q / |q|; an axis is its direction."""
+    q = Quaterniond.from_rpy(0.1, 0.2, 0.3)
+    scaled = Quaterniond(2.0 * q.coeffs())
+    iso = Isometry3d(np.zeros(3), scaled)
+    nptest.assert_allclose(iso.linear, q.toRotationMatrix(), atol=DEFAULT_PREC)
+    assert orthonormality_residual(iso.linear) <= EIGEN_DEFAULT_PREC
+    aa = AngleAxisd(0.4, np.array([0.0, 0.0, 5.0]))
+    nptest.assert_allclose(aa.axis, Z_AXIS, atol=DEFAULT_PREC)
+
+
+def test_quaterniond_has_no_scalar_first_constructor():
+    """Quaterniond(a, b, c, d) was Eigen's (w, x, y, z) while Quaterniond([a, b, c, d]) is
+    (x, y, z, w): the same numbers, two rotations. Only the scalar-last forms remain."""
+    with pytest.raises(TypeError):
+        Quaterniond(1.0, 0.0, 0.0, 0.0)
+    q = Quaterniond.from_xyzw(0.0, 0.0, 0.0, 1.0)
+    assert q.isApprox(Quaterniond(np.array([0.0, 0.0, 0.0, 1.0])))
 
 
 # ---------- transform() under an isometry ----------
@@ -822,8 +872,7 @@ def test_parametrized_line_transform_translates_origin_only():
 #
 # The binding registers 10 `__mul__` overloads across the rigid-transform
 # types. Each test below exercises ONE overload, asserts the return type,
-# and verifies a known-result rotation/translation. Per @johnwason's PR
-# review question on coverage — addressed comprehensively here.
+# and verifies a known-result rotation/translation, so every overload is covered.
 
 # --- Isometry3d.__mul__ (5 overloads) ---
 
