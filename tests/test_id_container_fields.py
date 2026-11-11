@@ -54,6 +54,18 @@ CASES = {
         "floating_joints",
         lambda names: {name: Isometry3d.Identity() for name in names},
     ),
+    # def_rw with rv_policy::copy: without the copy each value would point into a map node that
+    # replacing the field frees.
+    "SceneState.link_transforms": (
+        SceneState,
+        "link_transforms",
+        lambda names: {name: Isometry3d.Identity() for name in names},
+    ),
+    "SceneState.joint_transforms": (
+        SceneState,
+        "joint_transforms",
+        lambda names: {name: Isometry3d.Identity() for name in names},
+    ),
     "ShortestPath.links": (ShortestPath, "links", list),
     "ShortestPath.joints": (ShortestPath, "joints", list),
     "ShortestPath.active_joints": (ShortestPath, "active_joints", list),

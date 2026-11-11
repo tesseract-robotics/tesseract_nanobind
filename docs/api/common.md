@@ -626,7 +626,7 @@ C++ containers cross as plain Python containers; there are no container classes 
 |-----|--------|
 | `std::vector<Isometry3d>` | `list[Isometry3d]` |
 | `std::vector<Vector3d>` | `list[np.ndarray]` - list of 3D points |
-| link-name to transform maps | `dict[LinkId, Isometry3d]`; a `str` key finds an id-keyed entry |
+| link-name to transform maps | `dict[str, Isometry3d]`, keyed by link name |
 
 ## Reference
 
