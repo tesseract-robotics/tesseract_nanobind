@@ -7,12 +7,12 @@ tesseract-robotics `==0.36.0.dev20261103` · libclang `clang version 22.1.8` · 
 
 | module | covered | gaps | deviations | accepted | quoted types | type fallbacks |
 |---|---|---|---|---|---|---|
-| tesseract_collision | 278 | 4 | 2 | 14 | 0 | 8 |
+| tesseract_collision | 278 | 11 | 2 | 14 | 0 | 8 |
 | tesseract_command_language | 380 | 1 | 0 | 128 | 0 | 16 |
 | tesseract_common | 262 | 89 | 24 | 59 | 0 | 11 |
 | tesseract_environment | 237 | 9 | 7 | 55 | 0 | 0 |
 | tesseract_geometry | 158 | 8 | 4 | 22 | 0 | 1 |
-| tesseract_kinematics | 105 | 6 | 3 | 16 | 0 | 5 |
+| tesseract_kinematics | 105 | 19 | 3 | 16 | 0 | 5 |
 | tesseract_motion_planners | 39 | 4 | 0 | 6 | 0 | 3 |
 | tesseract_motion_planners_descartes | 62 | 0 | 0 | 34 | 0 | 4 |
 | tesseract_motion_planners_ompl | 123 | 0 | 1 | 28 | 0 | 0 |
@@ -23,11 +23,11 @@ tesseract-robotics `==0.36.0.dev20261103` · libclang `clang version 22.1.8` · 
 | tesseract_serialization | 0 | 1 | 0 | 24 | 0 | 0 |
 | tesseract_srdf | 45 | 3 | 0 | 1 | 0 | 0 |
 | tesseract_state_solver | 87 | 1 | 2 | 8 | 0 | 0 |
-| tesseract_task_composer | 240 | 4 | 1 | 47 | 0 | 2 |
+| tesseract_task_composer | 240 | 6 | 1 | 47 | 0 | 2 |
 | tesseract_task_composer_planning | 70 | 0 | 0 | 21 | 0 | 0 |
 | tesseract_time_parameterization | 75 | 0 | 0 | 10 | 0 | 0 |
 | tesseract_urdf | 4 | 5 | 0 | 0 | 0 | 0 |
-| trajopt_ifopt | 330 | 12 | 0 | 46 | 0 | 0 |
+| trajopt_ifopt | 334 | 10 | 0 | 47 | 0 | 0 |
 | trajopt_sqp | 188 | 2 | 3 | 33 | 0 | 6 |
 
 Quoted C++ names in the stubs of audited modules (unbound type, or a missing `nb::module_::import_`):
@@ -183,8 +183,15 @@ None.
 
 | C++ symbol | kind | header:line | missing overload (arity) | issue |
 |---|---|---|---|---|
+| `BulletCastBVHManagerFactory` | class | tesseract/collision/bullet/bullet_factories.h:71 | — | won't fix: plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`). |
+| `BulletCastSimpleManagerFactory` | class | tesseract/collision/bullet/bullet_factories.h:81 | — | won't fix: plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`). |
+| `BulletDiscreteBVHManagerFactory` | class | tesseract/collision/bullet/bullet_factories.h:51 | — | won't fix: plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`). |
+| `BulletDiscreteSimpleManagerFactory` | class | tesseract/collision/bullet/bullet_factories.h:61 | — | won't fix: plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`). |
+| `BulletFactoriesAnchor` | function | tesseract/collision/bullet/bullet_factories.h:91 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_CONTACT_MANAGERS_PLUGINS`, so a wheel finds the plugins without a system install. |
 | `ContactResultMap.find` | method | tesseract/collision/types.h:300 | — | won't fix: Returns a C++ iterator; `at` and iteration read a result by key. |
 | `ContactTestData` | class | tesseract/collision/types.h:345 | — | won't fix: Internal to the collision checkers (types.h:322). |
+| `FCLDiscreteBVHManagerFactory` | class | tesseract/collision/fcl/fcl_factories.h:32 | — | won't fix: plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`). |
+| `FCLFactoriesAnchor` | function | tesseract/collision/fcl/fcl_factories.h:42 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_CONTACT_MANAGERS_PLUGINS`, so a wheel finds the plugins without a system install. |
 | `tesseract/collision/common.h` | header | tesseract/collision/common.h:49 | — | won't fix: Helpers for C++ collision backends; a Python subclass cannot be a backend. |
 | `tesseract/collision/utils.h` | header | tesseract/collision/utils.h:42 | — | won't fix: Helpers for C++ collision backends; a Python subclass cannot be a backend. |
 
@@ -722,6 +729,19 @@ None.
 
 | C++ symbol | kind | header:line | missing overload (arity) | issue |
 |---|---|---|---|---|
+| `KDLFactoriesAnchor` | function | tesseract/kinematics/kdl/kdl_factories.h:84 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install. |
+| `KDLFwdKinChainFactory` | class | tesseract/kinematics/kdl/kdl_factories.h:32 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
+| `KDLInvKinChainLMAFactory` | class | tesseract/kinematics/kdl/kdl_factories.h:45 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
+| `KDLInvKinChainNRFactory` | class | tesseract/kinematics/kdl/kdl_factories.h:58 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
+| `KDLInvKinChainNR_JLFactory` | class | tesseract/kinematics/kdl/kdl_factories.h:71 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
+| `OPWFactoriesAnchor` | function | tesseract/kinematics/opw/opw_factory.h:45 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install. |
+| `OPWInvKinFactory` | class | tesseract/kinematics/opw/opw_factory.h:32 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
+| `REPInvKinFactoriesAnchor` | function | tesseract/kinematics/rep_factory.h:45 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install. |
+| `REPInvKinFactory` | class | tesseract/kinematics/rep_factory.h:32 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
+| `ROPInvKinFactoriesAnchor` | function | tesseract/kinematics/rop_factory.h:45 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install. |
+| `ROPInvKinFactory` | class | tesseract/kinematics/rop_factory.h:32 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
+| `URFactoriesAnchor` | function | tesseract/kinematics/ur/ur_factory.h:45 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install. |
+| `URInvKinFactory` | class | tesseract/kinematics/ur/ur_factory.h:32 | — | won't fix: plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`). |
 | `dampedPInv` | function | tesseract/kinematics/utils.h:122 | — | won't fix: numpy covers it. |
 | `getRedundantSolutionsHelper` | function | tesseract/kinematics/utils.h:205 | — | won't fix: Recursion helper behind `getRedundantSolutions`. |
 | `solvePInv` | function | tesseract/kinematics/utils.h:109 | — | won't fix: numpy covers it. |
@@ -1197,6 +1217,8 @@ None.
 | `TaskComposerNode.DynamicPortsTag` | class | tesseract/task_composer/task_composer_node.h:59 | — | won't fix: Constructor tag for C++ nodes with configuration-defined ports. |
 | `TaskComposerNodePorts.ValidationError.__init__` | constructor | tesseract/task_composer/task_composer_node_ports.h:68 | — | won't fix: `validate` produces them; Python only reads them. |
 | `TaskComposerPipeline.__init__` | constructor | tesseract/task_composer/task_composer_pipeline.h:54 | 0-2: `parent_uuid` unreachable | won't fix: `parent_uuid` stays unbound: `TaskComposerGraph::addNode` sets a node's parent when the graph takes it. |
+| `TaskComposerTaskFactoryAnchor` | function | tesseract/task_composer/task_composer_task_plugin_factory.h:32 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_TASK_COMPOSER_PLUGINS`, so a wheel finds the plugins without a system install. |
+| `TaskComposerTaskflowFactoriesAnchor` | function | tesseract/task_composer/taskflow/taskflow_task_composer_plugin_factories.h:32 | — | won't fix: plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_TASK_COMPOSER_PLUGINS`, so a wheel finds the plugins without a system install. |
 
 ### Deviations
 
@@ -1361,10 +1383,6 @@ None.
 
 | C++ symbol | kind | header:line | missing overload (arity) | issue |
 |---|---|---|---|---|
-| `InverseKinematicsConstraint.calcJacobianBlock` | method | trajopt_ifopt/constraints/inverse_kinematics_constraint.h:115 | — | #289 |
-| `JointAccelConstraint.__init__` | constructor | trajopt_ifopt/constraints/joint_acceleration_constraint.h:73 | 3-4 | #290 |
-| `JointJerkConstraint.__init__` | constructor | trajopt_ifopt/constraints/joint_jerk_constraint.h:73 | 3-4 | #290 |
-| `JointVelConstraint.__init__` | constructor | trajopt_ifopt/constraints/joint_velocity_constraint.h:73 | 3-4 | #290 |
 | `Var.__init__` | constructor | trajopt_ifopt/variable_sets/var.h:55 | 0 | won't fix: `Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297). Their `parent` stays unbound: a raw `Node*` that dangles after solve. |
 | `Var.__init__` | constructor | trajopt_ifopt/variable_sets/var.h:70 | 3-5: `parent` unreachable | won't fix: `Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297). Their `parent` stays unbound: a raw `Node*` that dangles after solve. |
 | `Var.__init__` | constructor | trajopt_ifopt/variable_sets/var.h:87 | 5-6: `parent` unreachable | won't fix: `Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297). Their `parent` stays unbound: a raw `Node*` that dangles after solve. |
@@ -1373,6 +1391,8 @@ None.
 | `getHash` | function | trajopt_common/collision_utils.h:41 | — | won't fix: Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`. |
 | `getShapePairKey` | function | trajopt_common/collision_utils.h:53 | — | won't fix: Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`. |
 | `removeInvalidContactResults` | function | trajopt_common/collision_utils.h:108 | — | won't fix: Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`. |
+| `selectRows` | function | trajopt_ifopt/utils/ifopt_utils.h:67 | — | won't fix: Internal to the `bounds` constructors of `JointVelConstraint`, `JointAccelConstraint` and `JointJerkConstraint` (#290): with `RangeBoundHandling.kSplitToTwoInequalities` they split each range bound into two rows (`splitRangeBounds`) and pick the Jacobian rows to match (`selectRows`); Python constructs those constraints. |
+| `splitRangeBounds` | function | trajopt_ifopt/utils/ifopt_utils.h:59 | — | won't fix: Internal to the `bounds` constructors of `JointVelConstraint`, `JointAccelConstraint` and `JointJerkConstraint` (#290): with `RangeBoundHandling.kSplitToTwoInequalities` they split each range bound into two rows (`splitRangeBounds`) and pick the Jacobian rows to match (`selectRows`); Python constructs those constraints. |
 
 ### Deviations
 
@@ -1412,6 +1432,7 @@ None.
 | `Differentiable.Mode.kSumToScalar` | k-prefix-enumerator | trajopt_ifopt/core/component.h:201 |
 | `DiscreteCollisionEvaluator.calcCollisions` | out-param | trajopt_ifopt/constraints/collision/discrete_collision_evaluators.h:71 |
 | `DiscreteCollisionNumericalConstraint.calcJacobianBlock` | out-param | trajopt_ifopt/constraints/collision/discrete_collision_numerical_constraint.h:94 |
+| `InverseKinematicsConstraint.calcJacobianBlock` | out-param | trajopt_ifopt/constraints/inverse_kinematics_constraint.h:118 |
 | `LVSContinuousCollisionEvaluator.calcCollisionData` | out-param | trajopt_ifopt/constraints/collision/continuous_collision_evaluators.h:128 |
 | `LVSDiscreteCollisionEvaluator.calcCollisionData` | out-param | trajopt_ifopt/constraints/collision/continuous_collision_evaluators.h:186 |
 | `NodesVariables.addObserver` | unimplemented-observer | trajopt_ifopt/variable_sets/nodes_variables.h:103 |
@@ -1421,10 +1442,10 @@ None.
 | `RangeBoundHandling.kSplitToTwoInequalities` | k-prefix-enumerator | trajopt_ifopt/core/constraint_set.h:76 |
 | `SingleTimestepCollisionEvaluator.calcCollisions` | out-param | trajopt_ifopt/constraints/collision/discrete_collision_evaluators.h:117 |
 | `TrajOptCollisionConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
-| `calcBoundsErrors` | out-param | trajopt_ifopt/utils/ifopt_utils.h:77 |
-| `calcBoundsViolations` | out-param | trajopt_ifopt/utils/ifopt_utils.h:88 |
-| `calcNumericalConstraintGradient` | ifopt-problem-only | trajopt_ifopt/utils/ifopt_utils.h:108 |
-| `calcNumericalCostGradient` | ifopt-problem-only | trajopt_ifopt/utils/ifopt_utils.h:99 |
+| `calcBoundsErrors` | out-param | trajopt_ifopt/utils/ifopt_utils.h:94 |
+| `calcBoundsViolations` | out-param | trajopt_ifopt/utils/ifopt_utils.h:105 |
+| `calcNumericalConstraintGradient` | ifopt-problem-only | trajopt_ifopt/utils/ifopt_utils.h:125 |
+| `calcNumericalCostGradient` | ifopt-problem-only | trajopt_ifopt/utils/ifopt_utils.h:116 |
 | `createNodesVariables` | nodes-variables-factory | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `getGradient` | out-param | trajopt_common/collision_utils.h:122 |
 | `getGradient` | out-param | trajopt_common/collision_utils.h:137 |
