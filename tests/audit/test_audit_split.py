@@ -26,7 +26,7 @@ def defined_names(module: str) -> set[str]:
 
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
-# audit_types, audit_ownership, audit_telemetry, audit_toolchain, audit_cache, audit_parse,
+# audit_types, audit_ownership, audit_telemetry, audit_toolchain, audit_cache, audit_symbols, audit_parse,
 # audit_bound, gil_entry_points, audit_facts, audit_stub, audit_lookup, audit_rules,
 # audit_anchor, audit_match, audit_report, audit_bindings.
 EXPECTED_SCRIPTS = (
@@ -35,6 +35,7 @@ EXPECTED_SCRIPTS = (
     "audit_telemetry",
     "audit_toolchain",
     "audit_cache",
+    "audit_symbols",
     "audit_parse",
     "audit_bound",
     "gil_entry_points",
@@ -69,7 +70,7 @@ PARSE = {
     "MAX_REPORTED_DIAGNOSTICS", "HeaderParseError", "parse_tu", "STRINGSTREAM", "CEREAL_HOOKS",
     "ALLOCATION_OPERATORS", "OPERATOR_DUNDERS", "OSTREAM_DECL", "FOREIGN_NAMESPACES",
     "FUNCTION_KINDS", "METHOD_KINDS", "FIELD_KINDS", "RAW_BUFFER_POINTEES",
-    "SIZE_SPELLINGS", "YAML_NODE", "BYTES_KEYS", "Kind", "Arity", "CppOverload", "CppSymbol",
+    "SIZE_SPELLINGS", "YAML_NODE", "BYTES_KEYS",
     "header_rel", "location", "audited_headers", "_owns", "prefix_headers",
     "direct_include_spellings", "binding_module", "foreign_headers",
     "_is_eigen_ref_of_non_const", "_is_out_param", "_out_param_type", "_is_raw_buffer",
@@ -82,19 +83,36 @@ PARSE = {
     "_base_definition", "_overload", "_specialises_not_api_template", "own_header_lines",
     "TYPE_INDEX", "_is_reference_wrapper_vector",  # #256 group 1
     # G2 (R13)
-    "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",
+    "UNBOUND_DEPENDENCY_ROOTS", "_unbound_dependency",
     # G4 (forwarding ctor templates)
     "REFERENCE_TYPE_KINDS", "_is_forwarding_ctor_template",
     # G3 (R13's not-API half)
-    "_not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES", "no_bound_class",
+    "not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES", "no_bound_class",
     # wave 3 step 4b (the absent_ok rule table)
     "AbsentOkTest", "ABSENT_OK_RULES",
+    # #397: the cached extraction and the paths it is keyed on.
+    "inclusions", "direct_includes", "owned_direct", "api_selection", "extract_api",
 }  # fmt: skip
 
 
 def test_parse_defines_exactly():
     assert defined_names("audit_parse") == PARSE
     assert not defined_names("audit_match") & PARSE
+
+
+# #397: the C++ API as plain data, out of `audit_parse`; needs no libclang.
+SYMBOLS = {
+    "UNBOUND_DEPENDENCY", "SymbolShapeError", "Kind", "Arity", "Dependency", "NO_DEPENDENCY",
+    "CppOverload", "CppSymbol", "_resolved", "resolve_bound", "_encode_key", "_decode_key",
+    "_encode_keys", "_encode_dependency", "_decode_dependency", "encode_symbols",
+    "_decode_overload", "decode_symbols",
+}  # fmt: skip
+
+
+def test_symbols_defines_exactly():
+    assert defined_names("audit_symbols") == SYMBOLS
+    assert not defined_names("audit_parse") & SYMBOLS
+    assert not defined_names("audit_match") & SYMBOLS
 
 
 # 0b Task 6 (class identity); its own file since the wave-2 merge (#256).

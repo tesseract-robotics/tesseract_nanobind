@@ -232,7 +232,7 @@ STRUCTURAL_RULE = "serialization-default-ctor"
 def _structural_place(monkeypatch):
     """`audit_tu` with the 3-ary `Shelf.place` carrying a structural `absent_ok`, and the
     overload table naming the same overload."""
-    real = match_.cpp_api
+    real = match_.resolve_bound  # after the fact cache: a wrapper before it would be stored
 
     def cpp_api(*args, **kwargs):
         cpp = real(*args, **kwargs)
@@ -243,7 +243,7 @@ def _structural_place(monkeypatch):
             ]
         return cpp
 
-    monkeypatch.setattr(match_, "cpp_api", cpp_api)
+    monkeypatch.setattr(match_, "resolve_bound", cpp_api)
     monkeypatch.setitem(audit.ACCEPTED, FIXTURE_OVERLOAD_RULE, "x")
     monkeypatch.setitem(
         audit.ACCEPTED_CPP_OVERLOADS, ("poly", "Shelf.place", "3"), FIXTURE_OVERLOAD_RULE

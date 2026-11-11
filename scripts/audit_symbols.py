@@ -15,7 +15,7 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from audit_types import TypeKey
@@ -182,7 +182,7 @@ def _encode_key(key: object) -> object:
     return [_encode_key(k) for k in key] if isinstance(key, tuple) else key
 
 
-def _decode_key(value: object) -> object:
+def _decode_key(value: Any) -> Any:
     return tuple(_decode_key(v) for v in value) if isinstance(value, list) else value
 
 
@@ -196,8 +196,8 @@ def _encode_dependency(dep: Dependency) -> object:
     return [dep.always, sorted(dep.unless_bound)]
 
 
-def _decode_dependency(value: object) -> Dependency:
-    always, unless = value  # type: ignore[misc]
+def _decode_dependency(value: Any) -> Dependency:
+    always, unless = value
     return Dependency(bool(always), frozenset(unless))
 
 
@@ -237,30 +237,29 @@ def encode_symbols(symbols: Mapping[str, CppSymbol]) -> list[object]:
     ]
 
 
-def _decode_overload(o: Mapping[str, object]) -> CppOverload:
-    lo, hi = o["arity"]  # type: ignore[misc]
+def _decode_overload(o: Any) -> CppOverload:
+    lo, hi = o["arity"]
     return CppOverload(
         arity=Arity(lo, hi),
-        out_params=tuple(o["out_params"]),  # type: ignore[arg-type]
-        location=o["location"],  # type: ignore[arg-type]
-        returns_void=o["returns_void"],  # type: ignore[arg-type]
-        mapped=o["mapped"],  # type: ignore[arg-type]
-        absent_ok=o["absent_ok"],  # type: ignore[arg-type]
-        raw_buffer=o["raw_buffer"],  # type: ignore[arg-type]
-        byte_buffers=tuple(o["byte_buffers"]),  # type: ignore[arg-type]
+        out_params=tuple(o["out_params"]),
+        location=o["location"],
+        returns_void=o["returns_void"],
+        mapped=o["mapped"],
+        absent_ok=o["absent_ok"],
+        raw_buffer=o["raw_buffer"],
+        byte_buffers=tuple(o["byte_buffers"]),
         params=tuple(
-            None if p is None else frozenset(_decode_key(k) for k in p)  # type: ignore[misc]
-            for p in o["params"]  # type: ignore[attr-defined]
+            None if p is None else frozenset(_decode_key(k) for k in p) for p in o["params"]
         ),
-        out_positions=tuple(o["out_positions"]),  # type: ignore[arg-type]
-        reference_wrapper_view=o["reference_wrapper_view"],  # type: ignore[arg-type]
-        yaml_position=o["yaml_position"],  # type: ignore[arg-type]
-        names=tuple(o["names"]),  # type: ignore[arg-type]
+        out_positions=tuple(o["out_positions"]),
+        reference_wrapper_view=o["reference_wrapper_view"],
+        yaml_position=o["yaml_position"],
+        names=tuple(o["names"]),
         dependency=_decode_dependency(o["dependency"]),
     )
 
 
-def decode_symbols(value: object) -> dict[str, CppSymbol]:
+def decode_symbols(value: Any) -> dict[str, CppSymbol]:
     """The symbols `encode_symbols` wrote, in their order.
 
     Raises:
@@ -268,7 +267,7 @@ def decode_symbols(value: object) -> dict[str, CppSymbol]:
     """
     try:
         out: dict[str, CppSymbol] = {}
-        for s in value:  # type: ignore[attr-defined]
+        for s in value:
             out[s["name"]] = CppSymbol(
                 name=s["name"],
                 kind=Kind(s["kind"]),

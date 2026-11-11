@@ -14,6 +14,7 @@ SCRIPTS = (
     "audit_telemetry",
     "audit_toolchain",
     "audit_cache",
+    "audit_symbols",
     "audit_parse",
     "audit_bound",
     "gil_entry_points",
