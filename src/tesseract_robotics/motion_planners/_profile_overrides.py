@@ -23,7 +23,7 @@ class ProfileOverrideNotDispatchedError(TypeError):
 ProfileOverrideNotDispatchedError.__module__ = "tesseract_robotics.motion_planners"
 
 
-def refuse_hook_overrides(concrete: type, hooks: tuple[str, ...], instead: str) -> None:
+def refuse_hook_overrides(concrete: type[object], hooks: tuple[str, ...], instead: str) -> None:
     """Make defining any of `hooks` in a Python subclass of `concrete` raise.
 
     Args:
@@ -35,7 +35,7 @@ def refuse_hook_overrides(concrete: type, hooks: tuple[str, ...], instead: str) 
         ProfileOverrideNotDispatchedError: at class definition, from the installed hook.
     """
 
-    def __init_subclass__(cls: type, **kwargs: object) -> None:
+    def __init_subclass__(cls: type[object], **kwargs: object) -> None:
         overridden = sorted(hook for hook in hooks if hook in cls.__dict__)
         if overridden:
             raise ProfileOverrideNotDispatchedError(
@@ -43,10 +43,13 @@ def refuse_hook_overrides(concrete: type, hooks: tuple[str, ...], instead: str) 
                 f"which the planner would never call: {concrete.__name__} has no Python dispatch. "
                 f"{instead}"
             )
-        super(concrete, cls).__init_subclass__(**kwargs)  # type: ignore[misc]
+        # ty requires a statically known pivot class; `concrete` is one only at runtime.
+        super(concrete, cls).__init_subclass__(**kwargs)  # ty: ignore[invalid-super-argument]
 
     # Named as the class's own method, so the stub generator renders it in the class instead of
     # importing a private helper.
     __init_subclass__.__module__ = concrete.__module__
     __init_subclass__.__qualname__ = f"{concrete.__qualname__}.__init_subclass__"
-    concrete.__init_subclass__ = classmethod(__init_subclass__)  # type: ignore[method-assign,assignment]
+    # Installed on a class that already exists: a dynamic attribute write, not a method
+    # definition a type checker could match against type.__init_subclass__.
+    setattr(concrete, "__init_subclass__", classmethod(__init_subclass__))

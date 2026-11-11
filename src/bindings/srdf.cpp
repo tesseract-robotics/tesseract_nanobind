@@ -92,8 +92,8 @@ NB_MODULE(srdf, m) {
              "group_name"_a, "tcp_name"_a, "Remove the named TCP offset, if present.")
         .def("hasGroupTCP", &ts::KinematicsInformation::hasGroupTCP,
              "group_name"_a, "tcp_name"_a, "True if `group_name` has the named TCP offset `tcp_name`.")
-        .def("__eq__", &ts::KinematicsInformation::operator==)
-        .def("__ne__", &ts::KinematicsInformation::operator!=);
+        .def("__eq__", &ts::KinematicsInformation::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &ts::KinematicsInformation::operator!=, TNB_NE_ATTRS);
 
     // SRDFModel
     nb::class_<ts::SRDFModel>(m, "SRDFModel")
@@ -111,8 +111,8 @@ NB_MODULE(srdf, m) {
         .def_rw("collision_margin_data", &ts::SRDFModel::collision_margin_data, "Collision margins (default and per link pair).")
         .def_rw("contact_managers_plugin_info", &ts::SRDFModel::contact_managers_plugin_info, "The contact manager plugin configuration.")
         .def_rw("calibration_info", &ts::SRDFModel::calibration_info, "Joint origin calibrations (calibration_config).")
-        .def("__eq__", &ts::SRDFModel::operator==)
-        .def("__ne__", &ts::SRDFModel::operator!=)
+        .def("__eq__", &ts::SRDFModel::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &ts::SRDFModel::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const ts::SRDFModel& self) {
             return "SRDFModel('" + self.name + "')";
         });

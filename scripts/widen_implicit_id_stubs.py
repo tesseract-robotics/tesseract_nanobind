@@ -24,12 +24,9 @@ _QUAL = r"(?:tesseract_robotics\.common\._common\.)?"
 _NOT_KEY = r"(?<!Mapping\[)(?<!dict\[)"
 _ID = re.compile(rf"{_NOT_KEY}(?<![\w.])({_QUAL}(?:LinkId|JointId))(?![\w]| \| str)")
 _PAIR = re.compile(rf"{_NOT_KEY}(?<![\w.])({_QUAL}LinkIdPair)(?![\w]| \| tuple)")
-# The id classes' own dunders (`__eq__(self, arg: LinkId)`) already have a `str` overload.
 # `Mapping[<id>, ` opening a parameter's id-keyed mapping, with the str form of that key.
 _MAPPING = re.compile(rf"Mapping\[({_QUAL}(LinkIdPair|LinkId|JointId)), ")
 _KEY_AS_STR = {"LinkIdPair": "tuple[str, str]", "LinkId": "str", "JointId": "str"}
-_ID_CLASSES = re.compile(r"^class (LinkId|JointId|LinkIdPair)\b")
-_CLASS = re.compile(r"^class \w+")
 _DEF = re.compile(r"^\s*def \w+\(")
 
 
@@ -88,9 +85,8 @@ def widen_def(text: str) -> str:
 
 
 def widen(text: str) -> str:
-    """Widen every parameter annotation in a stub, except inside the id classes."""
+    """Widen every parameter annotation in a stub."""
     out = []
-    in_id_class = False
     pending = ""  # a `def` whose parameter list has not closed yet
     for line in text.splitlines(keepends=True):
         if pending:
@@ -98,15 +94,11 @@ def widen(text: str) -> str:
         elif _DEF.match(line):
             pending = line
         else:
-            if _CLASS.match(line):
-                in_id_class = _ID_CLASSES.match(line) is not None
             out.append(line)
             continue
-        if pending.startswith("def "):
-            in_id_class = False
         if _param_span(pending, _DEF.match(pending).end() - 1) is None:
             continue
-        out.append(pending if in_id_class else widen_def(pending))
+        out.append(widen_def(pending))
         pending = ""
     if pending:
         raise ValueError(f"unbalanced parameter list at end of stub: {pending!r}")

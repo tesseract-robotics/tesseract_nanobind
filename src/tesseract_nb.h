@@ -326,13 +326,23 @@ NAMESPACE_END(NB_NAMESPACE)
 namespace nb = nanobind;
 using namespace nb::literals;
 
-// Bind C++ operator==/operator!= as __eq__/__ne__. These types are mutable, so they must
-// not hash: nanobind adds __eq__ after the type exists, which leaves object.__hash__
-// (identity) in place unless it is cleared explicitly. `extra` goes to both operators
-// (e.g. nb::call_guard<nb::gil_scoped_release>() for a comparison that takes a C++ lock).
+// Signatures of every bound __eq__ / __ne__. Python's == must not raise for an operand of
+// another type, so each one is also an nb::is_operator(): a failed argument match returns
+// NotImplemented and `x == 5` falls back to identity (False). The operand is therefore any
+// object, as for object.__eq__, which an override must accept; without these signatures the
+// stub would narrow it to the bound type. Use as `.def("__eq__", eq, TNB_EQ_ATTRS)`.
+#define TNB_EQ_ATTRS nb::is_operator(), nb::sig("def __eq__(self, other: object, /) -> bool")
+#define TNB_NE_ATTRS nb::is_operator(), nb::sig("def __ne__(self, other: object, /) -> bool")
+
+// Bind C++ operator==/operator!= as __eq__/__ne__ (TNB_EQ_ATTRS / TNB_NE_ATTRS). These types
+// are mutable, so they must not hash: nanobind adds __eq__ after the type exists, which leaves
+// object.__hash__ (identity) in place unless it is cleared explicitly. `extra` goes to both
+// operators (e.g. nb::call_guard<nb::gil_scoped_release>() for a comparison that takes a C++
+// lock).
 template <typename Class, typename... Extra>
 void bind_value_equality(Class& cls, const Extra&... extra) {
-    cls.def(nb::self == nb::self, extra...).def(nb::self != nb::self, extra...);
+    cls.def(nb::self == nb::self, nb::sig("def __eq__(self, other: object, /) -> bool"), extra...)
+        .def(nb::self != nb::self, nb::sig("def __ne__(self, other: object, /) -> bool"), extra...);
     cls.attr("__hash__") = nb::none();
 }
 

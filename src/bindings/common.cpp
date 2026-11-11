@@ -99,6 +99,25 @@ public:
     }
 };
 
+// `a == b` for a NameId and any Python object: an id of the same kind compares by identity
+// (operator==), a str by name, anything else is NotImplemented (Python then tries b.__eq__, and
+// falls back to identity).
+template <typename Id>
+nb::object id_equals(const Id& a, nb::handle b) {
+    if (nb::isinstance<Id>(b))
+        return nb::bool_(a == nb::cast<const Id&>(b));
+    if (nb::isinstance<nb::str>(b))
+        return nb::bool_(a.name() == nb::cast<std::string>(b));
+    return nb::borrow(Py_NotImplemented);
+}
+
+// The negation of an id_equals result; NotImplemented passes through.
+inline nb::object negate(nb::object equal) {
+    if (equal.is(Py_NotImplemented))
+        return equal;
+    return nb::bool_(!nb::cast<bool>(equal));
+}
+
 // LinkId / JointId: upstream's hash-of-name identity (tesseract IDENTITY_DESIGN.md).
 // Python sees the name: equality with str and hash(name) let an id-keyed dict answer d["tool0"].
 // The C++ order (by hash) is not exposed; __lt__ sorts by name so Python sorting is deterministic.
@@ -111,10 +130,9 @@ void bindNameId(nb::module_& m, const char* py_name) {
         .def("name", &Id::name)
         .def("value", &Id::value)
         .def("isValid", &Id::isValid)
-        .def("__eq__", [](const Id& a, const Id& b) { return a == b; }, nb::is_operator())
-        .def("__eq__", [](const Id& a, const std::string& b) { return a.name() == b; }, nb::is_operator())
-        .def("__ne__", [](const Id& a, const Id& b) { return a != b; }, nb::is_operator())
-        .def("__ne__", [](const Id& a, const std::string& b) { return a.name() != b; }, nb::is_operator())
+        // One function per operator: two overloads (Id, str) would each render `other: object`.
+        .def("__eq__", [](const Id& a, nb::handle b) { return id_equals(a, b); }, TNB_EQ_ATTRS)
+        .def("__ne__", [](const Id& a, nb::handle b) { return negate(id_equals(a, b)); }, TNB_NE_ATTRS)
         .def("__lt__", [](const Id& a, const Id& b) { return a.name() < b.name(); }, nb::is_operator())
         .def("__hash__", [](const Id& a) { return nb::hash(nb::str(a.name().c_str(), a.name().size())); })
         .def("__str__", &Id::name)
@@ -244,9 +262,9 @@ NB_MODULE(_common, m) {
         })
         // noconvert: a tuple's hash is order-dependent, so a tuple must never compare equal to an unordered pair
         .def("__eq__", [](const LinkIdPair& a, const LinkIdPair& b) { return a == b; },
-             nb::arg().noconvert(), nb::is_operator())
+             nb::arg().noconvert(), TNB_EQ_ATTRS)
         .def("__ne__", [](const LinkIdPair& a, const LinkIdPair& b) { return !(a == b); },
-             nb::arg().noconvert(), nb::is_operator())
+             nb::arg().noconvert(), TNB_NE_ATTRS)
         .def("__hash__", [](const LinkIdPair& self) {
             const auto view = self.orderedNameView();
             return nb::hash(nb::make_tuple(view.first, view.second));
@@ -593,10 +611,10 @@ NB_MODULE(_common, m) {
                same_shape(a.jerk_limits, b.jerk_limits) && a == b;
     };
     kinematic_limits
-        .def("__eq__", kinematic_limits_equal, nb::is_operator())
+        .def("__eq__", kinematic_limits_equal, TNB_EQ_ATTRS)
         .def("__ne__", [kinematic_limits_equal](const KinematicLimits& a, const KinematicLimits& b) {
             return !kinematic_limits_equal(a, b);
-        }, nb::is_operator());
+        }, TNB_NE_ATTRS);
     kinematic_limits.attr("__hash__") = nb::none();
 
     // satisfiesLimits<double>: scalar-tolerance overload (with upstream's defaults) and
@@ -772,6 +790,11 @@ NB_MODULE(_common, m) {
         .def_rw("fwd_plugin_infos", &tesseract::common::KinematicsPluginInfo::fwd_plugin_infos)
         .def_rw("inv_plugin_infos", &tesseract::common::KinematicsPluginInfo::inv_plugin_infos)
         .def("insert", &tesseract::common::KinematicsPluginInfo::insert, "other"_a)
+        // The inherited PluginDiscoveryInfo::insert (search paths and libraries), which the
+        // C++ overload hides: a KinematicsPluginInfo is a PluginDiscoveryInfo, so insert takes one.
+        .def("insert", [](tesseract::common::KinematicsPluginInfo& self, const tesseract::common::PluginDiscoveryInfo& other) {
+            self.tesseract::common::PluginDiscoveryInfo::insert(other);
+        }, "other"_a)
         .def("clear", &tesseract::common::KinematicsPluginInfo::clear)
         .def("empty", &tesseract::common::KinematicsPluginInfo::empty);
     // A class constant, not a static property: stubgen renders its value, not a getter signature.
@@ -788,6 +811,11 @@ NB_MODULE(_common, m) {
         .def_rw("discrete_plugin_infos", &tesseract::common::ContactManagersPluginInfo::discrete_plugin_infos)
         .def_rw("continuous_plugin_infos", &tesseract::common::ContactManagersPluginInfo::continuous_plugin_infos)
         .def("insert", &tesseract::common::ContactManagersPluginInfo::insert, "other"_a)
+        // The inherited PluginDiscoveryInfo::insert (search paths and libraries), which the
+        // C++ overload hides: a ContactManagersPluginInfo is a PluginDiscoveryInfo, so insert takes one.
+        .def("insert", [](tesseract::common::ContactManagersPluginInfo& self, const tesseract::common::PluginDiscoveryInfo& other) {
+            self.tesseract::common::PluginDiscoveryInfo::insert(other);
+        }, "other"_a)
         .def("clear", &tesseract::common::ContactManagersPluginInfo::clear)
         .def("empty", &tesseract::common::ContactManagersPluginInfo::empty);
     // A class constant, not a static property: stubgen renders its value, not a getter signature.
@@ -819,6 +847,11 @@ NB_MODULE(_common, m) {
         .def_rw("executor_plugin_infos", &tesseract::common::TaskComposerPluginInfo::executor_plugin_infos)
         .def_rw("task_plugin_infos", &tesseract::common::TaskComposerPluginInfo::task_plugin_infos)
         .def("insert", &tesseract::common::TaskComposerPluginInfo::insert, "other"_a)
+        // The inherited PluginDiscoveryInfo::insert (search paths and libraries), which the
+        // C++ overload hides: a TaskComposerPluginInfo is a PluginDiscoveryInfo, so insert takes one.
+        .def("insert", [](tesseract::common::TaskComposerPluginInfo& self, const tesseract::common::PluginDiscoveryInfo& other) {
+            self.tesseract::common::PluginDiscoveryInfo::insert(other);
+        }, "other"_a)
         .def("clear", &tesseract::common::TaskComposerPluginInfo::clear)
         .def("empty", &tesseract::common::TaskComposerPluginInfo::empty);
     // A class constant, not a static property: stubgen renders its value, not a getter signature.
@@ -835,6 +868,11 @@ NB_MODULE(_common, m) {
         .def_rw("search_libraries", &tesseract::common::ProfilesPluginInfo::search_libraries)
         .def_rw("plugin_infos", &tesseract::common::ProfilesPluginInfo::plugin_infos)
         .def("insert", &tesseract::common::ProfilesPluginInfo::insert, "other"_a)
+        // The inherited PluginDiscoveryInfo::insert (search paths and libraries), which the
+        // C++ overload hides: a ProfilesPluginInfo is a PluginDiscoveryInfo, so insert takes one.
+        .def("insert", [](tesseract::common::ProfilesPluginInfo& self, const tesseract::common::PluginDiscoveryInfo& other) {
+            self.tesseract::common::PluginDiscoveryInfo::insert(other);
+        }, "other"_a)
         .def("clear", &tesseract::common::ProfilesPluginInfo::clear)
         .def("empty", &tesseract::common::ProfilesPluginInfo::empty);
     // A class constant, not a static property: stubgen renders its value, not a getter signature.

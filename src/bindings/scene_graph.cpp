@@ -62,8 +62,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("damping", &tsg::JointDynamics::damping, "Viscous damping [N·s/m or N·m·s/rad].")
         .def_rw("friction", &tsg::JointDynamics::friction, "Static friction [N or N·m].")
         .def("clear", &tsg::JointDynamics::clear, "Reset to zero.")
-        .def("__eq__", &tsg::JointDynamics::operator==)
-        .def("__ne__", &tsg::JointDynamics::operator!=)
+        .def("__eq__", &tsg::JointDynamics::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::JointDynamics::operator!=, TNB_NE_ATTRS)
         .def("__str__", &stream_str<tsg::JointDynamics>)  // operator<< (joint.h:82)
         .def("__repr__", [](const tsg::JointDynamics& self) {
             return "JointDynamics(damping=" + std::to_string(self.damping) +
@@ -82,8 +82,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("acceleration", &tsg::JointLimits::acceleration, "Acceleration limit [m/s² or rad/s²].")
         .def_rw("jerk", &tsg::JointLimits::jerk, "Jerk limit [m/s³ or rad/s³].")
         .def("clear", &tsg::JointLimits::clear, "Reset every limit to zero.")
-        .def("__eq__", &tsg::JointLimits::operator==)
-        .def("__ne__", &tsg::JointLimits::operator!=)
+        .def("__eq__", &tsg::JointLimits::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::JointLimits::operator!=, TNB_NE_ATTRS)
         .def("__str__", &stream_str<tsg::JointLimits>)  // operator<< (joint.h:112)
         .def("__repr__", [](const tsg::JointLimits& self) {
             return "JointLimits(lower=" + std::to_string(self.lower) +
@@ -100,8 +100,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("k_position", &tsg::JointSafety::k_position, "Position gain of the safety controller.")
         .def_rw("k_velocity", &tsg::JointSafety::k_velocity, "Velocity gain of the safety controller.")
         .def("clear", &tsg::JointSafety::clear, "Reset to zero.")
-        .def("__eq__", &tsg::JointSafety::operator==)
-        .def("__ne__", &tsg::JointSafety::operator!=)
+        .def("__eq__", &tsg::JointSafety::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::JointSafety::operator!=, TNB_NE_ATTRS)
         .def("__str__", &stream_str<tsg::JointSafety>);  // operator<< (joint.h:173)
 
     // JointCalibration
@@ -113,8 +113,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("rising", &tsg::JointCalibration::rising, "Rising-edge position [m or rad].")
         .def_rw("falling", &tsg::JointCalibration::falling, "Falling-edge position [m or rad].")
         .def("clear", &tsg::JointCalibration::clear, "Reset to zero.")
-        .def("__eq__", &tsg::JointCalibration::operator==)
-        .def("__ne__", &tsg::JointCalibration::operator!=)
+        .def("__eq__", &tsg::JointCalibration::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::JointCalibration::operator!=, TNB_NE_ATTRS)
         .def("__str__", &stream_str<tsg::JointCalibration>);  // operator<< (joint.h:200)
 
     // JointMimic
@@ -126,8 +126,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("multiplier", &tsg::JointMimic::multiplier, "Factor applied to the mimicked joint's value.")
         .def_rw("joint_id", &tsg::JointMimic::joint_id, nb::rv_policy::copy, "The mimicked joint.")
         .def("clear", &tsg::JointMimic::clear, "Reset to offset 0, multiplier 1, no joint.")
-        .def("__eq__", &tsg::JointMimic::operator==)
-        .def("__ne__", &tsg::JointMimic::operator!=)
+        .def("__eq__", &tsg::JointMimic::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::JointMimic::operator!=, TNB_NE_ATTRS)
         .def("__str__", &stream_str<tsg::JointMimic>);  // operator<< (joint.h:227)
 
     // Joint (non-copyable)
@@ -149,8 +149,8 @@ NB_MODULE(_scene_graph, m) {
         .def("clear", &tsg::Joint::clear, "Reset every field.")
         .def("clone", nb::overload_cast<>(&tsg::Joint::clone, nb::const_), "A copy, optionally under a new id.")
         .def("clone", nb::overload_cast<tesseract::common::JointId>(&tsg::Joint::clone, nb::const_), "id"_a, "A copy, optionally under a new id.")
-        .def("__eq__", &tsg::Joint::operator==)
-        .def("__ne__", &tsg::Joint::operator!=)
+        .def("__eq__", &tsg::Joint::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::Joint::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tsg::Joint& self) {
             return "Joint('" + self.getName() + "')";
         });
@@ -166,8 +166,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("color", &tsg::Material::color, "RGBA color, each in [0, 1].")
         .def_static("getDefaultMaterial", &tsg::Material::getDefaultMaterial, "The material links without one are drawn with.")
         .def("clear", &tsg::Material::clear, "Reset the color and texture.")
-        .def("__eq__", &tsg::Material::operator==)
-        .def("__ne__", &tsg::Material::operator!=);
+        .def("__eq__", &tsg::Material::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::Material::operator!=, TNB_NE_ATTRS);
 
     // Inertial
     nb::class_<tsg::Inertial>(m, "Inertial")
@@ -181,8 +181,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("iyz", &tsg::Inertial::iyz, "Inertia tensor entry [kg·m²], in the origin frame.")
         .def_rw("izz", &tsg::Inertial::izz, "Inertia tensor entry [kg·m²], in the origin frame.")
         .def("clear", &tsg::Inertial::clear, "Reset to zero mass and inertia.")
-        .def("__eq__", &tsg::Inertial::operator==)
-        .def("__ne__", &tsg::Inertial::operator!=);
+        .def("__eq__", &tsg::Inertial::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::Inertial::operator!=, TNB_NE_ATTRS);
 
     // Visual
     nb::class_<tsg::Visual>(m, "Visual")
@@ -196,8 +196,8 @@ NB_MODULE(_scene_graph, m) {
         .def_rw("material", &tsg::Visual::material, "The material, or None for the default.")
         .def_rw("name", &tsg::Visual::name, "The visual's name.")
         .def("clear", &tsg::Visual::clear, "Reset every field.")
-        .def("__eq__", &tsg::Visual::operator==)
-        .def("__ne__", &tsg::Visual::operator!=);
+        .def("__eq__", &tsg::Visual::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::Visual::operator!=, TNB_NE_ATTRS);
 
     // Collision
     nb::class_<tsg::Collision>(m, "Collision")
@@ -210,8 +210,8 @@ NB_MODULE(_scene_graph, m) {
             [](tsg::Collision& self, std::shared_ptr<const tg::Geometry> g) { self.geometry = g; }, "The collision geometry.")
         .def_rw("name", &tsg::Collision::name, "The collision's name.")
         .def("clear", &tsg::Collision::clear, "Reset every field.")
-        .def("__eq__", &tsg::Collision::operator==)
-        .def("__ne__", &tsg::Collision::operator!=);
+        .def("__eq__", &tsg::Collision::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::Collision::operator!=, TNB_NE_ATTRS);
 
     // Link (non-copyable)
     nb::class_<tsg::Link>(m, "Link")
@@ -240,8 +240,8 @@ NB_MODULE(_scene_graph, m) {
         .def("clear", &tsg::Link::clear, "Reset every field.")
         .def("clone", nb::overload_cast<>(&tsg::Link::clone, nb::const_), "A copy, optionally under a new id.")
         .def("clone", nb::overload_cast<tesseract::common::LinkId>(&tsg::Link::clone, nb::const_), "id"_a, "A copy, optionally under a new id.")
-        .def("__eq__", &tsg::Link::operator==)
-        .def("__ne__", &tsg::Link::operator!=)
+        .def("__eq__", &tsg::Link::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::Link::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tsg::Link& self) {
             return "Link('" + self.getName() + "')";
         });
@@ -365,8 +365,8 @@ NB_MODULE(_scene_graph, m) {
              nb::overload_cast<const tsg::SceneGraph&, const tsg::Joint&, const std::string&>(&tsg::SceneGraph::insertSceneGraph),
              "scene_graph"_a, "joint"_a, "prefix"_a = "")
 
-        .def("__eq__", &tsg::SceneGraph::operator==)
-        .def("__ne__", &tsg::SceneGraph::operator!=)
+        .def("__eq__", &tsg::SceneGraph::operator==, TNB_EQ_ATTRS)
+        .def("__ne__", &tsg::SceneGraph::operator!=, TNB_NE_ATTRS)
         .def("__repr__", [](const tsg::SceneGraph& self) {
             return "SceneGraph('" + self.getName() + "')";
         });
