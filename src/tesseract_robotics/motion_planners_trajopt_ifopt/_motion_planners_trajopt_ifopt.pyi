@@ -11,7 +11,6 @@ import tesseract_robotics.common
 import tesseract_robotics.environment
 import tesseract_robotics.motion_planners
 import tesseract_robotics.trajopt_ifopt
-import tesseract_robotics.trajopt_ifopt
 import tesseract_robotics.trajopt_sqp
 
 
