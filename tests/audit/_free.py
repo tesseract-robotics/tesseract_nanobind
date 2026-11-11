@@ -1,7 +1,7 @@
 """Load the audit scripts that need no libclang, for the contract tests that run in any env.
 
-`_load` imports every script, libclang included; the tests of the cache, its key and its
-telemetry import this module instead. Both register a script in `sys.modules` under its own
+`_load` imports every script, libclang included; the tests of the cache, its key, its
+telemetry and the module -> sources table import this module instead. Both register a script in `sys.modules` under its own
 name, so a session that uses both (the audit env) holds one copy of each.
 """
 
@@ -12,7 +12,13 @@ from types import ModuleType
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 # Import order: each script imports only the ones before it.
-FREE_SCRIPTS = ("audit_telemetry", "audit_toolchain", "audit_cache", "audit_symbols")
+FREE_SCRIPTS = (
+    "audit_ownership",
+    "audit_telemetry",
+    "audit_toolchain",
+    "audit_cache",
+    "audit_symbols",
+)
 FREE_CLIS = ("audit_cache_prune", "audit_telemetry_report")
 
 

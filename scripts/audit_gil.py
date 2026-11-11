@@ -5,9 +5,13 @@ A binding releases the GIL when a `.def` / `m.def` call passes
 `nb::gil_scoped_release` in its body, directly or in a function, function template or
 local lambda of the same binding TU that it calls. Any other call that passes the
 call_guard (e.g. `bind_value_equality(cls, guard)`) counts under the callee's name.
+A `.def` in a function template whose receiver is a parameter, or a member of one
+(`cls.def(...)`, `c.move_profile.def(...)`), counts once per call of the template, under
+the Python class its call site passes.
 
-libclang parses each binding TU with function bodies (the API audit skips them) and
-the result is compared with the list, in both directions:
+libclang parses each binding TU with function bodies (the API audit skips them): a
+module's primary and each of its parts (`audit_ownership.binding_sources`), every release
+listed under the module. The result is compared with the list, in both directions:
 
 - a listed entry point that no longer releases the GIL fails;
 - a release on a binding that is not listed fails.
@@ -25,7 +29,8 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import clang.cindex as ci
@@ -40,6 +45,12 @@ RELEASE_TYPE = "nanobind::gil_scoped_release"
 GUARD_TYPE = f"nanobind::call_guard<{RELEASE_TYPE}>"
 CLASS_PREFIX = "nanobind::class_<"
 MODULE_TYPE = "nanobind::module_"
+# What an `nb::init<...>()` / `nb::init_implicit<T>()` argument's type spells: the bound
+# `__init__`.
+INIT_TYPES = ("nanobind::init<", "nanobind::init_implicit<")
+# Canonical kinds of a class template argument that names no concrete class: a template
+# parameter (`type-parameter-0-0`) or a type libclang leaves undecided.
+DEPENDENT_KINDS = frozenset({ci.TypeKind.INVALID, ci.TypeKind.UNEXPOSED})
 DEF_METHODS = frozenset(
     {"def", "def_static", "def_prop_ro", "def_prop_rw", "def_prop_ro_static", "def_prop_rw_static"}
 )
@@ -76,6 +87,25 @@ class ParseError(RuntimeError):
 class UnresolvedScopeError(RuntimeError):
     """A `.def` releases the GIL on a receiver whose Python class the scanner cannot name:
     listing it under a guessed class would hide it from the comparison."""
+
+
+@dataclass(frozen=True)
+class ReceiverDef:
+    """A releasing `.def` in a function template on a receiver its caller passes: named at
+    each call site (`Scanner._by_receiver`).
+
+    Attributes:
+        receiver_at: The position of the parameter the receiver is, or is a member of.
+        member: The member of that parameter the receiver is (`c.move_profile`); None when the
+            receiver is the parameter itself (`cls`).
+        name: The bound Python name.
+        where: `file:line` of the `.def`.
+    """
+
+    receiver_at: int
+    member: str | None
+    name: str
+    where: str
 
 
 def parse(cpp: Path, args: Sequence[str], unsaved: str | None = None) -> ci.TranslationUnit:
@@ -271,16 +301,73 @@ class Scanner:
             helpers.setdefault(helper.spelling, []).append((receiver_at, name_at))
         return helpers
 
+    def _by_receiver(self) -> dict[str, list[ReceiverDef]]:
+        """Main-file function templates that bind a releasing `.def` with a literal name on a
+        receiver their caller passes (motion_planners_simple's bind_instruction_info,
+        motion_planners_descartes' bind_descartes): template name -> its `ReceiverDef`s."""
+        helpers: dict[str, list[ReceiverDef]] = {}
+        for call in self.tu.cursor.walk_preorder():
+            if call.kind != ci.CursorKind.CALL_EXPR or not _in_main_file(call, self.tu):
+                continue
+            parts = self._def_call(call)
+            if parts is None:
+                continue
+            callee, receiver, args = parts
+            named_by_caller = bool(args) and self._parameter_index(args[0]) is not None
+            if named_by_caller or self._scope(receiver) is not None:
+                continue
+            root = self._receiver_root(receiver)
+            if root is None or not self._def_releases(args):
+                continue
+            param, at, member = root
+            where = f"{Path(callee.location.file.name).name}:{callee.location.line}"
+            helpers.setdefault(param.semantic_parent.spelling, []).append(
+                ReceiverDef(at, member, self._bound_name(call, args), where)
+            )
+        return helpers
+
     # --- bound names ---------------------------------------------------------
 
     def _scope(self, receiver: ci.Cursor) -> str | None:
-        t = _canonical(receiver.type)
+        return self._scope_of(_canonical(receiver.type))
+
+    def _scope_of(self, t: ci.Type) -> str | None:
+        """The Python scope a receiver of type `t` binds into; None for a type a template
+        leaves open (`nb::class_<Info>` in `template <typename Info>`)."""
         if t.spelling == MODULE_TYPE:
             return MODULE_SCOPE
-        if t.spelling.startswith(CLASS_PREFIX):
-            cpp = _canonical(t.get_template_argument_type(0)).spelling
-            return self.python_names.get(cpp, cpp)
-        return None
+        if not t.spelling.startswith(CLASS_PREFIX) or t.get_num_template_arguments() < 1:
+            return None
+        arg = _canonical(t.get_template_argument_type(0))
+        if arg.kind in DEPENDENT_KINDS:
+            return None
+        return self.python_names.get(arg.spelling, arg.spelling)
+
+    def _receiver_root(self, receiver: ci.Cursor) -> tuple[ci.Cursor, int, str | None] | None:
+        """(parameter, its position, member) of a receiver that is a parameter of the
+        enclosing function or a member of one, through a chain of `.def` calls; else None."""
+        root = _strip(receiver)
+        while root.kind == ci.CursorKind.CALL_EXPR and (inner := self._def_call(root)) is not None:
+            root = _strip(inner[1])
+        member = None
+        if root.kind == ci.CursorKind.MEMBER_REF_EXPR:
+            children = list(root.get_children())
+            tokens = list(root.get_tokens())
+            if len(children) != 1 or not tokens:
+                return None
+            # A dependent member access has no spelling; its last token names the member.
+            member = root.spelling or tokens[-1].spelling
+            root = _strip(children[0])
+        at = self._parameter_index(root)
+        return None if at is None else (root.referenced, at, member)
+
+    def _member_scope(self, arg: ci.Cursor, member: str | None) -> str | None:
+        """The scope of a call-site argument, or of its field `member`."""
+        t = _canonical(arg.type)
+        if member is None:
+            return self._scope_of(t)
+        field = next((f for f in t.get_fields() if f.spelling == member), None)
+        return None if field is None else self._scope_of(_canonical(field.type))
 
     def _bound_name(self, call: ci.Cursor, args: list[ci.Cursor]) -> str:
         if not args:
@@ -289,7 +376,7 @@ class Scanner:
         if (name := _string_literal(first)) is not None:
             return name
         spelling = _canonical(first.type).spelling
-        if "nanobind::detail::init" in spelling:
+        if spelling.startswith(INIT_TYPES):
             return "__init__"
         tokens = [t.spelling for t in first.get_tokens()]
         if "self" in tokens:
@@ -301,6 +388,8 @@ class Scanner:
     def scan(self) -> dict[Release, str]:
         """Every release in the TU, with the `file:line` of the first binding that has it."""
         helpers = self._named_by_caller()
+        by_receiver = self._by_receiver()
+        called: set[str] = set()
         found: dict[Release, str] = {}
         for call in self.tu.cursor.walk_preorder():
             if call.kind != ci.CursorKind.CALL_EXPR or not _in_main_file(call, self.tu):
@@ -313,7 +402,9 @@ class Scanner:
                 scope = self._scope(receiver)
                 # A name the caller passes is resolved at the call site (helpers, below).
                 named_by_caller = bool(args) and self._parameter_index(args[0]) is not None
-                if not named_by_caller and self._def_releases(args):
+                # A receiver the caller passes is resolved at the call site (by_receiver, below).
+                by_caller = scope is None and self._receiver_root(receiver) is not None
+                if not named_by_caller and not by_caller and self._def_releases(args):
                     name = self._bound_name(call, args)
                     if scope is None:
                         where = f"{Path(callee.location.file.name).name}:{callee.location.line}"
@@ -333,6 +424,15 @@ class Scanner:
                         name = _string_literal(_strip(args[name_at]))
                         if scope is not None and name is not None:
                             releases.append(Release(self.module, scope, name))
+                    for d in by_receiver.get(target.spelling, ()):
+                        scope = self._member_scope(_strip(args[d.receiver_at]), d.member)
+                        if scope is None:
+                            raise UnresolvedScopeError(
+                                f"{d.where}: {d.name} releases the GIL, but the Python class "
+                                f"{target.spelling} is called with is unknown here"
+                            )
+                        found.setdefault(Release(self.module, scope, d.name), d.where)
+                        called.add(target.spelling)
                 if self._guarded(args) and args:
                     # A binding helper given the guard: bind_value_equality(cls, guard).
                     scope = self._scope(_strip(args[0]))
@@ -340,7 +440,48 @@ class Scanner:
                         releases.append(Release(self.module, scope, call.spelling))
             for release in releases:
                 found.setdefault(release, f"{Path(loc.file.name).name}:{loc.line}")
+        if uncalled := sorted(set(by_receiver) - called):
+            listed = "; ".join(f"{d.where}: {d.name}" for h in uncalled for d in by_receiver[h])
+            raise UnresolvedScopeError(
+                f"{listed} release the GIL on a receiver their caller passes, but nothing in "
+                f"this TU calls {uncalled}: the Python class is unknown here (a template parameter?)"
+            )
         return found
+
+
+# `audit_facts.gil_releases`: (binding source, args, scan, parse) -> its releases.
+ReleaseFetch = Callable[
+    [
+        Path,
+        Sequence[str],
+        Callable[[ci.TranslationUnit], Mapping[Release, str]],
+        Callable[[Path, Sequence[str]], ci.TranslationUnit],
+    ],
+    Mapping[Release, str],
+]
+
+
+def module_releases(
+    module: str, sources: Sequence[Path], args: Sequence[str], fetch: ReleaseFetch
+) -> dict[Release, str]:
+    """Every GIL release of one module's binding: each of its TUs scanned on its own, the
+    releases listed under `module` with the `file:line` of the first TU that has them.
+
+    Args:
+        module: The Python module the releases are listed under.
+        sources: The module's binding TUs, primary first (`audit_ownership.binding_sources`).
+        args: The parse arguments.
+        fetch: The release scan of one TU (`audit_facts.gil_releases`: cached).
+    """
+
+    def scan(tu: ci.TranslationUnit) -> dict[Release, str]:
+        return Scanner(tu, module).scan()
+
+    found: dict[Release, str] = {}
+    for cpp in sources:
+        for release, where in fetch(cpp, args, scan, parse).items():
+            found.setdefault(release, where)
+    return found
 
 
 def compare(
@@ -365,7 +506,7 @@ def main(argv: list[str] | None = None) -> int:
     # Need the audit env (CONDA_PREFIX); not at import, for the tests.
     import audit_parse
     from audit_facts import gil_releases
-    from audit_ownership import binding_modules, binding_source
+    from audit_ownership import binding_modules, binding_sources
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("modules", nargs="*", help="Default: every binding module.")
@@ -374,11 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     args = [*audit_parse.PARSE_ARGS, *(f"-I{d}" for d in audit_parse.INCLUDE_DIRS)]
     found: dict[Release, str] = {}
     for module in modules:
-
-        def scan(tu: ci.TranslationUnit, module: str = module) -> dict[Release, str]:
-            return Scanner(tu, module).scan()
-
-        found.update(gil_releases(binding_source(module), args, scan, parse))
+        found.update(module_releases(module, binding_sources(module), args, gil_releases))
     problems = compare(found, load_entry_points(ENTRY_POINTS), modules)
     for line in problems:
         print(line, file=sys.stderr)

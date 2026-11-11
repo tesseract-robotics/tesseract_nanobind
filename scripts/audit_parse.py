@@ -20,14 +20,11 @@ from audit_native import (
 )
 from audit_ownership import (
     HEADER_SUFFIXES,
-    INCLUDE_DIRECTIVE,
     REPO_ROOT,
     SRC,
-    header_auditor,
     header_is_unaudited,
     header_owner,
     is_third_party,
-    is_unaudited,
     owner_prefixes,
     owning_prefix,
 )
@@ -305,44 +302,6 @@ def prefix_headers(
                 spelling = h.relative_to(d).as_posix()
                 if h.suffix in HEADER_SUFFIXES and header_owner(spelling, prefixes) == module:
                     found.setdefault(h.resolve(), spelling)
-    return found
-
-
-def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
-    """`<…>` spellings the files #include, read as text (other bindings are not parsed)."""
-    return frozenset(
-        m for s in sources for m in INCLUDE_DIRECTIVE.findall(s.read_text(encoding="utf-8"))
-    )
-
-
-def binding_module(path: Path) -> str:
-    """`src/bindings/srdf.cpp` → `srdf`; a test fixture `other_bindings.cpp` → `other`."""
-    return path.stem.removesuffix("_bindings")
-
-
-def foreign_headers(
-    module: str,
-    own_includes: frozenset[str],
-    other_includes: Mapping[str, frozenset[str]],
-    prefixes: Mapping[str, tuple[str, ...]],
-    include_dirs: Sequence[Path],
-) -> dict[Path, str]:
-    """Headers under another module's prefix that this binding #includes directly, that the
-    owner's binding does not, and that this module audits (`header_auditor`)."""
-    found: dict[Path, str] = {}
-    for spelling in own_includes:
-        owner = header_owner(spelling, prefixes)
-        if owner is None or owner == module or spelling in other_includes.get(owner, frozenset()):
-            continue
-        if is_unaudited(spelling, prefixes[owner]):
-            continue
-        includers = [module, *(m for m, inc in other_includes.items() if spelling in inc)]
-        if header_auditor(includers) != module:
-            continue
-        for d in include_dirs:
-            if (d / spelling).is_file():
-                found[(d / spelling).resolve()] = spelling
-                break
     return found
 
 

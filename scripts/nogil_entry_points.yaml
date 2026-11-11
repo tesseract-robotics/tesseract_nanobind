@@ -2,7 +2,8 @@
 # this list and the bindings disagree, in either direction; docs/developer/threading.md
 # embeds this file.
 #
-# module (binding TU) -> Python class (`module` for module-level functions) -> method: reason
+# module (every TU of its binding: the primary and its parts, audit_ownership.MODULE_PARTS)
+#   -> Python class (`module` for module-level functions) -> method: reason
 # An entry covers every overload of that name that releases the GIL.
 #
 # The rule (docs/developer/threading.md): release the GIL only around a call that
@@ -63,6 +64,10 @@ motion_planners:
     solve: Seconds of CPU for OMPL, TrajOpt, TrajOpt-Ifopt and Descartes.
   module:
     contactCheckProgram: Collision-checks every state of a program; pure C++ loop.
+    assignCurrentStateAsSeed: >-
+      Reads the environment under its lock (see environment.Environment.init).
+    formatProgram: See assignCurrentStateAsSeed.
+    toToolpath: See assignCurrentStateAsSeed; forward kinematics per waypoint.
 
 motion_planners_simple:
   SimpleMotionPlanner:
@@ -75,6 +80,44 @@ motion_planners_simple:
     generateInterpolatedProgram: >-
       Interpolates every segment and solves a state per step: ~0.1 s per call in the tests
       (gil-hotspots). Only reads env.
+  # Bound by the template bind_instruction_info, named at its call sites.
+  JointGroupInstructionInfo:
+    __init__: Reads the environment under its lock (getJointGroup / getKinematicGroup).
+  KinematicGroupInstructionInfo:
+    __init__: See JointGroupInstructionInfo.__init__.
+
+motion_planners_descartes:
+  # Bound once for both scalar types by the template bind_descartes, named at its call sites.
+  DescartesMoveProfileD:
+    createKinematicGroup: >-
+      Reads the environment under its lock (see motion_planners.assignCurrentStateAsSeed) and
+      loads the IK plugin.
+    createWaypointSampler: >-
+      Reads the environment under its lock; a Python override takes the GIL in its trampoline.
+    createEdgeEvaluator: See createWaypointSampler.
+    createStateEvaluator: See createWaypointSampler.
+  DescartesMoveProfileF:
+    createKinematicGroup: See DescartesMoveProfileD.createKinematicGroup.
+    createWaypointSampler: See DescartesMoveProfileD.createWaypointSampler.
+    createEdgeEvaluator: See DescartesMoveProfileD.createEdgeEvaluator.
+    createStateEvaluator: See DescartesMoveProfileD.createStateEvaluator.
+
+motion_planners_trajopt_ifopt:
+  TrajOptIfoptMoveProfile:
+    create: Reads the environment under its lock; checks run with the GIL first.
+  TrajOptIfoptCompositeProfile:
+    create: See TrajOptIfoptMoveProfile.create.
+  module:
+    createCollisionConstraints: See TrajOptIfoptMoveProfile.create.
+
+trajopt_ifopt:
+  # Bound in the part trajopt_ifopt_collision.cpp.
+  SingleTimestepCollisionEvaluator:
+    __init__: Reads the environment under its lock (its contact manager).
+  LVSDiscreteCollisionEvaluator:
+    __init__: See SingleTimestepCollisionEvaluator.__init__.
+  LVSContinuousCollisionEvaluator:
+    __init__: See SingleTimestepCollisionEvaluator.__init__.
 
 trajopt_sqp:
   TrustRegionSQPSolver:
@@ -85,7 +128,6 @@ kinematics:
     calcInvKin: Numerical solvers (TRAC-IK, KDL) iterate until their timeout.
   KinematicGroup:
     calcInvKin: See InverseKinematics.calcInvKin; plus redundant-solution expansion.
-    calcInvKinMultiple: Alias of the list overload of calcInvKin.
   module:
     checkKinematics: FK then IK for every working frame and tip link.
 
@@ -119,15 +161,20 @@ geometry:
 serialization:
   module:
     environment_to_xml: >-
-      Serializes the whole command history: seconds for a mesh-heavy scene (gil-hotspots).
-      Reads the environment under its shared lock, as clone() does; fires no event callback.
+      Serializes the whole command history under the environment's lock (see
+      environment.Environment.init): seconds for a mesh-heavy scene.
     environment_to_binary: See environment_to_xml.
-    environment_to_file: See environment_to_xml; plus file IO.
+    environment_to_file: See environment_to_xml; the file is written without the GIL too.
     environment_from_xml: >-
-      Replays the command history into a new Environment, building its collision geometry:
-      seconds (gil-hotspots). The new Environment has no event callbacks yet.
+      Replays the command history into a new Environment (seconds); it has no callbacks yet.
     environment_from_binary: See environment_from_xml.
     environment_from_file: See environment_from_xml; plus file IO.
+    composite_instruction_to_file: File IO on the already serialized text (serialized with the GIL).
+    scene_state_to_file: See composite_instruction_to_file.
+    task_composer_log_to_file: See composite_instruction_to_file.
+    composite_instruction_from_file: File IO, then parsing into a new object no other thread sees.
+    scene_state_from_file: See composite_instruction_from_file.
+    task_composer_log_from_file: See composite_instruction_from_file.
 
 collision:
   DiscreteContactManager:
@@ -148,28 +195,69 @@ collision:
 
 environment:
   Environment:
+    init: >-
+      Takes the environment's unique lock and fires event callbacks under its shared lock; a thread
+      waiting for that lock with the GIL would deadlock against a Python callback
+      (docs/developer/threading.md, Environment event callbacks). Builds the scene: 0.9 s.
+    isInitialized: Takes the environment's shared lock; see init.
+    reset: See init.
+    clear: Takes the environment's unique lock; see init.
+    getRevision: See isInitialized.
+    getInitRevision: See isInitialized.
+    getTimestamp: See isInitialized.
+    getCurrentStateTimestamp: See isInitialized.
+    getName: See isInitialized.
+    setName: See clear.
+    getSceneGraph: See isInitialized.
+    getState: See isInitialized; the overloads that solve a new state cost a state solve.
     link_transforms_batch: >-
-      Forward kinematics over every row of a joint-value array, pure C++ into a buffer allocated
-      before the release; the arguments are validated with the GIL held.
-    applyCommand: >-
-      The AddLink, AddSceneGraph and AddTrajectoryLink overloads build collision geometry,
-      seconds for mesh- or SDF-heavy links. Event callbacks re-acquire the GIL (see the
-      deadlock caveat in docs/developer/threading.md).
+      Forward kinematics over every row of a joint-value array into a buffer allocated before the
+      release; validation reads the environment, so it runs inside the release too.
+    setState: See init (fires SCENE_STATE_CHANGED).
+    addEventCallback: >-
+      The registration takes the unique lock; the callable is wrapped first, with the GIL.
+    removeEventCallback: See clear.
+    clearEventCallbacks: See clear.
+    applyCommand: See init; mesh-heavy links build collision geometry for seconds.
     applyCommands: See applyCommand.
-    clone: >-
-      Deep copy under the environment's shared lock, so a background thread can clone without
-      blocking the UI thread (gh-134).
-    getState: >-
-      The overloads that solve a new state; they take the environment's shared lock, which a
-      writer releasing the GIL may hold.
-    getStateByMap: Python-only alias of getState.
-    getStateByNamesAndValues: Python-only alias of getState.
-    getDiscreteContactManager: >-
-      Builds every collision shape on first use when no manager is cached; read-locked, and no
-      event callback fires.
+    getCommandHistory: See isInitialized.
+    getStateSolver: See isInitialized.
+    getJointIds: See isInitialized.
+    getActiveJointIds: See isInitialized.
+    getLinkIds: See isInitialized.
+    getActiveLinkIds: See isInitialized.
+    getStaticLinkIds: See isInitialized.
+    getRootLinkId: See isInitialized.
+    getCurrentJointValues: See isInitialized.
+    getLinkTransform: See isInitialized.
+    getRelativeLinkTransform: See isInitialized.
+    getLinkTransforms: See isInitialized.
+    getCurrentFloatingJointValues: See isInitialized.
+    getJointLimits: See isInitialized.
+    getLinkCollisionEnabled: See isInitialized.
+    getLinkVisibility: See isInitialized.
+    getContactManagersPluginInfo: See isInitialized.
+    getLink: See isInitialized.
+    getJoint: See isInitialized.
+    getGroupNames: See isInitialized.
+    getGroupJointIds: See isInitialized.
+    getJointGroup: See isInitialized.
+    getKinematicGroup: See isInitialized; loads the IK plugin on first use (0.5-0.8 s).
+    findTCPOffset: See isInitialized; a Python find-TCP callback takes the GIL itself.
+    addFindTCPOffsetCallback: See addEventCallback.
+    getDiscreteContactManager: See isInitialized; builds every collision shape on first use.
     getContinuousContactManager: See getDiscreteContactManager.
-    bind_value_equality: >-
-      __eq__ / __ne__ hold a shared lock on the left operand's mutex, as clone() does.
+    setActiveDiscreteContactManager: See clear.
+    setActiveContinuousContactManager: See clear.
+    clearCachedDiscreteContactManager: See clear.
+    clearCachedContinuousContactManager: See clear.
+    getAllowedCollisionMatrix: See isInitialized.
+    getCollisionMarginData: See isInitialized.
+    setResourceLocator: See clear.
+    getResourceLocator: See isInitialized.
+    getKinematicsInformation: See isInitialized.
+    clone: Deep copy under the shared lock (gh-134); see isInitialized.
+    bind_value_equality: __eq__ / __ne__ hold a shared lock on the left operand's mutex.
   module:
     checkTrajectory: Collision-checks every state of a trajectory; can run for seconds.
     checkTrajectorySegment: One continuous check; called in loops.

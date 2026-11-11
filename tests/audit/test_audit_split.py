@@ -74,7 +74,6 @@ PARSE = {
     "FUNCTION_KINDS", "METHOD_KINDS", "FIELD_KINDS", "RAW_BUFFER_POINTEES",
     "SIZE_SPELLINGS", "YAML_NODE", "BYTES_KEYS",
     "header_rel", "location", "audited_headers", "_owns", "prefix_headers",
-    "direct_include_spellings", "binding_module", "foreign_headers",
     "_is_eigen_ref_of_non_const", "_is_out_param", "_out_param_type", "_is_raw_buffer",
     "_is_byte_pointer", "_byte_buffer_pairs", "_has_default", "_is_yaml_node",
     "_same_python_form", "_stream_insertion_owner", "_befriends_cereal", "cpp_api", "decl_names",

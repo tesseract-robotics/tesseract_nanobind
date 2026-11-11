@@ -1,5 +1,5 @@
 """What a binding TU binds: the `nb::class_`/`nb::enum_`/`nb::exception` constructions in its
-NB_MODULE body."""
+main file (the primary's NB_MODULE body, or a part's `bind_*` functions)."""
 
 from __future__ import annotations
 

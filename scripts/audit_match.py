@@ -10,7 +10,17 @@ from types import MappingProxyType
 
 import audit_types
 from audit_anchor import check_anchor_headers, check_anchor_includes_current
-from audit_facts import Synthetic, api_facts, bound_facts, decl_facts, include_facts
+from audit_facts import (
+    Synthetic,
+    api_facts,
+    bound_facts,
+    decl_facts,
+    include_facts,
+    merge_api,
+    merge_bound,
+    merge_decls,
+    merge_includes,
+)
 from audit_lookup import (
     NO_ALIAS,
     BoundLookup,
@@ -33,8 +43,10 @@ from audit_ownership import (
     UnauditedModuleError,
     UnknownModuleError,
     binding_modules,
-    binding_source,
+    binding_sources,
     committed_stub,
+    direct_include_spellings,
+    foreign_headers,
     header_auditor,
     is_unaudited,
     owner_prefixes,
@@ -50,9 +62,6 @@ from audit_parse import (
     HeaderParseError,
     Kind,
     api_selection,
-    binding_module,
-    direct_include_spellings,
-    foreign_headers,
     header_rel,
     not_api_headers,
     own_header_lines,
@@ -300,25 +309,33 @@ def _protocol_rule(name: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str
 
 @functools.cache
 def _bound_of(
-    cpp: Path, extra_include_dirs: tuple[Path, ...]
+    sources: tuple[Path, ...], extra_include_dirs: tuple[Path, ...]
 ) -> tuple[Mapping[str, str], frozenset[str]]:
-    """`bound_classes` and the `bound_exceptions` names of one binding source, parsed with
-    bodies once per audit run, on a fact-cache miss only (`audit_facts.bound_facts`)."""
-    facts = bound_facts(cpp, extra_include_dirs, parse_tu)
+    """`bound_classes` and the `bound_exceptions` names of one module's binding sources (its
+    primary and parts), each parsed with bodies once per audit run, on a fact-cache miss only
+    (`audit_facts.bound_facts`).
+
+    Raises:
+        PartConflictError: two sources bind one Python name to different classes.
+    """
+    facts = merge_bound(bound_facts(s, extra_include_dirs, parse_tu) for s in sources)
     return MappingProxyType(dict(facts.classes)), facts.exceptions
 
 
-def _bound_classes_of(cpp: Path, extra_include_dirs: tuple[Path, ...]) -> Mapping[str, str]:
-    """`bound_classes` of one binding source."""
-    return _bound_of(cpp, extra_include_dirs)[0]
+def _bound_classes_of(
+    sources: tuple[Path, ...], extra_include_dirs: tuple[Path, ...]
+) -> Mapping[str, str]:
+    """`bound_classes` of one module's binding sources."""
+    return _bound_of(sources, extra_include_dirs)[0]
 
 
 @functools.cache
 def bound_index(module: str) -> Mapping[str, str]:
-    """`bound_classes` of a binding module's TU; empty for any other name (a fixture stub)."""
+    """`bound_classes` of every TU of a binding module; empty for any other name (a fixture
+    stub)."""
     if module not in binding_modules():
         return NO_ALIAS
-    return _bound_classes_of(binding_source(module), ())
+    return _bound_classes_of(binding_sources(module), ())
 
 
 def poly_ancestors(ancestors: Ancestors) -> Ancestors:
@@ -786,16 +803,21 @@ def audit_tu(
     init_path: Path | None,
     prefix: tuple[str, ...],
     extra_include_dirs: Sequence[Path] = (),
-    other_bindings: Sequence[Path] = (),
+    other_bindings: Mapping[str, Sequence[Path]] | None = None,
     stub_roots: Sequence[Path] = (SRC,),
     prefixes: Mapping[str, tuple[str, ...]] | None = None,
     bound: BoundLookup | None = None,
+    parts: Sequence[Path] = (),
 ) -> ModuleReport:
-    """Audit one translation unit against one stub and, if the module has one, package `__init__.py`.
+    """Audit one binding module's translation units against one stub and, if the module has
+    one, package `__init__.py`.
 
+    The binding is `cpp_path` (the primary, with `NB_MODULE`) and its `parts`, each a TU of its
+    own: a header any of them #includes directly is the binding's, a class any of them binds is
+    the module's, and each audited header's API is extracted from the first TU that includes it.
     Audits every header under `prefix` (the module's prefixes) that the module owns, except
     `UNAUDITED_HEADERS` and headers that the binding
-    does not #include but one of `other_bindings` does: those are audited by `header_auditor`
+    does not #include but one of `other_bindings` (module → its sources) does: those are audited by `header_auditor`
     of their includers and listed in `ModuleReport.delegated`. Conversely, a header under
     another module's prefix (`prefixes`: module → prefixes, for ownership) that this binding
     #includes and its owner's binding does not is audited here when this module is its auditor.
@@ -808,7 +830,10 @@ def audit_tu(
         PrefixMismatchError: `prefixes` holds `module` with other prefixes than `prefix`.
         StaleAnchorIncludeError: see `check_anchor_includes_current`.
         AnchorHeaderApiError: see `check_anchor_headers`.
+        PartConflictError: two of the binding's TUs disagree (`audit_facts.merge_*`).
     """
+    sources = (cpp_path, *parts)
+    extra = tuple(extra_include_dirs)
     include_dirs = (*extra_include_dirs, *INCLUDE_DIRS)
     if prefixes is not None and prefixes.get(module, prefix) != prefix:
         raise PrefixMismatchError(
@@ -816,7 +841,7 @@ def audit_tu(
         )
     prefixes = {**(prefixes or {}), module: prefix}
     if bound is None:
-        own = _bound_classes_of(cpp_path, tuple(extra_include_dirs))
+        own = _bound_classes_of(sources, extra)
 
         def bound(m: str) -> Mapping[str, str]:
             return own if m == module else bound_index(m)
@@ -831,18 +856,19 @@ def audit_tu(
         return any(qualified in lookup(m).values() for m in modules)
 
     @functools.cache
-    def tu():  # noqa: ANN202  (a libclang TranslationUnit; this module does not import it)
-        """The declarations parse: once, and only when a fact misses or an anchor header
-        needs its cursors."""
+    def tu(source: Path):  # noqa: ANN202  (a libclang TranslationUnit; not imported here)
+        """A source's declarations parse: once, and only when a fact misses or an anchor
+        header needs its cursors."""
         with EVENTS.timed("decl-parse"):
-            return parse_tu(cpp_path, extra_include_dirs)
+            return parse_tu(source, extra_include_dirs)
 
-    includes = include_facts(cpp_path, extra_include_dirs, tu)
-    decl = decl_facts(cpp_path, extra_include_dirs, tu)
+    per_tu = {s: include_facts(s, extra, functools.partial(tu, s)) for s in sources}
+    includes = merge_includes(per_tu.values())
+    decl = merge_decls(decl_facts(s, extra, functools.partial(tu, s)) for s in sources)
     direct = owned_direct(includes.direct, module, prefixes, include_dirs)
-    own_includes = direct_include_spellings([cpp_path])
+    own_includes = direct_include_spellings(sources)
     check_anchor_includes_current(module, own_includes, prefixes)
-    other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
+    other_includes = {m: direct_include_spellings(ps) for m, ps in (other_bindings or {}).items()}
     owned_elsewhere = frozenset().union(*other_includes.values())
     audited: dict[Path, str] = {}
     delegated: dict[str, str] = {}
@@ -860,18 +886,26 @@ def audit_tu(
             )
         else:
             audited[h] = spelling
-    if anchor_headers:
-        check_anchor_headers(tu(), anchor_headers)
+    for s in sources:
+        if mine := {h: sp for h, sp in anchor_headers.items() if h in per_tu[s].direct}:
+            check_anchor_headers(tu(s), mine)
     audited |= foreign_headers(module, own_includes, other_includes, prefixes, include_dirs)
     included = includes.included
     selected = frozenset(audited) & included
-    not_api = not_api_headers(includes.inclusions, selected, prefixes)
     with EVENTS.timed("cpp-api"):
-        # The stored extraction, then the one rule that reads other modules (R13).
-        cpp = resolve_bound(
-            api_facts(cpp_path, extra_include_dirs, api_selection(selected, not_api), tu),
-            bound_anywhere,
-        )
+        apis = []
+        claimed: frozenset[Path] = frozenset()
+        for s in sources:
+            # Each audited header from the first TU that includes it: the primary keeps the
+            # selection (and cache key) it has on its own.
+            mine = (selected & per_tu[s].included) - claimed
+            claimed |= mine
+            if s == cpp_path or mine:
+                not_api = not_api_headers(per_tu[s].inclusions, mine, prefixes)
+                selection = api_selection(mine, not_api)
+                apis.append(api_facts(s, extra, selection, functools.partial(tu, s)))
+        # The stored extractions, then the one rule that reads other modules (R13).
+        cpp = resolve_bound(merge_api(apis), bound_anywhere)
     with EVENTS.timed("match"):
         report = match(
             module,
@@ -883,7 +917,7 @@ def audit_tu(
             decl.ancestors,
             lookup,
             decl.bases,
-            _bound_of(cpp_path, tuple(extra_include_dirs))[1],
+            _bound_of(sources, extra)[1],
         )
     unincluded = {h: s for h, s in audited.items() if h not in included}
     with EVENTS.timed("unincluded-headers"):
@@ -923,12 +957,14 @@ def audit_module(module: str) -> ModuleReport:
         HeaderParseError: see `parse_tu`.
     """
     resolve_module(module)
+    primary, *parts = binding_sources(module)
     return audit_tu(
         module,
-        binding_source(module),
+        primary,
         committed_stub(module),
         package_init(module),
         AUDITED_HEADER_PREFIX[module],
-        other_bindings=[binding_source(m) for m in binding_modules() if m != module],
+        other_bindings={m: binding_sources(m) for m in binding_modules() if m != module},
         prefixes=owner_prefixes(),
+        parts=parts,
     )

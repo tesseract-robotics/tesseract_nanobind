@@ -79,7 +79,7 @@ def g1_reports():
 
 @pytest.fixture(scope="module")
 def cl_tu():
-    return audit.parse_tu(own.binding_source(CL))
+    return audit.parse_tu(own.primary_source(CL))
 
 
 def accepted_pairs(report):
@@ -220,7 +220,7 @@ def test_reference_setter_premise(cl_tu, owner):
 
 def test_algorithm_internal_classes_are_in_the_totg_namespace():
     """R5's premise: the four classes sit in TOTG's implementation namespace."""
-    tu = audit.parse_tu(own.binding_source(TP))
+    tu = audit.parse_tu(own.primary_source(TP))
     for name in ("Path", "PathSegment", "PathData", "Trajectory"):
         assert _record(tu, name).semantic_parent.spelling == "totg"
 
