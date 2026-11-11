@@ -52,7 +52,7 @@ pixi task list
 | `install` | Install bindings | `native-build`, then editable `pip install -e . --no-build-isolation` against `.native/<triplet>/ws/install` |
 | `test` | Run tests | pytest with xdist parallel, excluding benchmarks (depends on `install`) |
 | `test-benchmark` | Run benchmarks | benchmark tests, serial |
-| `typecheck` | Type check | pyright on `src/tesseract_robotics/` |
+| `typecheck` | Type check | ty on `src/tesseract_robotics/` |
 | `lint` | Lint | ruff check |
 | `fmt` | Format | ruff format |
 | `stubs` | Regenerate stubs | the committed `.pyi` stubs; see [Stub Generation](#stub-generation) |
@@ -318,10 +318,7 @@ See [Migration Notes](migration.md#cross-module-type-resolution) for details.
 pixi run typecheck
 ```
 
-Uses pyright configured via `pyrightconfig.json`. Key design decisions:
-
-- **Python code is type-checked** — the `planning/` module and other pure Python code
-- **Auto-generated stubs are excluded** — nanobind generates `.pyi` stubs with C++ type artifacts
+ty is the type checker of record: `pixi run typecheck` runs `ty check` on `src/tesseract_robotics`, the pre-push hook runs it, and CI runs it on Linux x86_64 against the built wheel. The whole package, examples and the generated `.pyi` stubs included, reports no diagnostics; a stub that ty rejects is fixed at the binding (`nb::sig`, named arguments, type registration), not ignored.
 
 When adding new bindings, declare inheritance in nanobind to get correct stubs:
 
@@ -383,7 +380,7 @@ pre-commit install --hook-type pre-push
 | ruff check --fix | pre-commit | Auto-fix lint issues |
 | ruff format | pre-commit | Format code |
 | stage-formatted | pre-commit | Auto-stage ruff changes |
-| typecheck (`pixi run typecheck`, pyright) | pre-push | Type check |
+| typecheck (`pixi run typecheck`, ty) | pre-push | Type check |
 
 Skip when needed: `git commit --no-verify` / `git push --no-verify`
 
