@@ -56,6 +56,7 @@ jobs:
     # Entries used after this stamp survive the prune below. The event logs (one per step,
     # scripts/audit_telemetry.py) live outside the cache directory: they are this run's only.
     - name: Stamp the run start
+      id: stamp
       run: |
         touch "$RUNNER_TEMP/audit-start"
         mkdir "$RUNNER_TEMP/audit-events"
@@ -103,12 +104,6 @@ jobs:
       if: ${{ !cancelled() && steps.audit.outcome == 'success' }}
       run: git diff --exit-code -I '^tesseract-robotics `' -- docs/developer/binding-api-audit.md
 
-    # Per step: hits and misses per fact kind, extraction and lock-wait seconds, and the
-    # seconds of each uncached phase. Also after a failed step: its numbers explain it.
-    - name: Fact cache use
-      if: ${{ !cancelled() }}
-      run: pixi run -e audit audit-telemetry "$RUNNER_TEMP/audit-events"
-
     # Only after a run that reached every step: a failed run used only part of the cache.
     - name: Drop the facts this run did not use
       if: ${{ success() }}
@@ -121,3 +116,11 @@ jobs:
       with:
         path: .cache/binding-audit
         key: binding-audit-facts-${{ github.run_id }}
+
+    # Per step: hits and misses per fact kind, extraction and lock-wait seconds, and the
+    # seconds of each uncached phase. Also after a failed step: its numbers explain it. Last,
+    # so a log it cannot read costs neither the prune nor the save; not when the job failed
+    # before the stamp step made the directory (that failure is the one to read).
+    - name: Fact cache use
+      if: ${{ !cancelled() && steps.stamp.outcome == 'success' }}
+      run: pixi run -e audit audit-telemetry "$RUNNER_TEMP/audit-events"

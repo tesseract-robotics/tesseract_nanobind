@@ -103,7 +103,7 @@ The audit's cost is libclang: two parses of each binding (one with function bodi
 - the file listing of each include dir inside the repo (`repo_dir_listing`), because a new file there can shadow a header found later on the search path;
 - the source of the scripts that run during extraction (`*_EXTRACTORS`).
 
-The listing names every file a parse could include: everything except the suffixes in `NOT_INCLUDED_SUFFIXES` (`.py`, `.pyi`, `.md`, `.typed`, `.cpp`) and `__pycache__`. The include dirs inside the repo are the package tree, so without this rule every stub or Python edit changed every key. The rule rests on one premise, that no parse includes such a file, and `require_listed` checks it on every parse whose facts are stored: a TU that includes a file of a skipped kind raises `UnlistedIncludeError` instead of being cached. The binding sources include only `.h` and `.hpp` spellings today (535 includes under `src/` and `tests/audit/fixtures/`, at d8ad6e8d).
+The listing names every file a parse could include: everything except the suffixes in `NOT_INCLUDED_SUFFIXES` (`.py`, `.pyi`, `.md`, `.typed`, `.cpp`) and `__pycache__`. The include dirs inside the repo are the package tree, so without this rule every stub or Python edit changed every key. The rule rests on one premise, that no parse includes such a file, and `require_listed` checks it on every parse whose facts are stored: a TU that includes a file of a skipped kind raises `UnlistedIncludeError` instead of being cached. No include in the binding sources is of a skipped kind today: of the 647 `#include` lines under `src/` and `tests/audit/fixtures/`, 523 name a `.h`, 18 a `.hpp` and 106 a file with no suffix (at 71f965f5).
 
 `audit_ownership.py` is not part of the digest. The parse reads only its path constants, which the arguments already cover, and its `header_rel`, which only formats errors. Binding PRs edit its tables constantly.
 
@@ -118,19 +118,21 @@ A per-entry `flock` makes xdist workers that ask for one fact compute it once. I
 | `fetch` | `FactCache.fetch`, once per answered fetch (none when `compute` raises) | `kind`, `hit`, `compute_s` (extraction only, 0 on a hit), `wait_s` (time until the entry lock was held), `pid` |
 | `phase` | `audit_tu`, through `EVENTS.timed` | `name` (`decl-parse`, `cpp-api`, `match`, `unincluded-headers`), `seconds`, `pid` |
 
-The step "Fact cache use" (`pixi run -e audit audit-telemetry DIR`) prints one pair of tables per step:
+The step "Fact cache use" (`pixi run -e audit audit-telemetry DIR`) prints one pair of tables per step. It runs last, after the cache is saved, and only when the stamp step created the directory, so a log it cannot read fails the job without costing the prune or the save, and a job that failed before the audit started shows one red step, not two:
 
 ```text
-3-audit: 141 events from 1 process
+3-audit: 204 events from 1 process
 kind   hits  misses  compute  wait
 bound    34       0      0.0   0.0
 decl     34       0      0.0   0.0
 phase               calls  seconds
 cpp-api                34     61.2
 decl-parse             34     88.4
+match                  34      9.7
+unincluded-headers     34     12.3
 ```
 
-The numbers above only show the layout; they are not a measurement. Reading it: a warm run has 0 misses for `bound` and `gil`; `wait` is time workers spent blocked on another worker's parse of the same binding; `decl-parse` and `cpp-api` seconds are the uncached cost that the last paragraph of this section is about, summed over the processes that paid it.
+The numbers above only show the layout; they are not a measurement. Reading it: a warm run has 0 misses for `bound` and `gil`; `wait` is time workers spent blocked on another worker's parse of the same binding; `decl-parse` and `cpp-api` seconds are the uncached cost that the last paragraph of this section is about, summed over the processes that paid it. `match` is not rule time alone: it includes reading the stub (`py_api`) and, on a miss, the bodies parse behind `bound_facts`.
 
 Rejected alternatives:
 
