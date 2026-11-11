@@ -1,18 +1,15 @@
 """Regression tests for KinematicsInformation.group_tcps Python accessor.
 
-The underlying C++ field is unordered_map<string, unordered_map<string, Isometry3d,
-Eigen::aligned_allocator<...>>>. A raw def_rw exposed a Python attribute whose getter
-raised TypeError on access because nanobind's default stl/unordered_map caster does
-not pattern-match against the aligned_allocator template arg. The binding now exposes
-it via def_prop_rw with explicit lambdas that copy through default-allocator nested
-maps at the boundary.
+The underlying C++ field is a name-keyed map of name-keyed maps with an Eigen aligned
+allocator on the inner map; the name-keyed map caster handles both allocators, so the
+field is a plain copy-policy read/write attribute.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from tesseract_robotics.common import Isometry3d, Quaterniond
+from tesseract_robotics.common import Isometry3d, LinkId, Quaterniond
 from tesseract_robotics.srdf import KinematicsInformation
 
 
@@ -70,3 +67,34 @@ def test_group_tcps_multiple_groups() -> None:
     assert set(tcps.keys()) == {"arm", "positioner"}
     assert set(tcps["arm"].keys()) == {"tool0", "flange"}
     assert set(tcps["positioner"].keys()) == {"fixture"}
+
+
+def test_group_tcps_setter_accepts_link_id_keys() -> None:
+    ki = KinematicsInformation()
+    tcp = Isometry3d(np.array([4.0, 5.0, 6.0]), Quaterniond.Identity())
+    ki.group_tcps = {"arm": {LinkId("tool0"): tcp}}
+    assert ki.hasGroupTCP("arm", "tool0")
+    np.testing.assert_allclose(ki.group_tcps["arm"]["tool0"].translation, [4.0, 5.0, 6.0])
+
+
+def test_group_tcps_values_are_copies_and_survive_replacement() -> None:
+    ki = KinematicsInformation()
+    ki.group_tcps = {
+        "arm": {"tool0": Isometry3d(np.array([1.0, 2.0, 3.0]), Quaterniond.Identity())}
+    }
+    held = ki.group_tcps["arm"]["tool0"]
+    ki.group_tcps = {"other": {"t": Isometry3d()}}
+    np.testing.assert_allclose(held.translation, [1.0, 2.0, 3.0])
+    assert set(ki.group_tcps.keys()) == {"other"}
+
+
+def test_group_states_round_trip() -> None:
+    ki = KinematicsInformation()
+    ki.group_states = {"arm": {"home": {"j1": 0.5, "j2": -0.5}}}
+    states = ki.group_states
+    assert set(states["arm"]["home"].keys()) == {"j1", "j2"}
+    assert states["arm"]["home"]["j1"] == 0.5
+    held = states["arm"]["home"]
+    ki.group_states = {}
+    assert held["j2"] == -0.5
+    assert ki.group_states == {}

@@ -37,37 +37,7 @@ NB_MODULE(srdf, m) {
         // group added via AddKinematicsInformationCommand resolves through getKinematicGroup().
         .def_rw("kinematics_plugin_info", &ts::KinematicsInformation::kinematics_plugin_info, "The forward / inverse kinematics solver plugins per group.")
         .def_rw("group_states", &ts::KinematicsInformation::group_states, nb::rv_policy::copy, "Named joint states per group: group name -> state name -> joint values.")
-        // group_tcps: the C++ field is nested unordered_map (group name -> LinkId -> Isometry3d) with
-        // Eigen::aligned_allocator on the inner map (Isometry3d alignment). nanobind's
-        // default stl/unordered_map caster does not pattern-match against that allocator
-        // template arg, so a raw def_rw exposes a Python attribute whose getter raises
-        // TypeError on access. The fix is a def_prop_rw that copies through to a
-        // default-allocator nested map at the binding boundary; values (Isometry3d) round-trip
-        // via their existing nanobind class binding.
-        .def_prop_rw(
-            "group_tcps",
-            [](const ts::KinematicsInformation& self) {
-                std::unordered_map<std::string,
-                                   std::unordered_map<tesseract::common::LinkId, Eigen::Isometry3d>> out;
-                for (const auto& [group_name, tcps] : self.group_tcps) {
-                    std::unordered_map<tesseract::common::LinkId, Eigen::Isometry3d> inner;
-                    for (const auto& [tcp_name, tcp] : tcps) {
-                        inner.emplace(tcp_name, tcp);
-                    }
-                    out.emplace(group_name, std::move(inner));
-                }
-                return out;
-            },
-            [](ts::KinematicsInformation& self,
-               const std::unordered_map<std::string,
-                                        std::unordered_map<tesseract::common::LinkId, Eigen::Isometry3d>>& value) {
-                self.group_tcps.clear();
-                for (const auto& [group_name, tcps] : value) {
-                    for (const auto& [tcp_name, tcp] : tcps) {
-                        self.group_tcps[group_name][tcp_name] = tcp;
-                    }
-                }
-            })
+        .def_rw("group_tcps", &ts::KinematicsInformation::group_tcps, nb::rv_policy::copy, "Named TCP offsets per group: group name -> TCP link name -> Isometry3d.")
         .def("insert", &ts::KinematicsInformation::insert, "other"_a, "Merge `other` into this; on a name both define, `other`'s entry wins.")
         .def("clear", &ts::KinematicsInformation::clear, "Remove every group, state, TCP and plugin entry.")
         .def("hasGroup", &ts::KinematicsInformation::hasGroup, "group_name"_a, "True if `group_name` is a chain, joint or link group.")
