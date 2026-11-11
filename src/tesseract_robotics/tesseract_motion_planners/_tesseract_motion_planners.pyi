@@ -178,3 +178,8 @@ def checkPIQPSettings(settings: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQP
     """
     Raise RuntimeError, naming `profile_name`, unless `settings` has a KKT solver of PIQP's sparse backend and passes piqp::Settings::verify_settings().
     """
+
+def isValidState(joint_group: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, base_link: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, tcp_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')] | Sequence[Sequence[float]]) -> bool:
+    """
+    True if `joint_values` are within `limits` and the arm's configuration, read with sign correction (-1, 1), is FUT or NUT; any other configuration is invalid. The last six joint values are the arm's.
+    """

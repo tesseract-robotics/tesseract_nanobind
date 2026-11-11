@@ -1,5 +1,22 @@
 # API Changes: 0.35 → 0.36 (upstream main)
 
+!!! info "0.36.0.0rc1"
+    `0.36.0.0rc1` is a pre-release (`pip install --pre tesseract-robotics-nanobind`). Its wheels
+    build tesseract, trajopt and tesseract_planning from `nanobind-0.36` branches on the
+    `jf---` forks: upstream `master` plus open upstream pull requests, so the release does not
+    wait on upstream review.
+
+    | repository | upstream master | carried PRs |
+    | --- | --- | --- |
+    | tesseract | `a9c22066` | #1396 |
+    | tesseract_planning | `a6483823` | #789, #792, #794 |
+    | trajopt | `963baf7d` | #628, #629 |
+
+    `tesseract_robotics.build_identity.UPSTREAM_SOURCES` lists the exact commits. A PR that
+    merges upstream drops out of the table; the final 0.36.0.x builds from the upstream tag.
+    #792 makes `isValidState` bindable (#333); #629 and #794 use tesseract's
+    `PerThreadContactManager` (tesseract#1394).
+
 !!! warning "Unreleased"
     This page tracks the `upstream-main` branch (issue #141, PR #161), which builds
     against the 0.36 dev packages on the `tesseract-robotics/label/dev` channel:
