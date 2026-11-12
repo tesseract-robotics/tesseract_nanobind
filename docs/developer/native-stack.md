@@ -47,7 +47,7 @@ recorded identity equals the current one is skipped; any input change rebuilds i
 ## CI
 
 `wheels.yml` runs `sources`, `vcpkg` and `colcon` as separate steps (the vcpkg binary archives are
-published between the first two, and Windows verifies the OMPL RNG state between `vcpkg` and
+published between `vcpkg` and `colcon`, and Windows verifies the OMPL RNG state between `vcpkg` and
 `colcon`). The artifact-based reuse of a finished native install (`.github/actions/native-cache`)
 is unchanged: when it restores one, the steps are skipped. `scripts/native_stack.toml` is the one
 place the vcpkg revision and package list are declared.

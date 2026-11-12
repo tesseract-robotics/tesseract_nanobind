@@ -5,8 +5,9 @@
 The single most important rule for the Linux wheels: **the gcc runtime
 (`libstdc++.so.6`, `libgcc_s.so.1`) must come from the host or the active
 conda/pixi env, never from the wheel.** auditwheel never bundles it (manylinux
-policy), and the `test-wheel` job in `wheels.yml` asserts the installed wheel
-ships no copy.
+policy), and the `test_python_ver` action (`.github/actions/test_python_ver`),
+which `wheels.yml` runs in the build jobs and `test-artifacts`, asserts the
+installed wheel ships no copy.
 
 ### Why (gh-119 forensics, 2026-06-10)
 
@@ -80,12 +81,13 @@ externally built conda package.
 
 The wheel dependency set uses vcpkg release `2026.10.16`, the release used by
 PR #394's successful build, instead of following the latest release. Overlays
-remain checked into this repository and the selected upstream sources. This
-pins the port set without switching the existing action to manifest mode.
+remain checked into this repository and the selected upstream sources. The
+release is declared in `scripts/native_stack.toml`, and `scripts/native_stack.py`
+checks vcpkg out at that tag.
 
-The conda and vcpkg dependency versions are still different: the reviewed build
-used Boost 1.92 / 1.88, yaml-cpp 0.9 / 0.8 and KDL 1.5.3 / 1.5.4 respectively
-(wheel / development). Source alignment is not third-party ABI parity; the
+Until the development env moved onto the same native build, the conda and vcpkg
+dependency versions differed: the reviewed build used Boost 1.92 / 1.88,
+yaml-cpp 0.9 / 0.8 and KDL 1.5.3 / 1.5.4 respectively (wheel / development). Source alignment is not third-party ABI parity; the
 fresh-runner artifact tests exercise the shipped stack independently.
 
 The Linux `-include stdexcept` workaround is tracked in

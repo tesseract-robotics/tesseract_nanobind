@@ -18,7 +18,7 @@ flowchart LR
 | Environment | Python | C++ stack comes from | Used for |
 |---|---|---|---|
 | `default` | 3.14 (unpinned, `>=3.12`) | `.native/<triplet>` (`pixi run native-build`) | local development |
-| `py312` | 3.12 | same | CI wheel builds (abi3) |
+| `py312` | 3.12 | same | development on the 3.12 floor (CI builds the wheels without pixi) |
 | `py315` | 3.15 | same; `viser` from PyPI, because its `websockets <17` cap has no conda-forge py315 build | builds the bindings and runs the suite on the newest Python |
 
 The default envs carry the toolchain only (cmake, ninja, ccache, the autotools the vcpkg ports
@@ -90,15 +90,20 @@ versions and updates both the wheel filename and its WHEEL tags.
 
 - **Stub drift gate.** Each build job installs the wheel it just built and runs
   `scripts/generate_stubs.py --check`; Linux x86_64 also runs ty (`ty check`).
-- **`test-wheel` job.** A fresh venv on each platform installs the wheel with pip and
-  runs the test suite (without `tests/audit` and `tests/benchmarks`). Pull requests
-  test the abi3 wheel on 3.12; pushes, tags and manual runs test it on 3.12, 3.13,
-  3.14 and 3.15. Linux also checks that the wheel bundles no libstdc++.
+- **`test_python_ver` action.** A fresh venv installs the wheel with pip and
+  runs the test suite (without `tests/audit` and `tests/benchmarks`). The `test-artifacts`
+  job runs it on 3.12 on a fresh runner per platform, the only suite run a pull request
+  gets; on pushes, tags, scheduled and manual runs each build job also runs it on 3.13,
+  3.14 and 3.15. Linux also checks that the wheel bundles no libstdc++. On macOS arm64,
+  `test-wheel-openmp` installs the wheel into the `wheel-openmp` pixi env and checks it
+  shares the environment's OpenMP runtime.
 
 ### Publishing
 
-`wheels.yml` runs on pull requests, on pushes to `main` and `dev*` branches, and on
-tags matching `X.Y.Z.W`. On a tag, the `publish` job (after every `test-wheel` row)
+`wheels.yml` runs on pull requests, on pushes to `main` and `dev*` branches, on
+tags matching `X.Y.Z.W` or `X.Y.Z.WrcN`, weekly on a schedule and on manual dispatch.
+On a tag, the `publish` job (after every build job, `test-artifacts` row and
+`test-wheel-openmp`)
 checks that every wheel's version equals the tag and uploads all platforms at once
 with PyPI trusted publishing from the `pypi` environment. The version is the tag:
 `SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND` is set from the tag

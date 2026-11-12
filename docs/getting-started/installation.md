@@ -111,7 +111,7 @@ pixi install
 | Stage | Source | Output |
 | ----- | ------ | ------ |
 | `sources` | `vcs import` of `dependencies.rosinstall` (tesseract, trajopt, tesseract_planning, descartes_light, opw_kinematics, ruckig, boost_plugin_loader) | `ws/src` |
-| `vcpkg` | the revision and packages in `scripts/native_stack.toml` (Eigen, Boost, OMPL, FCL, Bullet, PCL, OSQP, spdlog, ...) | `vcpkg/installed/<triplet>` |
+| `vcpkg` | the revision and packages in `scripts/native_stack.toml` (Eigen, Boost, OMPL, FCL, Bullet, PCL, spdlog, ...) | `vcpkg/installed/<triplet>` |
 | `colcon` | the sources against the vcpkg libraries | `ws/install` (`TESSERACT_CPP_PREFIX`) |
 
 To run any command against that stack, use `python scripts/native_stack.py exec -- <command>`.
@@ -147,7 +147,7 @@ Run within pixi: `pixi run python your_script.py` or enter `pixi shell` first.
 
 Pixi installs `llvm-openmp` from conda-forge. If you have Homebrew's libomp installed, library conflicts can cause crashes. The pixi environment isolates this, but running outside `pixi shell` may pick up the wrong library.
 
-The PyPI wheels carry their own `libomp.dylib`. In a plain venv (pip, uv) that is the only runtime, but inside a conda or pixi environment that has `llvm-openmp` it makes two: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. Install the wheel into a venv, or use the pixi environment's editable install. The mechanism is in [macOS Wheel Gotchas](../developer/macos-wheels.md).
+The PyPI wheels carry their own `libomp.dylib`. Up to 0.35.0.8, inside a conda or pixi environment that has `llvm-openmp` that made two runtimes: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2; install those wheels into a venv, or use the pixi environment's editable install. From 0.36.0.0rc1 the wheel looks for `libomp.dylib` in the environment's `lib/` first and loads its bundled copy only when the environment has none, so the process gets one runtime either way. The mechanism is in [macOS Wheel Gotchas](../developer/macos-wheels.md).
 
 ### Scattered segfaults / "double free or corruption"
 
