@@ -8,7 +8,8 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "tesseract-robotics-nanobind"
-description = "Tesseract robotics Python bindings (nanobind)"
+description = "Python bindings (nanobind) for Tesseract, the ROS-Industrial motion planning framework"
+keywords = ["robotics", "motion planning", "kinematics", "collision checking", "trajectory optimization", "tesseract", "trajopt", "ompl"]
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
@@ -31,10 +32,12 @@ authors = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Topic :: Scientific/Engineering",
-    "Operating System :: Unix",
-    "Operating System :: POSIX",
-    # "Operating System :: macOS",
-    # "Operating System :: Microsoft :: Windows",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Manufacturing",
+    # one per operating system wheels.yml publishes a wheel for
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python",
     # "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -43,12 +46,16 @@ classifiers = [
     "Programming Language :: Python :: 3.15",  # covered by the cp312-abi3 wheel
     "Programming Language :: C++",
     "Programming Language :: Python :: Implementation :: CPython",
+    "Typing :: Typed",  # py.typed and the committed .pyi stubs
 ]
 dynamic = ["version", "optional-dependencies"]
 
 [project.urls]
 Homepage = "https://github.com/tesseract-robotics/tesseract_nanobind"
 Repository = "https://github.com/tesseract-robotics/tesseract_nanobind"
+Documentation = "https://tesseract-robotics.github.io/tesseract_nanobind/"
+Changelog = "https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/CHANGELOG.md"
+Issues = "https://github.com/tesseract-robotics/tesseract_nanobind/issues"
 
 [project.scripts]
 tesseract_nanobind_selftest = "tesseract_robotics.selftest:main"
@@ -140,8 +147,8 @@ local_scheme = "no-local-version"
 CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
 
 # The PyPI wheels are built by .github/workflows/wheels.yml without conda: the tesseract C++
-# stack is built from source with colcon against vcpkg dependencies, and auditwheel /
-# delvewheel / delocate bundle it. The pixi envs below are for local development only.
+# stack is built from source with colcon against vcpkg dependencies, and auditwheel,
+# delvewheel and scripts/repair_macos_wheel.py bundle it. The pixi envs below are for local development only.
 
 [tool.ty.src]
 # Audit fixtures are deliberately broken stubs and sources (unbound names, bad overrides).

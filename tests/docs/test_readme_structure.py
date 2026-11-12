@@ -64,3 +64,13 @@ def test_docs_home_shows_the_readme_quick_start_verbatim():
     home = (ROOT / "docs" / "index.md").read_text("utf-8")
     quick_start = README.split("\n## Quick Start\n", 1)[1]
     assert _first_python_block(home) == _first_python_block(quick_start)
+
+
+# A markdown link or image target: `](target)`.
+LINK_TARGET = re.compile(r"\]\((?P<target>[^)\s]+)\)")
+
+
+def test_every_link_resolves_on_the_pypi_project_page():
+    """The wheel's README is the PyPI project page, where a repository-relative target is dead."""
+    relative = [t for t in LINK_TARGET.findall(README) if not t.startswith("https://")]
+    assert relative == []

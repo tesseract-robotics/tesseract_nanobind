@@ -12,17 +12,18 @@ Python bindings for [Tesseract](https://github.com/tesseract-robotics/tesseract)
 ROS-Industrial motion planning framework. Load a robot, check collisions, solve kinematics and
 plan collision-free trajectories from Python, without ROS.
 
-The bindings cover the Tesseract C++ libraries module by module: 
-- `environment` and `scene graph`,
-- `kinematics` (KDL, OPW, UR), `collision checking` (Bullet, FCL)
-- `OMPL` motion-planning, `TrajOpt-Ifopt`, `Descartes` and simple planners.
+The bindings cover the Tesseract C++ libraries module by module:
+
+- `environment` and `scene graph`
+- `kinematics` (KDL, OPW, UR) and `collision checking` (Bullet, FCL)
+- `OMPL`, `TrajOpt`, `TrajOpt-Ifopt`, `Descartes` and the simple planners
 - `time parameterization` (TOTG, ISP, constant TCP speed, Ruckig) and the `task composer`
 
-A Python layer adds a `planning API`, `constraints written in Python` for the
-online SQP solver (`trajopt_ifopt.python_constraints`)
-A browser viewer and controller program emitters (ABB `RAPID`, KUKA `KRL`, Fanuc `TP`, Yaskawa `INFORM`, Universal Robots `URScript`). 
+A Python layer adds a `planning API`, `constraints written in Python` for the online SQP solver
+(`trajopt_ifopt.python_constraints`), a browser viewer and controller program emitters (ABB
+`RAPID`, KUKA `KRL`, Fanuc `TP`, Yaskawa `INFORM`, Universal Robots `URScript`).
 
-Over 4,300 tests run against every wheel CI builds.
+CI runs over 4,300 tests against every wheel it builds.
 
 ## Installation
 
@@ -83,13 +84,13 @@ with TesseractViewer() as viewer:
 
 ## Documentation
 
-The [documentation](https://tesseract-robotics.github.io/tesseract_nanobind/) has the [concepts](https://tesseract-robotics.github.io/tesseract_nanobind/concepts/), [user guide](https://tesseract-robotics.github.io/tesseract_nanobind/user-guide/planning/), [API reference](https://tesseract-robotics.github.io/tesseract_nanobind/api/) and [breaking changes](https://tesseract-robotics.github.io/tesseract_nanobind/breaking-changes/); its sources are in [`docs/`](docs/).
+The [documentation](https://tesseract-robotics.github.io/tesseract_nanobind/) has the [concepts](https://tesseract-robotics.github.io/tesseract_nanobind/concepts/), [user guide](https://tesseract-robotics.github.io/tesseract_nanobind/user-guide/planning/), [API reference](https://tesseract-robotics.github.io/tesseract_nanobind/api/) and [breaking changes](https://tesseract-robotics.github.io/tesseract_nanobind/breaking-changes/); its sources are in [`docs/`](https://github.com/tesseract-robotics/tesseract_nanobind/tree/main/docs).
 
 ## Versioning
 
 Version follows `0.A.B.C`: `A.B` is the [Tesseract](https://github.com/tesseract-robotics/tesseract) series the bindings wrap and `C` is the nanobind patch number; a pre-release appends `rcN`. Releases up to `0.35.0.x` wrap a tagged Tesseract release. The `0.36` series builds tesseract, trajopt and tesseract_planning from upstream `master` plus the open upstream pull requests we carry (`tesseract_robotics.build_identity.UPSTREAM_SOURCES` lists the exact commits), until the 0.36 tags exist upstream.
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
+See [CHANGELOG.md](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/CHANGELOG.md) for release notes.
 
 ## Development
 
@@ -101,4 +102,4 @@ This project builds upon the excellent work of [John Wason](https://github.com/j
 
 ## License
 
-[Apache 2.0](LICENSE). Attribution notices are in [NOTICE](NOTICE).
+[Apache 2.0](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/LICENSE). Attribution notices are in [NOTICE](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/NOTICE).
