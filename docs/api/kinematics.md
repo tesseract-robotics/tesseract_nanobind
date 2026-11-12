@@ -173,7 +173,8 @@ out of bounds.
 import numpy as np
 from tesseract_robotics.common import Isometry3d
 from tesseract_robotics.kinematics import (
-    calcManipulability, checkKinematics, harmonizeTowardMedian, harmonizeTowardZero,
+    calcManipulability, calcManipulabilityVolume, calcManipulabilityVolume_each,
+    checkKinematics, harmonizeTowardMedian, harmonizeTowardZero,
     isNearSingularity, isValid, numericalJacobian,
 )
 
@@ -184,6 +185,8 @@ J_rel = numericalJacobian(group, q, "link_2", Isometry3d.Identity(), "tool0", Is
 J = group.calcJacobian(q, "tool0")
 manip = calcManipulability(J)        # 6-row jacobian; manip.m, .m_linear, .f, ...
 manip.m.eigen_values, manip.m.measure, manip.m.condition, manip.m.volume
+w = calcManipulabilityVolume(J)      # bitwise manip.m.volume, from one SVD instead of three
+ws = calcManipulabilityVolume_each(np.stack([J, J]))  # (M, 6, n) -> (M,), GIL released
 isNearSingularity(J)                 # smallest singular value < 0.01 (threshold=...)
 
 qs = np.array([3 * np.pi / 2, -3 * np.pi / 2, 5.0])
@@ -197,8 +200,9 @@ checkKinematics(env.getKinematicGroup("manipulator"))  # FK -> IK round trip, to
 | function | raises |
 | --- | --- |
 | `numericalJacobian` | `KeyError` for a link the solver or group does not have; `ValueError` when `joint_values` is not `numJoints()` long |
-| `calcManipulability` | `TypeError` for a jacobian without 6 rows |
-| `isNearSingularity` | `ValueError` for an empty matrix |
+| `calcManipulability`, `calcManipulabilityVolume` | `TypeError` for a jacobian without 6 rows; `EmptyJacobianError` for one without columns; `NonFiniteJacobianError` for a NaN or infinite entry |
+| `calcManipulabilityVolume_each` | `TypeError` for anything but an (M, 6, n) stack; `EmptyJacobianError` for n = 0; `NonFiniteJacobianError` naming the index of the jacobian with a NaN or infinite entry |
+| `isNearSingularity` | `EmptyJacobianError` for a matrix without rows or columns; `NonFiniteJacobianError` for a NaN or infinite entry |
 | `harmonizeTowardZero`, `harmonizeTowardMedian` | `IndexError` for an index outside `qs` (or `position_limits`), before any write; `TypeError` for a list, a tuple or an array that would need converting (`float32`, read-only) |
 | `isValid` | `TypeError` for anything but 6 values |
 
@@ -207,7 +211,12 @@ checkKinematics(env.getKinematicGroup("manipulator"))  # FK -> IK round trip, to
     (`sys.float_info.max`) when an ellipsoid's smallest eigenvalue is about zero.
     `checkKinematics` returns `True` when IK finds no solution at all: only a
     solution farther than `tol` from the FK pose makes it `False`.
-    `checkKinematics` releases the GIL while it runs.
+    `checkKinematics` and `calcManipulabilityVolume_each` release the GIL while they run.
+
+`EmptyJacobianError` and `NonFiniteJacobianError` are `ValueError`s. A non-finite jacobian is
+refused because its SVD reads rank 0, the answer for a singularity: volume 0.0, and
+`isNearSingularity` true. `calcManipulabilityVolume` and `calcManipulabilityVolume_each` have no
+C++ counterpart; they keep `calcManipulability`'s spelling because they return its `m.volume`.
 
 `solvePInv` and `dampedPInv` are not bound (use `np.linalg.pinv` / `lstsq`),
 nor is `getRedundantSolutionsHelper` (the recursion behind
