@@ -32,6 +32,11 @@ from .test_convex_hull import BOX_SIDES, _assert_box_hull
 CUBE_GAP_OFFSET = 3.0
 # Voxel count for the tests: a coarse grid keeps compute fast on two cubes.
 TEST_RESOLUTION = 10000
+# Voxel count for the GIL-release test: V-HACD's default. The main thread must wake from
+# Event.wait and take the GIL while compute runs; at TEST_RESOLUTION compute takes ~9 ms (M1),
+# which a loaded CI runner's thread wake-up can exceed (seen on macOS arm64 under xdist). At
+# 400k voxels compute takes ~0.1 s (M1), far above wake-up latency.
+GIL_TEST_RESOLUTION = 400000
 # s: GIL switch interval during the release probe; far longer than compute, so only an
 # explicit release lets the main thread run while compute is in progress.
 LONG_SWITCH_INTERVAL = 100.0
@@ -161,7 +166,9 @@ def test_compute_releases_gil():
     worker inside compute if compute drops the GIL. A compute too fast to observe fails, never
     passes vacuously."""
     vertices, faces = _two_cubes()
-    decomposition = ConvexDecompositionVHACD(_params())
+    params = _params()
+    params.resolution = GIL_TEST_RESOLUTION
+    decomposition = ConvexDecompositionVHACD(params)
     started = threading.Event()
     state = {"in_compute": False, "hulls": None}
 
