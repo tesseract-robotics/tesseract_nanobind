@@ -5,9 +5,11 @@ tesseract_planning ahead of the next release (0.36), so the bindings catch up
 while upstream moves rather than after it tags. See issue #141.
 
 !!! note "History"
-    This page records the 0.36 catch-up. The feedstock builds, the `packaged` and `upstream` pixi
-    envs and `scripts/build_upstream.sh` were replaced by one native build shared with CI, see
-    [The native stack build](native-stack.md); commands below that name them no longer exist.
+    This page records the 0.36 catch-up. The dev-label conda pins in `[tool.pixi.dependencies]`,
+    the feedstock builds, the `packaged` and `upstream` pixi envs and `scripts/build_upstream.sh`
+    were replaced by one native build shared with CI, see
+    [The native stack build](native-stack.md); statements below about them describe that earlier
+    state, and commands below that name them no longer exist.
 
 ## Status
 
@@ -97,7 +99,7 @@ converts ids with `.name()` at its boundary
   includes every planner's header and the module links the planners, which makes
   all three the same; a registration in a planner's own binding module would not
   reach this module on Windows, where the registry is per DLL.
-- **Implicit id conversions are invisible to stubgen.** `scripts/generate_stubs.sh`
+- **Implicit id conversions are invisible to stubgen.** `scripts/generate_stubs.py`
   runs `scripts/widen_implicit_id_stubs.py`, which widens parameter-position
   `LinkId` / `JointId` to `| str` and `LinkIdPair` to `| tuple[str, str]`. A mapping
   parameter becomes `Mapping[LinkId, V] | Mapping[str, V]` (keys are invariant). Returned

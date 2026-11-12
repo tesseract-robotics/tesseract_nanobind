@@ -57,8 +57,8 @@ pixi task list
 | `fmt` | Format | ruff format |
 | `stubs` | Regenerate stubs | the committed `.pyi` stubs; see [Stub Generation](#stub-generation) |
 | `stubs-check` | Check stubs | fails if committed stubs differ from the built modules |
-| `docs` | Live docs | mkdocs serve with auto-reload |
-| `docs-build` | Build docs | Static site to `site/` |
+| `docs` (`-e docs`) | Live docs | `zensical serve` with auto-reload |
+| `docs-build` (`-e docs`) | Build docs | Static site to `site/` (`zensical build --strict`) |
 | `demo-record`, `demo-posters`, `demo-check` | Demo recordings | see [Demo Recordings](#demo-recordings) |
 | `demo-players`, `demo-fetch`, `demo-check-site` (`-e docs`) | Demo files in the docs | see [Demo Recordings](#demo-recordings) |
 | `docs-dotgraphs` | Pipeline graphs | regenerates the pipeline DOT graph SVGs (requires graphviz) |
@@ -147,13 +147,14 @@ Running `pixi run test` reinstalls the bindings first, since it depends on `inst
 
 ### Environments
 
-The default environment is for local development; `py312` is the one CI builds wheels in:
+The default environment is for local development; `py312` runs the suite on the 3.12 floor
+(CI builds the wheels without pixi, see [binaries](binaries.md#building-a-wheel)):
 
 ```bash
 # Default environment (Python from pixi.lock)
 pixi run test
 
-# The wheel build environment
+# The Python 3.12 environment
 pixi run -e py312 test
 ```
 
@@ -162,7 +163,7 @@ Environments defined in `pyproject.toml`:
 | Environment | Python | Usage |
 |-------------|--------|-------|
 | `default` | from lockfile | Local development |
-| `py312` | 3.12.x | CI wheels (abi3) |
+| `py312` | 3.12.x | Suite on the 3.12 floor |
 | `py315` | 3.15.x | Suite on the newest Python |
 
 [How the binaries are built](binaries.md#pixi-environments) lists where each environment gets its C++.
@@ -282,7 +283,7 @@ graph LR
     root --> cfg["pyproject.toml, pixi.lock, CMakeLists.txt"]
     root --> src["src/"]
     root --> tests["tests/"]
-    root --> scripts["scripts/ (stubs, GIL audit, upstream build)"]
+    root --> scripts["scripts/ (stubs, GIL audit, native stack build)"]
     root --> up["upstream/ (tesseract, trajopt, tesseract_planning submodules)"]
     root --> pk["packaging/ (the support-data wheel)"]
     src --> pkg["tesseract_robotics/ (Python package, .pyi stubs, direct-install modules land here)"]
@@ -402,7 +403,7 @@ pixi run demo-check --preview         # drive every player in Chrome
 
 To add a demo: give it a camera in the manifest and a builder in `scripts/demos/scenes.py`, record it, capture its poster, and add `--8<-- "docs/demos/players/MODULE.html"` under its heading on its page. After review, set `status = "published"` and delete `reason`.
 
-**Hosting.** Recordings stay out of git, since each re-record would add its full size to history. The `demo-assets` release holds each file named by its SHA-256, and `scripts/demos/demos.lock.json` pins the hashes, so a re-record adds assets and older commits still build. To publish: `pixi run demo-fetch --stage DIR`, `gh release upload demo-assets DIR/* --clobber`, which is safe because the names are hashes. The tag has no digits on purpose: the wheel workflows and `setuptools_scm` act only on numeric tags. Upload before pushing, or the Docs workflow fails at its fetch step. Pages serves its own copies, which the build places in the site; nothing links to the release.
+**Hosting.** Recordings stay out of git, since each re-record would add its full size to history. The `demo-assets` release holds each file named by its SHA-256, and `scripts/demos/demos.lock.json` pins the hashes, so a re-record adds assets and older commits still build. To publish: `pixi run demo-fetch --stage DIR`, `gh release upload demo-assets DIR/* --clobber`, which is safe because the names are hashes. The tag has no digits on purpose: the wheel workflow and `setuptools_scm` act only on numeric tags. Upload before pushing, or the Docs workflow fails at its fetch step. Pages serves its own copies, which the build places in the site; nothing links to the release.
 
 Things that are not obvious:
 

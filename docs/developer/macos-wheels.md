@@ -12,8 +12,8 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
 
 ## upload-artifact times out ~1/3 of the time on arm64 runners
 
-!!! danger "`actions/upload-artifact@v4` `CreateArtifact: Request timeout` is a known, unfixed arm64-runner bug"
-    On `macos-14` (and any arm64 macOS runner) the `archive wheel` step fails
+!!! danger "`actions/upload-artifact` `CreateArtifact: Request timeout` is a known, unfixed arm64-runner bug"
+    Up to 0.35.0.x, on `macos-14` (and any arm64 macOS runner), `actions/upload-artifact@v4`'s `archive wheel` step failed
     roughly **one upload in three** with
     `Failed to CreateArtifact: Failed to make request after 5 attempts: Request timeout`.
     The wheel built fine — the failure is purely the upload handshake to GitHub's
@@ -24,11 +24,13 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     internal retries exhaust within the same bad network window, so they don't
     help — a *fresh outer re-invocation* usually succeeds.
 
-    Why it fragments releases: `publish` has `needs: [build]`, so **one** failed
-    upload marks the whole `build` matrix failed and the entire macOS publish is
-    skipped — zero macOS wheels for that release. At ~1/3 per job across 4 Python
-    builds, P(all 4 upload) = (2/3)⁴ ≈ **20%**, so ~80% of macOS releases would
-    otherwise need a manual job re-run.
+    Why it fragmented releases: in the 0.35 per-platform macOS workflow `publish` had
+    `needs: [build]`, so **one** failed upload marked the whole `build` matrix failed
+    and the entire macOS publish was skipped — zero macOS wheels for that release. At
+    ~1/3 per job across 4 Python builds, P(all 4 upload) = (2/3)⁴ ≈ **20%**, so ~80% of
+    macOS releases would otherwise have needed a manual job re-run. In the current
+    single `wheels.yml`, `publish` needs every build job, so a failed macOS upload
+    blocks the release on every platform.
 
     Fix (`wheels.yml`): retry the `archive wheels` step up to 3× with
     `overwrite: true` on the retries (clears any half-created artifact). The
@@ -37,17 +39,18 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
 
 ## The runner label is an architecture, not just an OS version
 
-!!! warning "Lowering `runs-on: macos-14` silently flips the wheel from arm64 to x86_64"
+!!! warning "Lowering `runs-on: macos-15` silently flips the wheel from arm64 to x86_64"
     GitHub's macOS runner labels split by **architecture**, not just OS age:
 
     | label | arch | notes |
     |---|---|---|
     | `macos-12` | Intel x86_64 | removed Dec 2024 |
     | `macos-13` | Intel x86_64 | deprecation path |
-    | `macos-14` | **arm64** | what we build on |
-    | `macos-15` | arm64 | newer; raises min-OS tag to 15 |
+    | `macos-14` | **arm64** | what we built on up to 0.35.0.x |
+    | `macos-15` | **arm64** | what we build arm64 on |
+    | `macos-15-intel` | Intel x86_64 | what we build x86_64 on (schedule, tags, manual runs) |
 
-    We ship `macosx_14_0_arm64`. "Lowering the macOS version" to `macos-13`/`-12`
+    We ship `macosx_15_0_arm64` (up to 0.35.0.x, `macosx_14_0_arm64`). "Lowering the macOS version" to `macos-13`/`-12`
     to dodge a runner problem (e.g. the upload flakiness above) does **not** keep
     the same wheel — it switches the build to **x86_64**, orphaning every
     Apple-Silicon user. And it wouldn't even help: the upload bug reproduces on
@@ -58,49 +61,55 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     **`MACOSX_DEPLOYMENT_TARGET`** (a build-env var, independent of the runner) —
     it sets the wheel's *minimum* macOS (`macosx_13_0_arm64`, …) for broader
     install compatibility without touching the runner or the architecture. Use
-    that, not the runner label.
+    that, not the runner label. It only lowers the tag as far as every bundled
+    library allows: the repair takes the highest minimum OS of the native closure,
+    and the current Homebrew `libomp` holds it at 15.0 (see below).
 
 ## STABLE_ABI: the wheel under test is not the Python under test
 
-!!! note "3.13/3.14 are verified by installing the `cp312-abi3` wheel, not by building a 3.13/3.14 wheel"
+!!! note "3.13–3.15 are verified by installing the `cp312-abi3` wheel, not by building a 3.13–3.15 wheel"
     nanobind's `STABLE_ABI` build emits a single `cp312-abi3` wheel that pip
-    installs on CPython 3.12, 3.13, 3.14+ — on every platform. So 3.13/3.14
-    *support* is real on macOS and Windows even though no 3.13/3.14 wheel is
-    built. To **verify** it in CI, the `test-wheel` matrix decouples the test
-    interpreter from the wheel artifact with a `wheel` field:
+    installs on CPython 3.12, 3.13, 3.14+ — on every platform. So 3.13–3.15
+    *support* is real on macOS and Windows even though no 3.13–3.15 wheel is
+    built. To **verify** it in CI, each build job installs the wheel it just built
+    into a fresh venv per interpreter through the `test_python_ver` action
+    (`.github/actions/test_python_ver`), once per Python:
 
     ```yaml
-    include:
-      - { python: '3.13', wheel: '3.12' }
-      - { python: '3.14', wheel: '3.12' }
+    - name: test Python 3.13
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.13"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
     ```
 
-    The download step then pulls `python-${{ matrix.wheel }}-macos-arm64` (the
-    `cp312-abi3` artifact) and installs it on a 3.13/3.14 interpreter. Every leg
+    The build jobs run it for 3.13, 3.14 and 3.15 on pushes, tags and scheduled
+    runs, and `test-artifacts` runs it for 3.12 on a fresh runner, the only suite
+    run a pull request gets. Every leg
     blocks. Before PR #98 only Linux did this; macOS and
     Windows tested 3.9 + 3.12 only, leaving the cross-platform abi3 claim
     *asserted* but not *verified*. Now all three platforms verify it.
 
 ## Sharing OpenMP with conda and pixi consumers
 
-`delocate-wheel` bundles all dependencies. After delocation,
-`scripts/configure_wheel_openmp.py` changes only OpenMP load commands to
+`scripts/repair_macos_wheel.py` bundles all dependencies into `.dylibs/` and
+leaves OpenMP to the dynamic linker: OpenMP load commands become
 `@rpath/libomp.dylib`, with the installed Python environment's `lib/` first,
-then the bundled `.dylibs/` directory. Changed Mach-O images are re-signed;
-`wheel pack` regenerates the wheel's required RECORD metadata.
+then the bundled `.dylibs/` directory. Changed Mach-O images are re-signed, and
+the script rewrites the wheel's RECORD metadata.
 
 `scripts/check_wheel_openmp.py` checks both import orders and the actual dyld
 image paths. Plain consumers must load exactly one bundled runtime; the
 `test-wheel-openmp` CI job must load exactly the environment runtime and pass
 Descartes planning tests. Both this job and fresh-runner artifact tests gate
-publishing. This does not restore the old general-purpose repair script or
-its plugin/YAML rewrites.
+publishing. In the `--lib-dir` mode the wheel workflow uses, the repair leaves
+the plugin YAML unchanged.
 
 The current Homebrew runtime raises both architectures' minimum macOS to
 15.0. A lower deployment target on the bindings cannot lower this requirement.
 
 !!! note "Why the bundled-only wheel fails under conda (#136)"
-    Wheels up to 0.35.0.9 were also repaired by `delocate-wheel`, which bundled `libomp` and
+    Wheels up to 0.35.0.8 were repaired by `delocate-wheel`, which bundled `libomp` and
     pointed everything at that copy.
 
     Install that wheel into a conda or pixi environment and the process gets

@@ -29,6 +29,12 @@ real cause.
     `__declspec(dllexport)` and `CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS`. Those
     aren't the bug.
 
+    This applied up to 0.35.0.x, when the pipeline copied the plugin DLLs into
+    the package. The collision, kinematics and task composer modules now link
+    the factory DLLs (see [binaries](binaries.md#plugin-anchors)), so
+    `delvewheel repair` reaches them through the `.pyd` import tables and
+    `wheels.yml` runs it without `--analyze-existing`.
+
 ## Runtime DLL search path
 
 !!! warning "`os.add_dll_directory` does not cover plain `LoadLibrary` from C++"
@@ -42,9 +48,12 @@ real cause.
     itself — which is exactly what `boost::dll::shared_library` does, and
     therefore what `boost_plugin_loader` does — that C++ call uses the
     **legacy** Windows DLL search order, which respects `PATH` but ignores
-    `add_dll_directory`. The fix is to prepend the package dir and
-    `<project-name>.libs/` to `PATH` in `__init__.py` before any submodule
-    import. See `src/tesseract_robotics/__init__.py` for the canonical block.
+    `add_dll_directory`. Up to 0.35.0.x the fix was to prepend the package dir
+    and `<project-name>.libs/` to `PATH` in `__init__.py` before any submodule
+    import. That block is gone: the plugin anchors make boost_plugin_loader open
+    each linked factory DLL by its resolved path (see
+    [binaries](binaries.md#plugin-anchors)), and importing `tesseract_robotics`
+    no longer changes `PATH`.
 
     Note the directory naming asymmetry that bites here: delvewheel uses the
     project's *metadata* name (`tesseract-robotics-nanobind`) for the libs
