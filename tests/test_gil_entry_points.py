@@ -1,8 +1,8 @@
 """The GIL releases added for #124 (scripts/nogil_entry_points.yaml).
 
 scripts/audit_gil.py checks statically that every listed binding releases the GIL; these tests
-check it at run time for the entry points #124 added, and that each still returns the right
-result with the GIL released.
+check it at run time for the entry points #124 added and for `calcManipulabilityVolume_each`,
+and that each still returns the right result with the GIL released.
 
 The oracle: with a switch interval far above the test's run time, the main thread can only run
 while the worker is still busy if the worker drops the GIL. The worker repeats the call until the

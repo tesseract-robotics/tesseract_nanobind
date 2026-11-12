@@ -213,10 +213,65 @@ checkKinematics(env.getKinematicGroup("manipulator"))  # FK -> IK round trip, to
     solution farther than `tol` from the FK pose makes it `False`.
     `checkKinematics` and `calcManipulabilityVolume_each` release the GIL while they run.
 
-`EmptyJacobianError` and `NonFiniteJacobianError` are `ValueError`s. A non-finite jacobian is
-refused because its SVD reads rank 0, the answer for a singularity: volume 0.0, and
-`isNearSingularity` true. `calcManipulabilityVolume` and `calcManipulabilityVolume_each` have no
-C++ counterpart; they keep `calcManipulability`'s spelling because they return its `m.volume`.
+### Manipulability
+
+Yoshikawa's manipulability of a 6 × n jacobian $J$ is the volume of its velocity ellipsoid, the
+product of its singular values $\sigma_i$:
+
+$$
+w(J) = \sqrt{\det\left(J J^{\mathsf T}\right)} = \prod_{i=1}^{6} \sigma_i
+$$
+
+It is 0 at a singularity, and for every jacobian with fewer than 6 columns. The rows of $J$ mix
+m/rad (linear, rows 0–2) and rad/rad (angular, rows 3–5), so $w$ depends on the length unit:
+compare it between configurations of one robot, not between robots.
+
+| call | returns | cost |
+| --- | --- | --- |
+| `calcManipulability(J)` | `Manipulability`: the velocity ellipsoids `m`, `m_linear`, `m_angular` and the force ellipsoids `f`, `f_linear`, `f_angular`, each with `eigen_values`, `measure`, `condition` and `volume` | three SVDs: $J$, its linear rows and its angular rows |
+| `calcManipulabilityVolume(J)` | `float`, the same bits as `calcManipulability(J).m.volume` | one SVD |
+| `calcManipulabilityVolume_each(Js)` | `(M,)` array for an `(M, 6, n)` stack; row `i` is the same bits as `calcManipulabilityVolume(Js[i])` | one SVD per jacobian, with the GIL released |
+
+All three follow tesseract's rule (tesseract#1396). $w$ is the product of the singular values,
+multiplied in increasing order, when $J$ has full numerical row rank, and exactly `0.0` below
+it. A singular value counts as zero when $\sigma_i \le \min(6, n)\,\varepsilon\,\sigma_{\max}$
+(Eigen's `JacobiSVD` rank threshold, $\varepsilon$ = 2.2e-16). The values come from the SVD of
+$J$, not from $J J^{\mathsf T}$, which would square the condition number and lose every singular
+value below $\sqrt{\varepsilon}\,\sigma_{\max}$.
+
+```python
+from tesseract_robotics.kinematics import NonFiniteJacobianError
+
+Js = np.stack([J, 2.0 * J])
+ws = calcManipulabilityVolume_each(Js)               # C-contiguous float64 is read in place
+assert ws[0] == calcManipulabilityVolume(J) == calcManipulability(J).m.volume
+
+bad = J.copy()
+bad[2, 3] = np.nan
+try:
+    calcManipulabilityVolume_each(np.stack([J, bad]))
+except NonFiniteJacobianError as error:              # a ValueError
+    assert "jacobian 1 is not finite (entry [2, 3] = nan)" in str(error)
+```
+
+`EmptyJacobianError` and `NonFiniteJacobianError` are `ValueError`s. A jacobian with a NaN or
+infinite entry is refused because its SVD reads rank 0, which is the answer for a singularity:
+volume `0.0`, and `isNearSingularity` true. A blown-up forward-kinematics chain would
+otherwise read as a wrist singularity.
+
+`calcManipulabilityVolume` and `calcManipulabilityVolume_each` are the bindings' own; tesseract
+has no such function. They keep `calcManipulability`'s spelling because they return part of its
+result ([binding conventions](../developer/binding-conventions.md#names), rule 4).
+
+| claim | checked by |
+| --- | --- |
+| same bits as `calcManipulability(J).m.volume`, for n = 5, 6, 7 | `test_calc_manipulability_volume_is_the_full_calls_volume_bitwise`, `test_calc_manipulability_volume_each_row_is_the_per_jacobian_call_bitwise` |
+| same bits across the rank threshold, $\sigma_{\min}/\sigma_{\max}$ from 1e-1 to 1e-20 | `test_calc_manipulability_volume_is_the_full_calls_volume_across_the_rank_threshold` |
+| a near-singular $J$ ($\sigma_{\min}$ = 1e-6) reads $\prod \sigma_i$, not 0 | `test_calc_manipulability_volume_near_singular_is_singular_value_product` |
+| the GIL is released | `test_calc_manipulability_volume_each_releases_gil` |
+
+The tests are in `tests/tesseract_kinematics/test_kinematics_utils.py` and
+`tests/test_gil_entry_points.py`. No timing is claimed: none has been measured on this build.
 
 `solvePInv` and `dampedPInv` are not bound (use `np.linalg.pinv` / `lstsq`),
 nor is `getRedundantSolutionsHelper` (the recursion behind

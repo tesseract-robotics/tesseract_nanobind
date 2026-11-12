@@ -279,14 +279,36 @@ tcp_velocity = jacobian @ joint_velocities  # 6D twist [vx, vy, vz, wx, wy, wz]
 
 ### Singularity detection
 
-```python
-def manipulability(jacobian: np.ndarray) -> float:
-    """Yoshikawa manipulability index."""
-    return float(np.sqrt(np.linalg.det(jacobian @ jacobian.T)))
+Two measures, both from the singular values σ of the Jacobian:
 
-def is_near_singularity(jacobian: np.ndarray, threshold: float = 0.01) -> bool:
-    return manipulability(jacobian) < threshold
+```python
+from tesseract_robotics.kinematics import (
+    calcManipulability, calcManipulabilityVolume, calcManipulabilityVolume_each,
+    isNearSingularity,
+)
+
+near = isNearSingularity(jacobian)             # smallest σ < 0.01 (threshold=...)
+w = calcManipulabilityVolume(jacobian)         # Yoshikawa manipulability: the product of all six σ
+ellipsoids = calcManipulability(jacobian)      # the velocity and force ellipsoids, whole, linear and angular
+assert w == ellipsoids.m.volume
+
+# Along a path: one call for the (M, 6, n) stack, with the GIL released
+waypoints = np.linspace(joints, joints + 0.2, 5)
+volumes = calcManipulabilityVolume_each(
+    np.stack([manip.calcJacobian(q, "tool0") for q in waypoints])
+)
 ```
+
+`isNearSingularity` answers "is one direction of motion nearly lost?"; the manipulability
+falls smoothly towards 0 as a singularity approaches, which makes it the one to plot along a
+path or to bound in an optimization. Its value depends on the robot and the length unit, so
+compare it between configurations of one robot.
+
+Use these instead of `np.sqrt(np.linalg.det(J @ J.T))`: forming J·Jᵀ squares the condition
+number, so a singular value below about 1.5e-8 of the largest (√ε) is lost in rounding and a
+near-singular configuration cannot be told from a singular one. A Jacobian with a NaN or infinite entry raises
+`NonFiniteJacobianError` instead of reading as a singularity. The definitions, the rank rule and
+the errors are in the [API reference](../api/kinematics.md#manipulability).
 
 ## Tool frames
 

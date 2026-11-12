@@ -179,7 +179,8 @@ re-ranks a recording, for instance after the list changed.
 
 - `tests/audit/test_audit_gil.py`: the audit's contract, on a fixture TU with one binding per
   release form and per non-release that must not count.
-- `tests/test_gil_entry_points.py`: run-time checks of the releases #124 added. The oracle sets a
+- `tests/test_gil_entry_points.py`: run-time checks of the releases #124 added and of
+  `calcManipulabilityVolume_each`. The oracle sets a
   switch interval far above the test's run time, so the main thread can only run while a worker
   is inside the call if the call dropped the GIL. The worker repeats the call until the main
   thread has run, so a fast call is still caught. A call that holds the GIL fails

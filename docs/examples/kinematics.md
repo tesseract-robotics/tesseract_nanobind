@@ -137,6 +137,9 @@ the rank drops to 5. The example checks the columns, the rank and σ_min against
 `isNearSingularity`'s default threshold 0.01 (`utils.h:129`), not only the flag.
 At a singular configuration the ellipsoid's `measure` and `condition` are
 `sys.float_info.max` and its `volume` is 0, as upstream.
+`calcManipulabilityVolume` returns that `m.volume` alone, from one decomposition
+instead of three, and `calcManipulabilityVolume_each` returns it for both
+jacobians as one (2, 6, 7) stack; the test checks the values are the same bits.
 
 ```python title="kinematics_analysis_example.py"
 --8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:singularity"

@@ -18,8 +18,8 @@ C++ Reference:
    `change_base`.
 2. `twistChangeBase` / `twistChangeRefPoint` on J·q̇ equal the same change
    applied to J, then multiplied by q̇ (a linear identity).
-3. `calcManipulability` and `isNearSingularity` at upstream's q and at q = 0,
-   where the IIWA is singular.
+3. `calcManipulability`, `calcManipulabilityVolume(_each)` and `isNearSingularity`
+   at upstream's q and at q = 0, where the IIWA is singular.
 4. `harmonizeTowardZero` / `harmonizeTowardMedian` undo a 2π shift.
 5. `isValid`, `checkKinematics`.
 6. `KinematicLimits` (`resize`, `jerk_limits`), `isWithinLimits`, `enforceLimits`.
@@ -70,6 +70,8 @@ from tesseract_robotics.kinematics import (
     Manipulability,
     ManipulabilityEllipsoid,
     calcManipulability,
+    calcManipulabilityVolume,
+    calcManipulabilityVolume_each,
     checkKinematics,
     harmonizeTowardMedian,
     harmonizeTowardZero,
@@ -353,6 +355,16 @@ def run() -> dict[str, Any]:
         )
         if name == "upstream":
             manipulability["repr"] = repr(manip)
+    # The volume alone, without the six ellipsoids: the same bits as manip.m.volume, for one
+    # jacobian or for a (M, 6, n) stack of them
+    jacobians = np.stack(
+        [fwd_kin.calcJacobian(q, TIP_LINK) for q in (Q, np.zeros(len(JOINT_NAMES)))]
+    )
+    manipulability["volume"] = {
+        "upstream": calcManipulabilityVolume(jacobians[0]),
+        "zero": calcManipulabilityVolume(jacobians[1]),
+        "each": calcManipulabilityVolume_each(jacobians).tolist(),
+    }
     # --8<-- [end:singularity]
     manipulability["default_repr"] = (repr(Manipulability()), repr(ManipulabilityEllipsoid()))
 
@@ -518,6 +530,7 @@ def main() -> None:
     print(
         f"At q = 0: m.measure = m.condition = {singular['measure']:.3e} (float max), m.volume = {singular['volume']}"
     )
+    print(f"calcManipulabilityVolume_each at upstream q and q = 0: {manip['volume']['each']}")
     harmonize = result["harmonize"]
     print(
         f"Harmonize q + 2π: toward zero off by {harmonize['toward_zero']:.1e}, "
