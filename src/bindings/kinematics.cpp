@@ -622,8 +622,13 @@ NB_MODULE(kinematics, m) {
         require_finite(jacobian, "calcManipulabilityVolume", "the jacobian");
         return svd_volume(Eigen::JacobiSVD<Eigen::MatrixXd>(jacobian));
     }, "jacobian"_a,
-    "Yoshikawa manipulability of a 6-row jacobian: bitwise calcManipulability(jacobian).m.volume,\n"
-    "from one SVD instead of three and no ellipsoids.\n\n"
+    "Yoshikawa manipulability of a 6-row jacobian: the product of its singular values.\n\n"
+    "Bitwise calcManipulability(jacobian).m.volume, from one SVD instead of three and without the\n"
+    "six ellipsoids. Exactly 0.0 below full numerical row rank, so for every n < 6.\n\n"
+    "Args:\n"
+    "    jacobian: (6, n) jacobian, linear rows 0-2 over angular rows 3-5.\n\n"
+    "Returns:\n"
+    "    The volume of the velocity ellipsoid. Its unit mixes m/rad and rad/rad.\n\n"
     "Raises:\n"
     "    EmptyJacobianError: jacobian has no columns.\n"
     "    NonFiniteJacobianError: jacobian has a NaN or infinite entry.");
@@ -646,8 +651,13 @@ NB_MODULE(kinematics, m) {
         }
         return volumes;
     }, "jacobians"_a, nb::call_guard<nb::gil_scoped_release>(),
-    "Yoshikawa manipulability of each jacobian of an (M, 6, n) stack, (M,); row i is bitwise\n"
-    "calcManipulability(jacobians[i]).m.volume. Releases the GIL.\n\n"
+    "Yoshikawa manipulability of each jacobian of a stack.\n\n"
+    "Row i is bitwise calcManipulabilityVolume(jacobians[i]). Releases the GIL.\n\n"
+    "Args:\n"
+    "    jacobians: (M, 6, n) stack. A C-contiguous float64 array is read in place; any other\n"
+    "        layout or dtype is converted first.\n\n"
+    "Returns:\n"
+    "    The (M,) volumes.\n\n"
     "Raises:\n"
     "    EmptyJacobianError: n is 0.\n"
     "    NonFiniteJacobianError: a jacobian has a NaN or infinite entry; the message names its index.");

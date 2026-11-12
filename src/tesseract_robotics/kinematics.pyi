@@ -392,8 +392,16 @@ def calcManipulability(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6
 
 def calcManipulabilityVolume(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6, None), writable=False)] | Sequence[Sequence[float]]) -> float:
     """
-    Yoshikawa manipulability of a 6-row jacobian: bitwise calcManipulability(jacobian).m.volume,
-    from one SVD instead of three and no ellipsoids.
+    Yoshikawa manipulability of a 6-row jacobian: the product of its singular values.
+
+    Bitwise calcManipulability(jacobian).m.volume, from one SVD instead of three and without the
+    six ellipsoids. Exactly 0.0 below full numerical row rank, so for every n < 6.
+
+    Args:
+        jacobian: (6, n) jacobian, linear rows 0-2 over angular rows 3-5.
+
+    Returns:
+        The volume of the velocity ellipsoid. Its unit mixes m/rad and rad/rad.
 
     Raises:
         EmptyJacobianError: jacobian has no columns.
@@ -402,8 +410,16 @@ def calcManipulabilityVolume(jacobian: Annotated[NDArray[numpy.float64], dict(sh
 
 def calcManipulabilityVolume_each(jacobians: Annotated[NDArray[numpy.float64], dict(shape=(None, 6, None), order='C', writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
     """
-    Yoshikawa manipulability of each jacobian of an (M, 6, n) stack, (M,); row i is bitwise
-    calcManipulability(jacobians[i]).m.volume. Releases the GIL.
+    Yoshikawa manipulability of each jacobian of a stack.
+
+    Row i is bitwise calcManipulabilityVolume(jacobians[i]). Releases the GIL.
+
+    Args:
+        jacobians: (M, 6, n) stack. A C-contiguous float64 array is read in place; any other
+            layout or dtype is converted first.
+
+    Returns:
+        The (M,) volumes.
 
     Raises:
         EmptyJacobianError: n is 0.

@@ -147,6 +147,11 @@ def test_kinematics_analysis_example():
     assert singular["min_eigen_value"] == 0.0
     assert singular["measure"] == singular["condition"] == sys.float_info.max
     assert singular["volume"] == 0.0
+    # calcManipulabilityVolume(_each) return m.volume itself, at the regular and the singular q
+    volumes = result["manipulability"]["volume"]
+    assert volumes["upstream"] == result["manipulability"]["upstream"]["m"]["volume"] > 0.0
+    assert volumes["zero"] == 0.0
+    assert volumes["each"] == [volumes["upstream"], volumes["zero"]]
     assert result["manipulability"]["repr"].startswith("Manipulability(m=ManipulabilityEllipsoid(")
     default_manip, default_ellipsoid = result["manipulability"]["default_repr"]
     assert default_manip.startswith("Manipulability(m=ManipulabilityEllipsoid(")

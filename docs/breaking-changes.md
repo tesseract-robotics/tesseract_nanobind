@@ -108,7 +108,7 @@ migration with before/after examples, and [0.33 → 0.35](changes.md) the earlie
 | 0.36.0 | Missing ids raise `KeyError`; `as*Instruction()` return views and a wrong cast raises `PolyTypeError`; `applyCommand` is one overload | [Errors and views](#environment-and-poly-lookups-raise-and-casts-are-views) |
 | 0.36.0 | `Isometry3d(matrix)` takes rotations only (`NotRotationError`); a zero quaternion or axis raises `DegenerateRotationError`; `Hyperplane3d.Through` follows Eigen | [Geometry inputs](#geometry-inputs-are-validated) |
 | 0.36.0 | `serialization.*_to_file` return `None` and raise `OSError`; binary archives are `bytes`; `urdf.writeURDFFile` returns the path and raises `URDFWriteError` | [Files and bytes](#serialization-and-urdf-writes-raise-and-bytes-are-bytes) |
-| 0.36.0 | A plugin-factory config path the locator cannot resolve raises `FileNotFoundError`; `trajopt_ifopt` is a package; Python constraint and Descartes profile errors are named; a non-finite jacobian raises `NonFiniteJacobianError` | [Named errors](#named-errors-in-the-bindings) |
+| 0.36.0 | A plugin-factory config path the locator cannot resolve raises `FileNotFoundError`; `trajopt_ifopt` is a package; Python constraint and Descartes profile errors are named | [Named errors](#named-errors-in-the-bindings) |
 | 0.36.0 | `Robot.ik` raises `IKNoSolutionError`; `Robot` mutators return `None` and raise `EnvironmentCommandError`; planning failures are named exceptions | [Planning errors](#the-planning-api-raises-instead-of-returning-flags) |
 | 0.36.0 | `MotionProgram.start_at`, `create_descartes_pipeline_profiles`, `TRAJOPT_PROFILE_NAMES`, `CartesianTarget(position=, quaternion=)`, `TaskComposer(config_path=)` removed; `_create_trajopt_profiles` is `create_trajopt_profile_pair` | [Planning names](#planning-names-removed-or-renamed) |
 | 0.36.0 | `TaskComposer.plan` raises for programming and configuration errors; `plan_ompl` defaults to `FreespacePipeline`; a pipeline without default profiles raises `NoDefaultProfilesError` | [Plan errors](#taskcomposerplan-raises-and-plan_ompl-uses-freespacepipeline) |
@@ -1121,8 +1121,6 @@ Files are written and read exactly at `path` (`str` or `os.PathLike`, no suffix 
 | `CartAxis` constraint with a zero axis: `RuntimeError` | `DegenerateAxisError` (a `ValueError`) |
 | `python_constraints`: bare `ValueError` | `BoundsShapeError`, `InvertedBoundsError`, `ClearanceMarginError` |
 | a Descartes Python profile whose `create*` returns the wrong type: `AttributeError` on a worker | `ProfileReturnTypeError` (a `TypeError`) at creation |
-| `calcManipulability` on a jacobian with a NaN or infinite entry: volume 0.0; `isNearSingularity`: `True` | `NonFiniteJacobianError` (a `ValueError`) |
-| `calcManipulability` on a jacobian without columns: a crash; `isNearSingularity` on an empty matrix: bare `ValueError` | `EmptyJacobianError` (a `ValueError`) |
 | `ContactResultVector[-1]` | works |
 | `ContactResultMap.filter` passed a reference | passes a copy, copied back into the map |
 | `OSQPEigenSolver` without `setAdaptiveRhoInterval` or getters | both OSQP classes have `set*` / `get*` for every setting |
