@@ -39,8 +39,10 @@
 #include <tesseract/kinematics/opw/opw_factory.h>
 #include <tesseract/kinematics/ur/ur_factory.h>
 #include <boost_plugin_loader/utils.h>
+#include <Eigen/SVD>
 #include <filesystem>
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <yaml-cpp/yaml.h>
@@ -58,6 +60,20 @@ NB_MAKE_OPAQUE(tk::KinGroupIKInputs)
 // the minimum version (tesseract-robotics/tesseract#1381).
 struct KinematicsPluginRemovalError : std::runtime_error {
     using std::runtime_error::runtime_error;
+};
+
+// A jacobian with no rows or no columns has no singular values. isNearSingularity reads the
+// smallest one regardless (utils.cpp:224), and calcManipulability segfaults on a 6 x 0 jacobian
+// (measured at tesseract 4cf644d7).
+struct EmptyJacobianError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// JacobiSVD flags a non-finite input and rank() then reads 0, so upstream's rule returns the
+// singular answer (volume 0.0, near a singularity): a blown-up FK chain would read as a wrist
+// singularity.
+struct NonFiniteJacobianError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
 };
 
 namespace {
@@ -120,6 +136,37 @@ void require_indices(const std::vector<Eigen::Index>& indices, Eigen::Index size
         if (i < 0 || i >= size)
             throw nb::index_error(("joint index " + std::to_string(i) + " is outside " + what + " (size " +
                                    std::to_string(size) + ")").c_str());
+}
+
+// Rows of a geometric jacobian: three linear over three angular.
+constexpr Eigen::Index JACOBIAN_ROWS = 6;
+
+void require_columns(Eigen::Index cols, const char* caller) {
+    if (cols == 0)
+        throw EmptyJacobianError(std::string(caller) + ": the jacobian has no columns");
+}
+
+// `which` names the jacobian in the message: "the jacobian", or "jacobian 3" of a stack.
+template <typename Derived>
+void require_finite(const Eigen::MatrixBase<Derived>& jacobian, const char* caller, const std::string& which) {
+    if (jacobian.allFinite())
+        return;
+    for (Eigen::Index row = 0; row < jacobian.rows(); ++row)
+        for (Eigen::Index col = 0; col < jacobian.cols(); ++col)
+            if (!std::isfinite(jacobian(row, col))) {
+                std::ostringstream ss;
+                ss << caller << ": " << which << " is not finite (entry [" << row << ", " << col
+                   << "] = " << jacobian(row, col) << ")";
+                throw NonFiniteJacobianError(ss.str());
+            }
+}
+
+// calcManipulability's m.volume from the SVD of the whole jacobian, by upstream's rule
+// (calcEllipsoids, utils.cpp:240-250, tesseract#1396): the product of the singular values in
+// increasing order at full row rank, exactly 0.0 below it. Pinned bitwise by
+// test_calc_manipulability_volume_is_the_full_calls_volume_across_the_rank_threshold.
+double svd_volume(const Eigen::JacobiSVD<Eigen::MatrixXd>& svd) {
+    return svd.rank() < JACOBIAN_ROWS ? 0.0 : svd.singularValues().reverse().prod();
 }
 
 std::string repr_ellipsoid(const tk::ManipulabilityEllipsoid& e) {
@@ -454,6 +501,11 @@ NB_MODULE(kinematics, m) {
         .attr("__doc__") =
         "Refused to remove a group's last kinematics solver: tesseract 0.35.0 then reads and writes "
         "through an erased map iterator (kinematics_plugin_factory.cpp:150-154, tesseract-robotics/tesseract#1381).";
+    nb::exception<EmptyJacobianError>(m, "EmptyJacobianError", PyExc_ValueError)
+        .attr("__doc__") = "A jacobian with no rows or no columns: it has no singular values.";
+    nb::exception<NonFiniteJacobianError>(m, "NonFiniteJacobianError", PyExc_ValueError)
+        .attr("__doc__") =
+        "A jacobian with a NaN or infinite entry: its SVD reads rank 0, which is the answer for a singularity.";
 
     // ========== Utility functions ==========
     m.def("getRedundantSolutions", [](const Eigen::Ref<const Eigen::VectorXd>& sol,
@@ -514,14 +566,17 @@ NB_MODULE(kinematics, m) {
     "    KeyError: base_link_id or link_id is not a link of joint_group.");
 
     m.def("isNearSingularity", [](const Eigen::Ref<const Eigen::MatrixXd>& jacobian, double threshold) {
-        // The smallest singular value is svd.singularValues().tail(1) (utils.cpp:218): none for an empty matrix.
+        // The smallest singular value is svd.singularValues().tail(1) (utils.cpp:224): none for an empty matrix.
         if (jacobian.rows() == 0 || jacobian.cols() == 0)
-            throw nb::value_error("isNearSingularity: the jacobian is empty");
+            throw EmptyJacobianError("isNearSingularity: the jacobian is empty (" + std::to_string(jacobian.rows()) +
+                                     " x " + std::to_string(jacobian.cols()) + ")");
+        require_finite(jacobian, "isNearSingularity", "the jacobian");
         return tk::isNearSingularity(jacobian, threshold);
     }, "jacobian"_a, "threshold"_a = SINGULARITY_THRESHOLD_DEFAULT,
     "True when the smallest singular value of jacobian is below threshold.\n\n"
     "Raises:\n"
-    "    ValueError: jacobian is empty.");
+    "    EmptyJacobianError: jacobian has no rows or no columns.\n"
+    "    NonFiniteJacobianError: jacobian has a NaN or infinite entry.");
 
     // Results, not inputs: read-only fields.
     nb::class_<tk::ManipulabilityEllipsoid>(m, "ManipulabilityEllipsoid")
@@ -547,13 +602,55 @@ NB_MODULE(kinematics, m) {
         });
 
     // A fixed 6 rows in the Ref type: calcManipulability splits topRows(3) / bottomRows(3)
-    // (utils.cpp:224-225), so any other row count raises TypeError at the call boundary.
-    m.def("calcManipulability", [](const Eigen::Ref<const Eigen::Matrix<double, 6, Eigen::Dynamic>>& jacobian) {
+    // (utils.cpp:279-280), so any other row count raises TypeError at the call boundary.
+    using Jacobian = Eigen::Matrix<double, JACOBIAN_ROWS, Eigen::Dynamic>;
+    m.def("calcManipulability", [](const Eigen::Ref<const Jacobian>& jacobian) {
+        require_columns(jacobian.cols(), "calcManipulability");
+        require_finite(jacobian, "calcManipulability", "the jacobian");
         return tk::calcManipulability(jacobian);
     }, "jacobian"_a,
     "Manipulability and force ellipsoids of a 6-row jacobian.\n\n"
     "When an ellipsoid's smallest eigenvalue is ~0 (a singular jacobian), its measure and condition\n"
-    "are the largest double (sys.float_info.max), as upstream returns them (utils.cpp:240-244).");
+    "are the largest double (sys.float_info.max), as upstream returns them (utils.cpp:256-261).\n\n"
+    "Raises:\n"
+    "    EmptyJacobianError: jacobian has no columns.\n"
+    "    NonFiniteJacobianError: jacobian has a NaN or infinite entry.");
+    // calcManipulability decomposes the jacobian and both 3-row blocks and fills six ellipsoids;
+    // these two return the one number of the first decomposition.
+    m.def("calcManipulabilityVolume", [](const Eigen::Ref<const Jacobian>& jacobian) {
+        require_columns(jacobian.cols(), "calcManipulabilityVolume");
+        require_finite(jacobian, "calcManipulabilityVolume", "the jacobian");
+        return svd_volume(Eigen::JacobiSVD<Eigen::MatrixXd>(jacobian));
+    }, "jacobian"_a,
+    "Yoshikawa manipulability of a 6-row jacobian: bitwise calcManipulability(jacobian).m.volume,\n"
+    "from one SVD instead of three and no ellipsoids.\n\n"
+    "Raises:\n"
+    "    EmptyJacobianError: jacobian has no columns.\n"
+    "    NonFiniteJacobianError: jacobian has a NaN or infinite entry.");
+    // (M, 6, n) as numpy holds a stack: C order, row-major 6 x n per jacobian. An input that is
+    // strided, Fortran-ordered or not float64 is converted by nanobind first.
+    m.def("calcManipulabilityVolume_each", [](
+              const nb::ndarray<nb::numpy, const double, nb::shape<-1, JACOBIAN_ROWS, -1>, nb::c_contig>& jacobians) {
+        const auto cols = static_cast<Eigen::Index>(jacobians.shape(2));
+        require_columns(cols, "calcManipulabilityVolume_each");
+        const auto count = static_cast<Eigen::Index>(jacobians.shape(0));
+        using RowMajorJacobian = Eigen::Matrix<double, JACOBIAN_ROWS, Eigen::Dynamic, Eigen::RowMajor>;
+        Eigen::VectorXd volumes(count);
+        Eigen::MatrixXd jacobian(JACOBIAN_ROWS, cols);
+        Eigen::JacobiSVD<Eigen::MatrixXd> svd(JACOBIAN_ROWS, cols);
+        for (Eigen::Index i = 0; i < count; ++i) {
+            jacobian = Eigen::Map<const RowMajorJacobian>(jacobians.data() + i * JACOBIAN_ROWS * cols,
+                                                          JACOBIAN_ROWS, cols);
+            require_finite(jacobian, "calcManipulabilityVolume_each", "jacobian " + std::to_string(i));
+            volumes(i) = svd_volume(svd.compute(jacobian));
+        }
+        return volumes;
+    }, "jacobians"_a, nb::call_guard<nb::gil_scoped_release>(),
+    "Yoshikawa manipulability of each jacobian of an (M, 6, n) stack, (M,); row i is bitwise\n"
+    "calcManipulability(jacobians[i]).m.volume. Releases the GIL.\n\n"
+    "Raises:\n"
+    "    EmptyJacobianError: n is 0.\n"
+    "    NonFiniteJacobianError: a jacobian has a NaN or infinite entry; the message names its index.");
 
     // In place, as #184: writable Eigen::Ref, so an array nanobind would have to convert (float32,
     // read-only, non-contiguous) raises TypeError instead of being written as a lost copy.

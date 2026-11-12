@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **A non-finite jacobian raises `NonFiniteJacobianError`** — `calcManipulability` read a jacobian with a NaN or infinite entry as volume 0.0 and `isNearSingularity` as `True`: the SVD flags the input and its rank reads 0, so a blown-up FK chain looked like a singularity. Both now raise `kinematics.NonFiniteJacobianError`, a `ValueError` whose message names the first such entry.
+
+### Changes
+
 - **Sparse and multi-level `SignedDistanceField`** — a field can keep one NanoVDB grid as stored and read it in place (`SignedDistanceField(nvdb, band_clamp, scale)`, `readSparseSignedDistanceFieldNVDB` by grid name or index, `getSignedDistanceFieldNVDBGridNames`), or stack sparse fields of one surface by resolution, finest first (`SignedDistanceField(levels)`). Also bound: `isSparse`, `getNVDB`, `getBandClamp`, `getLevels`, `getGradient`, `getDistanceAndGradient`, and the `SignedDistanceFieldInterpolation` enum with `set`/`getInterpolation` and `set`/`getGradientInterpolation`. `getDistances` raises for a sparse field, which has no dense grid, and `getDistance` returns `inf` where it has no answer. tesseract is now built from upstream `master` `e5c79c0c`, which has tesseract-robotics/tesseract#1390 and #1391 (and #1396, so the fork branch is no longer needed).
+- **`calcManipulabilityVolume` and `calcManipulabilityVolume_each`** — Yoshikawa manipulability without the six ellipsoids: bitwise `calcManipulability(J).m.volume`, from one SVD instead of three. `calcManipulabilityVolume_each` takes an (M, 6, n) stack, returns (M,) and releases the GIL; a non-finite jacobian's error names its index. Both are additions of the bindings, not of tesseract.
+- **`kinematics.EmptyJacobianError`** — `isNearSingularity` on a matrix without rows or columns raises it; it is a `ValueError`, as before.
+
+### Fixed
+
+- **`calcManipulability` on a jacobian without columns raises `EmptyJacobianError`** — `np.zeros((6, 0))` segfaulted.
 
 ## [0.36.0.0rc1] - 2026-11-11 — pre-release on upstream master plus our open PRs
 

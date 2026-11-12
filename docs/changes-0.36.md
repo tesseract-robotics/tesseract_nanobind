@@ -709,7 +709,7 @@ Additions, not changes: 0.35 code keeps working. Each was a 0.36 API with no bin
 | Module | New |
 |---|---|
 | `collision` | `CollisionObjectSpec`; `addCollisionObjects`, `removeCollisionObjects`, `setCollisionObjectsEnabled`, `getCollisionObjectsTransform`, `setCollisionObjectsTransform(ids, state)` on both managers; `setCollisionObjectsTransform(ids, state0, state1)` on `ContinuousContactManager`; `collideImplicitSDF`, `makeImplicitSDFShape` and their types |
-| `kinematics` | `PositionerSampleResolution`, `gatherJointLimits`, `buildSampleGrid`, `computeChainReachUpperBound` |
+| `kinematics` | `PositionerSampleResolution`, `gatherJointLimits`, `buildSampleGrid`, `computeChainReachUpperBound`; `calcManipulabilityVolume`, `calcManipulabilityVolume_each` (the bindings' own: `calcManipulability(J).m.volume` from one SVD) |
 | `task_composer` | `schema()` on graphs, pipelines, tasks and the Taskflow executor; `TaskComposerNodePorts.inputSchema` / `outputSchema`; `ValidationError.toString` |
 | `common` | `PropertyTree` (YAML as text), `PluginDiscoveryInfo` |
 | `trajopt_ifopt` | `CartAxisKinematics`; `calcJacobianBlock` on the CartAxis constraints; `CollisionCoeffData.hasZeroCoeff` |

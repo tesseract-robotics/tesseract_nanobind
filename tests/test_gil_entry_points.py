@@ -139,6 +139,20 @@ def test_kinematic_group_calc_inv_kin_still_solves(iiwa_group):
         )
 
 
+# Jacobians per call: one JacobiSVD each, ~1 us, so a call runs for milliseconds and the main
+# thread has a window to wake into.
+MANIPULABILITY_STACK_SIZE = 5_000
+
+
+def test_calc_manipulability_volume_each_releases_gil():
+    stack = np.random.default_rng(124).standard_normal((MANIPULABILITY_STACK_SIZE, 6, 7))
+
+    assert_releases_gil(lambda: kinematics.calcManipulabilityVolume_each(stack))
+    assert kinematics.calcManipulabilityVolume_each(stack[:3]).tolist() == [
+        kinematics.calcManipulability(jac).m.volume for jac in stack[:3]
+    ]
+
+
 def test_parse_urdf_file_releases_gil():
     path = str(_support_urdf("lbr_iiwa_14_r820.urdf"))
     locator = _PythonLocator()

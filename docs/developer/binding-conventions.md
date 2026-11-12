@@ -19,7 +19,8 @@ One rule, applied per name:
    `snake_case` verb: `cast_CommandAppliedEvent`, `AnyPoly_wrap_CompositeInstruction`.
 4. **A Python-only member that completes a C++ class's own interface takes the class's
    convention**, so one class reads in one style: `Link.addVisual` beside upstream's
-   `Link.getName`.
+   `Link.getName`. The same holds for a function that returns part of a C++ function's result:
+   `calcManipulabilityVolume` beside upstream's `calcManipulability`.
 
 No name has an alias. A C++ overload set is one Python name with `@overload`s; a Python-only
 alias of a native overload (`getStateByMap`, `calcInvKinMultiple`, ...) does not exist.

@@ -286,6 +286,14 @@ class KinematicsPluginRemovalError(RuntimeError):
     Refused to remove a group's last kinematics solver: tesseract 0.35.0 then reads and writes through an erased map iterator (kinematics_plugin_factory.cpp:150-154, tesseract-robotics/tesseract#1381).
     """
 
+class EmptyJacobianError(ValueError):
+    """A jacobian with no rows or no columns: it has no singular values."""
+
+class NonFiniteJacobianError(ValueError):
+    """
+    A jacobian with a NaN or infinite entry: its SVD reads rank 0, which is the answer for a singularity.
+    """
+
 def getRedundantSolutions(sol: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)] | Sequence[Sequence[float]], redundancy_capable_joints: Sequence[int]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
     """
     Get redundant solutions for a joint configuration by adding +/- 2*pi to redundancy capable joints
@@ -326,7 +334,8 @@ def isNearSingularity(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(No
     True when the smallest singular value of jacobian is below threshold.
 
     Raises:
-        ValueError: jacobian is empty.
+        EmptyJacobianError: jacobian has no rows or no columns.
+        NonFiniteJacobianError: jacobian has a NaN or infinite entry.
     """
 
 class ManipulabilityEllipsoid:
@@ -374,7 +383,31 @@ def calcManipulability(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6
     Manipulability and force ellipsoids of a 6-row jacobian.
 
     When an ellipsoid's smallest eigenvalue is ~0 (a singular jacobian), its measure and condition
-    are the largest double (sys.float_info.max), as upstream returns them (utils.cpp:240-244).
+    are the largest double (sys.float_info.max), as upstream returns them (utils.cpp:256-261).
+
+    Raises:
+        EmptyJacobianError: jacobian has no columns.
+        NonFiniteJacobianError: jacobian has a NaN or infinite entry.
+    """
+
+def calcManipulabilityVolume(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6, None), writable=False)] | Sequence[Sequence[float]]) -> float:
+    """
+    Yoshikawa manipulability of a 6-row jacobian: bitwise calcManipulability(jacobian).m.volume,
+    from one SVD instead of three and no ellipsoids.
+
+    Raises:
+        EmptyJacobianError: jacobian has no columns.
+        NonFiniteJacobianError: jacobian has a NaN or infinite entry.
+    """
+
+def calcManipulabilityVolume_each(jacobians: Annotated[NDArray[numpy.float64], dict(shape=(None, 6, None), order='C', writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """
+    Yoshikawa manipulability of each jacobian of an (M, 6, n) stack, (M,); row i is bitwise
+    calcManipulability(jacobians[i]).m.volume. Releases the GIL.
+
+    Raises:
+        EmptyJacobianError: n is 0.
+        NonFiniteJacobianError: a jacobian has a NaN or infinite entry; the message names its index.
     """
 
 def harmonizeTowardZero(qs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], redundancy_capable_joints: Sequence[int]) -> None:

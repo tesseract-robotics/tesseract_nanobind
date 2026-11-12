@@ -130,6 +130,7 @@ kinematics:
     calcInvKin: See InverseKinematics.calcInvKin; plus redundant-solution expansion.
   module:
     checkKinematics: FK then IK for every working frame and tip link.
+    calcManipulabilityVolume_each: One JacobiSVD per jacobian of an (M, 6, n) stack.
 
 time_parameterization:
   TimeParameterization:
