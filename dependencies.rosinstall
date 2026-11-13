@@ -9,9 +9,9 @@
     version: 0.7.4
 - git:
     local-name: tesseract
-    # master e5c79c0c: #1396 and the sparse and multi-level signed distance fields (#1390, #1391)
-    uri: https://github.com/tesseract-robotics/tesseract.git
-    version: e5c79c0cf95372c07080400ef0b73e3e97c34ba2
+    # master e5c79c0c + tesseract-robotics/tesseract#1408
+    uri: https://github.com/jf---/tesseract.git
+    version: 5dfd5ae224883d676e50ebb17807899001385be5
 - git:
     local-name: tesseract_planning
     # master a6483823 + tesseract-robotics/tesseract_planning#789, #792, #794

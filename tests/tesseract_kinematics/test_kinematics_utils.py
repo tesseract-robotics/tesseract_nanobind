@@ -1,5 +1,6 @@
 """Kinematics utilities from utils.h and validate.h (gh-213), on the KUKA iiwa of test_kdl_kinematics."""
 
+import subprocess
 import sys
 
 import numpy as np
@@ -288,6 +289,29 @@ def test_calc_manipulability_volume_is_the_full_calls_volume_across_the_rank_thr
     assert full[0] > 0.0 and full[-1] == 0.0  # the sweep does cross the threshold
     assert tk.calcManipulabilityVolume_each(stack).tolist() == full
     assert [tk.calcManipulabilityVolume(jac) for jac in stack] == full
+
+
+# Runs in a fresh interpreter: the order in which the binding modules load is the input.
+_VOLUME_AFTER_ENVIRONMENT = """
+import numpy as np
+import tesseract_robotics.environment
+from tesseract_robotics import kinematics as tk
+
+stack = np.random.default_rng(1393).standard_normal((200, 6, 6))
+full = [tk.calcManipulability(jac).m.volume for jac in stack]
+assert [tk.calcManipulabilityVolume(jac) for jac in stack] == full
+assert tk.calcManipulabilityVolume_each(stack).tolist() == full
+"""
+
+
+def test_calc_manipulability_volume_is_the_full_calls_volume_with_environment_imported_first():
+    """A second SVD in the binding module disagreed with tesseract's in the last bits on linux-arm64.
+
+    With `environment` imported before `kinematics`, tesseract's library and the binding module ran
+    different compiled copies of JacobiSVD, which GCC contracts differently: 2.8 % of 2000 random
+    jacobians matched. The volume now comes from tesseract's own decomposition.
+    """
+    subprocess.run([sys.executable, "-c", _VOLUME_AFTER_ENVIRONMENT], check=True)
 
 
 def test_calc_manipulability_needs_six_rows():

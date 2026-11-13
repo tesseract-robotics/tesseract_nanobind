@@ -39,7 +39,6 @@
 #include <tesseract/kinematics/opw/opw_factory.h>
 #include <tesseract/kinematics/ur/ur_factory.h>
 #include <boost_plugin_loader/utils.h>
-#include <Eigen/SVD>
 #include <filesystem>
 #include <algorithm>
 #include <cmath>
@@ -159,14 +158,6 @@ void require_finite(const Eigen::MatrixBase<Derived>& jacobian, const char* call
                    << "] = " << jacobian(row, col) << ")";
                 throw NonFiniteJacobianError(ss.str());
             }
-}
-
-// calcManipulability's m.volume from the SVD of the whole jacobian, by upstream's rule
-// (calcEllipsoids, utils.cpp:240-250, tesseract#1396): the product of the singular values in
-// increasing order at full row rank, exactly 0.0 below it. Pinned bitwise by
-// test_calc_manipulability_volume_is_the_full_calls_volume_across_the_rank_threshold.
-double svd_volume(const Eigen::JacobiSVD<Eigen::MatrixXd>& svd) {
-    return svd.rank() < JACOBIAN_ROWS ? 0.0 : svd.singularValues().reverse().prod();
 }
 
 std::string repr_ellipsoid(const tk::ManipulabilityEllipsoid& e) {
@@ -616,11 +607,15 @@ NB_MODULE(kinematics, m) {
     "    EmptyJacobianError: jacobian has no columns.\n"
     "    NonFiniteJacobianError: jacobian has a NaN or infinite entry.");
     // calcManipulability decomposes the jacobian and both 3-row blocks and fills six ellipsoids;
-    // these two return the one number of the first decomposition.
+    // these two return the one number of the first decomposition. Every decomposition is
+    // tesseract's own (calcManipulabilityVolume, utils.cpp): a JacobiSVD instantiated in this
+    // module is a second compiled copy, and on linux-arm64 it differed from the one tesseract ran
+    // by a few ulp whenever another module had loaded the kinematics library first (GCC contracts
+    // each copy's multiply-adds differently), so m.volume was not reproduced bit for bit.
     m.def("calcManipulabilityVolume", [](const Eigen::Ref<const Jacobian>& jacobian) {
         require_columns(jacobian.cols(), "calcManipulabilityVolume");
         require_finite(jacobian, "calcManipulabilityVolume", "the jacobian");
-        return svd_volume(Eigen::JacobiSVD<Eigen::MatrixXd>(jacobian));
+        return tk::calcManipulabilityVolume(jacobian);
     }, "jacobian"_a,
     "Yoshikawa manipulability of a 6-row jacobian: the product of its singular values.\n\n"
     "Bitwise calcManipulability(jacobian).m.volume, from one SVD instead of three and without the\n"
@@ -642,12 +637,11 @@ NB_MODULE(kinematics, m) {
         using RowMajorJacobian = Eigen::Matrix<double, JACOBIAN_ROWS, Eigen::Dynamic, Eigen::RowMajor>;
         Eigen::VectorXd volumes(count);
         Eigen::MatrixXd jacobian(JACOBIAN_ROWS, cols);
-        Eigen::JacobiSVD<Eigen::MatrixXd> svd(JACOBIAN_ROWS, cols);
         for (Eigen::Index i = 0; i < count; ++i) {
             jacobian = Eigen::Map<const RowMajorJacobian>(jacobians.data() + i * JACOBIAN_ROWS * cols,
                                                           JACOBIAN_ROWS, cols);
             require_finite(jacobian, "calcManipulabilityVolume_each", "jacobian " + std::to_string(i));
-            volumes(i) = svd_volume(svd.compute(jacobian));
+            volumes(i) = tk::calcManipulabilityVolume(jacobian);
         }
         return volumes;
     }, "jacobians"_a, nb::call_guard<nb::gil_scoped_release>(),
