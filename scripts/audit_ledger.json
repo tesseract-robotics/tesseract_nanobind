@@ -457,6 +457,9 @@
     "PositionerSampleResolution.__init__": {
       "wont_fix": "Spells the C++ aggregate initialization `{name, value, min, max}`; `min` and `max` default to None, the joint's limits."
     },
+    "calcManipulabilityVolume_each": {
+      "wont_fix": "Python-only batch form for numpy callers over (M, 6, n) arrays; no C++ counterpart."
+    },
     "dampedPInv": {
       "wont_fix": "numpy covers it."
     },
