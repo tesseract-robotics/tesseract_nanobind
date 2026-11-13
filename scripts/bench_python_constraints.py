@@ -30,6 +30,7 @@ import time
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics.examples import online_planning_scene
 from tesseract_robotics.trajopt_ifopt import python_constraints as pc
 
 ex = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
@@ -38,7 +39,7 @@ ex = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_ex
 ONE_SQP_STEP = 1
 TCP = "tool0"
 TOOL_AXIS = np.array([0.0, 0.0, 1.0])  # the tool's z axis, in tool coordinates
-TARGET = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # the example's target
+TARGET = np.array(online_planning_scene.TARGET_JOINTS)
 
 # time spent inside the Python callbacks, summed per run
 _PY_SECONDS = [0.0]

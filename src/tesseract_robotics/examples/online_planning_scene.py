@@ -1,13 +1,20 @@
-"""The person of the online planning examples: a figure to scale, and the walk it takes.
+"""The task of the online planning examples: the robot's run, the person, and the walk it takes.
 
-tesseract_support's `online_planning_example` scene models a person as `human_estop_zone`, a
+Both Python examples plan the same task from this module. The robot runs down the cell along
+the gantry's x axis, from `START_JOINTS` to `TARGET_JOINTS`, its arm at zero and pointing +y.
+A person walks up to the arm from the +y side and back, on a straight line across the robot's
+run, without ever crossing it.
+
+tesseract_support's `online_planning_example` scene models the person as `human_estop_zone`, a
 cylinder of radius 0.5 m and height 2 m on two prismatic joints, `human_x_joint` and
-`human_y_joint`. In the C++ example a person drags those joints with a joint state publisher.
-Both Python examples script the same walk instead, from this module: a closed loop at walking
-speed beside the robot's path, which pushes the planned path aside on every lap.
+`human_y_joint`. Its SRDF checks the person only against `robot_estop_zone`, a 2 m radius
+cylinder fixed to the gantry flange around the whole arm, so collision depends on the two
+gantry axes alone and the arm never takes part in avoiding the person.
+`check_arm_against_person` removes that zone and checks the arm's links against the person
+instead. `velocity_weights` makes a gantry step cost more than an arm step, so we get more
+impressive arm motion.
 
-The figure inside the cylinder is visual only: the planner still sees the cylinder and nothing
-else. It cannot turn, because the scene gives the person no rotational joint.
+The figure inside the cylinder is visual only.
 """
 
 from __future__ import annotations
@@ -18,17 +25,37 @@ from typing import Final
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from tesseract_robotics.common import Isometry3d
-from tesseract_robotics.environment import Environment
+from tesseract_robotics.common import AllowedCollisionMatrix, Isometry3d
+from tesseract_robotics.environment import (
+    Environment,
+    ModifyAllowedCollisionsCommand,
+    ModifyAllowedCollisionsType,
+)
 from tesseract_robotics.geometry import Box, Capsule, Cylinder, Geometry, Sphere
-from tesseract_robotics.planning import Pose, Robot
+from tesseract_robotics.planning import EnvironmentCommandError, Pose, Robot
 from tesseract_robotics.scene_graph import Joint, JointType, Link, Material, Visual
 
 # The person's link in the scene, and the cylinder link it is fixed to.
 PERSON_LINK: Final = "person"
 ENVELOPE_LINK: Final = "human_estop_zone"
-# The robot's own estop zone: a 2 m radius cylinder on the gantry flange.
+# The robot's own estop zone: a 2 m radius cylinder on the gantry flange, around the whole arm.
+# `check_arm_against_person` removes it.
 ROBOT_ZONE_LINK: Final = "robot_estop_zone"
+# The arm's links, which the SRDF never checks against the person. The gantry's beams and
+# carriage are left unchecked: they run at and above 2 m, the top of the person's cylinder.
+ARM_LINKS: Final = ("base_link", "link_1", "link_2", "link_3", "link_4", "link_5", "link_6")
+# Collision margin both examples keep between the arm and the person [m]: the C++ example's.
+COLLISION_MARGIN_M: Final = 0.1
+
+# --- The robot's run ------------------------------------------------------------------------
+# The `manipulator` group's joints: the gantry's x and y axes [m], then the arm's six [rad].
+# Both ends hold gantry y at GANTRY_Y_M, the flange at world y = 2.42 m, and the arm at zero.
+GANTRY_Y_M: Final = 1.5
+START_JOINTS: Final = (0.0, GANTRY_Y_M, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+TARGET_JOINTS: Final = (5.5, GANTRY_Y_M, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+# The arm joint whose velocity limit `velocity_weights` scales to a weight of 1.
+WEIGHT_REFERENCE_JOINT: Final = "joint_1"
+
 # The joints that move the cylinder, along world x and y [m].
 HUMAN_JOINTS: Final = ("human_x_joint", "human_y_joint")
 # World position of the cylinder at joint zero [m]: the joints' origins in the URDF.
@@ -60,26 +87,27 @@ TORSO_DEPTH_M: Final = 0.25
 # Work clothes and skin, RGBA.
 CLOTHES_RGBA: Final = (0.15, 0.25, 0.55, 1.0)
 SKIN_RGBA: Final = (0.85, 0.66, 0.53, 1.0)
-# The zones' red, as the URDF's `estop_red`, with the opacity raised so the viewer shows the
-# person's envelope; the robot's zone stays faint, as it surrounds the whole arm.
+# The URDF's `estop_red`, with the opacity raised so the viewer shows the person's envelope.
 ENVELOPE_RGBA: Final = (0.8, 0.0, 0.0, 0.25)
-ROBOT_ZONE_RGBA: Final = (0.8, 0.0, 0.0, 0.08)
 
 # --- The walk -------------------------------------------------------------------------------
-# A stadium (two straights joined by half circles) at constant speed, counterclockwise from
-# the top straight's right end. It stays in the part of the cell the plan can leave free: its
-# points keep more than the zones' 2.5 m radius sum plus the 0.1 m collision margin from the
-# gantry flange at the start (0.2, 0.92) and at the target (5.7, 3.92), at least 2.93 m and
-# 2.79 m. Its lower half comes within 1.42 m of the straight start-to-target line, so the plan
-# has to bend away from the person on every lap.
-WALK_CENTER_M: Final = (1.65, 4.45)
-WALK_STRAIGHT_LENGTH_M: Final = 1.2
-WALK_TURN_RADIUS_M: Final = 0.7
+# Back and forth along world y at x = WALK_X_M, halfway down the robot's run, at constant
+# speed: from the far end towards the robot and back, one lap a round trip. At the near end the
+# person's cylinder reaches past the tip of the arm at zero (world y 3.36 m). The walk spans
+# only 0.8 m, so the person stays in the arm's way: the straight start-to-target plan comes
+# within the collision margin on 9 of the lap's 12 ticks and runs into the person on 7, up to
+# 0.39 m deep, while the start and target stay at least 1.95 m clear, measured. A near end of
+# 3.1 m left the task composer's TrajOpt no feasible plan with the person there; 3.3 m keeps
+# every plan feasible.
+WALK_X_M: Final = 3.0
+WALK_NEAR_Y_M: Final = 3.3
+WALK_FAR_Y_M: Final = 4.1
 # Comfortable walking speed [m/s]: Bohannon, R.W., Age and Ageing 26(1), 1997, 15-19,
 # comfortable gait speed of adults 20 to 79 years, 1.27 to 1.46 m/s.
 WALKING_SPEED_M_S: Final = 1.3
 # One replan per tick [s]: the C++ example's spacing of the planned waypoints in time.
 TICK_S: Final = 0.1
+LAPS_PER_RUN: Final = 4
 
 
 def _capsule(radius_m: float, bottom_m: float, top_m: float) -> Capsule:
@@ -166,17 +194,54 @@ def add_person(robot: Robot) -> None:
     robot.add_link(link, joint)
 
 
+def check_arm_against_person(robot: Robot) -> None:
+    """Check the arm's links against the person, in place of the robot's estop zone.
+
+    Removes `ROBOT_ZONE_LINK`, which the SRDF checks against the person and nothing else, and
+    re-enables collision between each of `ARM_LINKS` and `ENVELOPE_LINK`.
+
+    Raises:
+        EnvironmentCommandError: the scene has no `ROBOT_ZONE_LINK` (a second call fails here,
+            before it changes anything), or the environment refused the collision pairs.
+    """
+    robot.remove_link(ROBOT_ZONE_LINK)
+    pairs = AllowedCollisionMatrix()
+    for link in ARM_LINKS:
+        pairs.addAllowedCollision(link, ENVELOPE_LINK, "")
+    if not robot.env.applyCommand(
+        ModifyAllowedCollisionsCommand(pairs, ModifyAllowedCollisionsType.REMOVE)
+    ):
+        raise EnvironmentCommandError(
+            f"Environment refused to check {', '.join(ARM_LINKS)} against '{ENVELOPE_LINK}'"
+        )
+
+
 def style_for_viewer(env: Environment) -> None:
-    """Colour the two estop zones so the person shows through its envelope."""
-    scene = env.getSceneGraph()
-    for link, rgba in ((ENVELOPE_LINK, ENVELOPE_RGBA), (ROBOT_ZONE_LINK, ROBOT_ZONE_RGBA)):
-        for visual in scene.getLink(link).visual:
-            visual.material.color = np.array(rgba, dtype=np.float64)
+    """Colour the person's envelope so the person shows through it."""
+    for visual in env.getSceneGraph().getLink(ENVELOPE_LINK).visual:
+        visual.material.color = np.array(ENVELOPE_RGBA, dtype=np.float64)
+
+
+def velocity_weights(robot: Robot) -> NDArray[np.float64]:
+    """Velocity cost weight of each `manipulator` joint: the inverse of its velocity limit.
+
+    Scaled so `WEIGHT_REFERENCE_JOINT` weighs 1. The URDF rates the gantry at 0.2 and 0.5 m/s
+    and the arm at 2.6 to 7.9 rad/s, so a gantry step costs about 13 and 5 times an arm step of
+    the same size: roughly what each takes in time. Both TrajOpt's velocity cost and
+    TrajOpt-Ifopt's squared `JointVelConstraint` sum weight times squared step, so the two
+    examples weigh a plan alike.
+
+    Returns:
+        One weight per joint, in the group's joint order.
+    """
+    names = robot.get_joint_names("manipulator")
+    limits = robot.env.getKinematicGroup("manipulator").getLimits().velocity_limits[:, 1]
+    return limits[names.index(WEIGHT_REFERENCE_JOINT)] / limits
 
 
 def walk_length_m() -> float:
-    """One lap of the walk [m]."""
-    return 2.0 * WALK_STRAIGHT_LENGTH_M + 2.0 * np.pi * WALK_TURN_RADIUS_M
+    """One lap of the walk, there and back [m]."""
+    return 2.0 * (WALK_FAR_Y_M - WALK_NEAR_Y_M)
 
 
 def ticks_per_lap() -> int:
@@ -184,24 +249,21 @@ def ticks_per_lap() -> int:
     return round(walk_length_m() / (WALKING_SPEED_M_S * TICK_S))
 
 
+def ticks_per_run() -> int:
+    """Ticks in `LAPS_PER_RUN` laps: what the examples plan by default and the demos record."""
+    return LAPS_PER_RUN * ticks_per_lap()
+
+
 def walk_position_m(tick: int) -> NDArray[np.float64]:
-    """World (x, y) of the person at `tick` [m]; the walk repeats every `ticks_per_lap()`."""
+    """World (x, y) of the person at `tick` [m]; the walk repeats every `ticks_per_lap()`.
+
+    Tick 0 is at the far end; the person reaches the near end, by the robot, halfway round.
+    """
     s = (tick % ticks_per_lap()) * walk_length_m() / ticks_per_lap()
-    cx, cy = WALK_CENTER_M
-    half, r = WALK_STRAIGHT_LENGTH_M / 2.0, WALK_TURN_RADIUS_M
-    turn = np.pi * r
-    if s < WALK_STRAIGHT_LENGTH_M:  # top straight, walking towards -x
-        return np.array([cx + half - s, cy + r])
-    s -= WALK_STRAIGHT_LENGTH_M
-    if s < turn:  # left half circle, top to bottom
-        angle = np.pi / 2.0 + s / r
-        return np.array([cx - half + r * np.cos(angle), cy + r * np.sin(angle)])
-    s -= turn
-    if s < WALK_STRAIGHT_LENGTH_M:  # bottom straight, walking towards +x, nearest the path
-        return np.array([cx - half + s, cy - r])
-    s -= WALK_STRAIGHT_LENGTH_M
-    angle = -np.pi / 2.0 + s / r  # right half circle, bottom to top
-    return np.array([cx + half + r * np.cos(angle), cy + r * np.sin(angle)])
+    leg = WALK_FAR_Y_M - WALK_NEAR_Y_M
+    towards_robot = s <= leg
+    y = WALK_FAR_Y_M - s if towards_robot else WALK_NEAR_Y_M + (s - leg)
+    return np.array([WALK_X_M, y])
 
 
 def human_joint_values(tick: int) -> NDArray[np.float64]:

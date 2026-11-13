@@ -21,9 +21,10 @@ C++ Reference:
 1. Build a TrajOptQPProblem over the node variables, as the C++ reference does:
    - Node/Var for each waypoint (replaces JointPosition)
    - NodesVariables container (passed to the TrajOptQPProblem constructor)
-   - JointPosConstraint for start position (constraint)
-   - CartPosConstraint for target pose (constraint; direct params, no CartPosInfo)
-   - JointVelConstraint for smoothness (squared cost)
+   - JointPosConstraint for the start joints (constraint)
+   - JointPosConstraint for the target joints (constraint; the C++ reference uses a
+     CartPosConstraint on the target pose)
+   - JointVelConstraint for smoothness (squared cost, weighted per joint)
    - CollisionConstraint for safety (constraint; no CollisionCache — now internal)
 
 2. Create TrustRegionSQPSolver with OSQPEigenSolver
@@ -34,10 +35,8 @@ C++ Reference:
    - stepSQPSolver() until converged, at most `SQP_STEPS_PER_TICK` times
    - Extract trajectory from results
 
-**The person**
-The C++ example moves the human cylinder by hand. Here a figure to scale stands in the
-cylinder and walks a scripted loop at walking speed (online_planning_scene.py), which the
-task composer variant shares.
+**The task**
+See online_planning_scene.py
 """
 
 # --8<-- [start:setup]
@@ -51,7 +50,7 @@ from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.collision import CollisionEvaluatorType, ContactTestType
-from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.examples import online_planning_scene as scene
 from tesseract_robotics.planning import Robot
 
@@ -61,10 +60,14 @@ from tesseract_robotics.planning import Robot
 TRUST_BOX_SIZE = 0.01
 # Most SQP steps per tick. The C++ loop takes one step per iteration (`num_steps = 1`) and
 # iterates as fast as the solver allows; at walking speed one 0.01 trust-box step per 0.1 s
-# tick lets the person into the plan's margin (worst 2.14 m between zone centres against
-# 2.6 m). Ten keep the margin on every tick of the walk, measured, and take about 40 ms, inside
-# the tick. The loop stops early when a step converges.
+# tick runs the arm into the person, 0.28 m deep at worst. Ten keep the 0.1 m margin on every
+# tick of the walk, measured, and take about 50 ms, inside the tick. The loop stops early when
+# a step converges.
 SQP_STEPS_PER_TICK = 10
+# Contacts each collision constraint keeps as rows. Several of the arm's links can touch the
+# person and the floor at once. With the config's default 3 the solver converged with a link
+# 0.03 m inside the margin; with 10 every tick keeps it, measured.
+COLLISION_ROWS_PER_WAYPOINT = 10
 
 
 class SolverDidNotConvergeError(RuntimeError):
@@ -82,7 +85,7 @@ def build_optimization_problem(
     extra_constraints=None,
     initial_trajectory=None,
 ):
-    """Build the TrajOptQPProblem that online_planning_example.cpp builds.
+    """Build the TrajOptQPProblem online_planning_example.cpp builds, with a joint target.
 
     Args:
         robot: Robot instance with environment
@@ -128,32 +131,29 @@ def build_optimization_problem(
         vars_list.append(node.getVar("joints"))
 
     # Add start position constraint (first waypoint = current position)
-    home_coeffs = np.ones(len(joint_names)) * 5.0
-    home_constraint = ti.JointPosConstraint(start_pos, vars_list[0], home_coeffs, "Home_Position")
+    joint_coeffs = np.ones(len(joint_names)) * 5.0
+    home_constraint = ti.JointPosConstraint(start_pos, vars_list[0], joint_coeffs, "Home_Position")
     problem.addConstraintSet(home_constraint)
 
-    # Add target pose constraint (last waypoint = target in Cartesian space)
-    target_tf = manip.calcFwdKin(target_pos)["tool0"]
-    target_constraint = ti.CartPosConstraint(
-        vars_list[-1],
-        manip,
-        "tool0",  # source_frame
-        "world",  # target_frame
-        Isometry3d.Identity(),  # source_frame_offset
-        target_tf,  # target_frame_offset
-        "Target_Pose",
+    # Add target position constraint (last waypoint = target joints), as the start's
+    target_constraint = ti.JointPosConstraint(
+        target_pos, vars_list[-1], joint_coeffs, "Target_Position"
     )
     problem.addConstraintSet(target_constraint)
 
-    # Add velocity cost (smooth motion), squared
+    # Add velocity cost (smooth motion), squared: weight times squared step, per joint, a
+    # gantry step costing more than an arm step
     vel_target = np.zeros(len(joint_names))
-    vel_constraint = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "JointVelocity")
+    vel_weights = scene.velocity_weights(robot)
+    vel_constraint = ti.JointVelConstraint(vel_target, vars_list, vel_weights, "JointVelocity")
     problem.addCostSet(vel_constraint, tsqp.CostPenaltyType.SQUARED)
 
     # Add collision constraints, configured as the C++ reference configures them
-    margin = 0.1  # 10cm safety margin
+    margin = scene.COLLISION_MARGIN_M  # 0.1 m safety margin
     margin_coeff = 10.0
     collision_config = ti.TrajOptCollisionConfig(margin, margin_coeff)
+    # More rows than the C++ default 3: several arm links can be in contact at once
+    collision_config.max_num_cnt = COLLISION_ROWS_PER_WAYPOINT
     collision_config.collision_check_config.contact_request.type = ContactTestType.ALL
     # LVSDiscreteCollisionEvaluator rejects any check type but LVS_DISCRETE. The C++ reference
     # sets DISCRETE for both modes, so its continuous mode throws on trajopt 0.35.0.
@@ -251,7 +251,8 @@ def run(
         use_continuous_collision: Use LVS continuous collision (True) or discrete (False)
                                   C++ default: False (discrete collision)
         extra_constraints: see build_optimization_problem
-        num_replan: replanning ticks after the initial solve; default one lap of the walk
+        num_replan: replanning ticks after the initial solve; default `scene.ticks_per_run()`,
+                    `scene.LAPS_PER_RUN` laps of the walk
         sqp_steps_per_tick: most SQP steps per tick; 1 is the C++ loop's single step
 
     Returns:
@@ -259,7 +260,7 @@ def run(
         `plans` (the same as `(steps, joints)` arrays), `ticks` (the walk's tick per solve)
     """
     if num_replan is None:
-        num_replan = scene.ticks_per_lap()
+        num_replan = scene.ticks_per_run()
     # Load robot model
     robot = Robot.from_tesseract_support(
         "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
@@ -267,13 +268,14 @@ def run(
     joint_names = robot.get_joint_names("manipulator")
     print(f"Manipulator joints ({len(joint_names)}): {joint_names}")
 
-    # Define start and target
-    start_pos = np.zeros(len(joint_names))
-    target_pos = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    # Define start and target: the robot runs down the cell along x, the arm at zero at both ends
+    start_pos = np.array(scene.START_JOINTS)
+    target_pos = np.array(scene.TARGET_JOINTS)
 
     robot.set_joints(start_pos, joint_names=joint_names)
-    # The person, at the walk's first point for the initial solve
+    # The person, at the walk's first point for the initial solve, checked against the arm
     scene.add_person(robot)
+    scene.check_arm_against_person(robot)
     scene.move_person(robot.env, 0)
 
     # Build initial problem
@@ -394,13 +396,13 @@ def main() -> int:
 
     if results.get("trajectories"):
         n_joints = len(results["joint_names"])
-        steps = 12
+        steps = results["steps"]
         robot = results["robot"]
         manip = robot.env.getKinematicGroup("manipulator")
 
         print("\n=== Trajectory Results ===")
 
-        target_joints = np.array([5.5, 3.0, 0, 0, 0, 0, 0, 0])
+        target_joints = np.array(scene.TARGET_JOINTS)
         target_tf = manip.calcFwdKin(target_joints)["tool0"]
         target_pos = target_tf.translation
 
@@ -417,6 +419,11 @@ def main() -> int:
             f"Initial TCP: {initial_pos} (error: {np.linalg.norm(initial_pos - target_pos):.3f}m)"
         )
         print(f"Final TCP:   {final_pos} (error: {np.linalg.norm(final_pos - target_pos):.3f}m)")
+        arm = np.abs(np.asarray(results["plans"])[:, :, 2:]).max(axis=(0, 1))
+        print(
+            f"Arm motion over the lap: up to {arm.max():.2f} rad "
+            f"({results['joint_names'][2 + int(arm.argmax())]})"
+        )
 
     if not results.get("trajectories"):
         return 0 if results["success"] else 1
@@ -428,7 +435,7 @@ def main() -> int:
 
     print("\n=== Viewer ===")
     print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
-    print("Person: walks its loop; the robot sweeps along the plan of each tick")
+    print("Person: walks up to the arm and back; the robot sweeps along the plan of each tick")
 
     env = results["robot"].env
     scene.style_for_viewer(env)

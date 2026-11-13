@@ -99,10 +99,10 @@ def _walk(module: str, results: dict) -> Scene:
 
 
 def _online(composer: TaskComposer) -> Scene:
-    # One pipeline plan per tick of one lap, so each tick shows a plan made for it.
+    # One pipeline plan per tick of the run, so each tick shows a plan made for it.
     module = "online_planning_example"
     results = _example(module).run(
-        num_iterations=online_planning_scene.ticks_per_lap(), composer=composer
+        num_iterations=online_planning_scene.ticks_per_run(), composer=composer
     )
     return _walk(module, results)
 

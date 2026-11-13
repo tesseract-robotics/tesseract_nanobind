@@ -13,12 +13,13 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics.examples import online_planning_scene
 from tesseract_robotics.trajopt_ifopt.python_constraints import HoldAxis
 
 ex = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
 # One warm-started SQP step per tick, the unit this figure compares (the example takes up to 10).
 ONE_SQP_STEP = 1
-TARGET = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+TARGET = np.array(online_planning_scene.TARGET_JOINTS)  # the example's target
 
 
 def carry_level(vars_, manip, env):
