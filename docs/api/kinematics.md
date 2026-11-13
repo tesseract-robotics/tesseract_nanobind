@@ -259,15 +259,19 @@ infinite entry is refused because its SVD reads rank 0, which is the answer for 
 volume `0.0`, and `isNearSingularity` true. A blown-up forward-kinematics chain would
 otherwise read as a wrist singularity.
 
-`calcManipulabilityVolume` and `calcManipulabilityVolume_each` are the bindings' own; tesseract
-has no such function. They keep `calcManipulability`'s spelling because they return part of its
-result ([binding conventions](../developer/binding-conventions.md#names), rule 4).
+`calcManipulabilityVolume` is tesseract's function (tesseract#1408, carried on the build's fork
+until it merges). `calcManipulabilityVolume_each` is the bindings' batch form of it and keeps its
+spelling ([binding conventions](../developer/binding-conventions.md#names), rule 4). Every
+decomposition runs inside tesseract, in the routine `calcManipulability` uses, which is why the
+values are the same bits on every platform and whatever was imported first: a second SVD compiled
+into the binding module differed in the last bits on linux-arm64.
 
 | claim | checked by |
 | --- | --- |
 | same bits as `calcManipulability(J).m.volume`, for n = 5, 6, 7 | `test_calc_manipulability_volume_is_the_full_calls_volume_bitwise`, `test_calc_manipulability_volume_each_row_is_the_per_jacobian_call_bitwise` |
 | same bits across the rank threshold, $\sigma_{\min}/\sigma_{\max}$ from 1e-1 to 1e-20 | `test_calc_manipulability_volume_is_the_full_calls_volume_across_the_rank_threshold` |
 | a near-singular $J$ ($\sigma_{\min}$ = 1e-6) reads $\prod \sigma_i$, not 0 | `test_calc_manipulability_volume_near_singular_is_singular_value_product` |
+| same bits with `environment` imported before `kinematics` | `test_calc_manipulability_volume_is_the_full_calls_volume_with_environment_imported_first` |
 | the GIL is released | `test_calc_manipulability_volume_each_releases_gil` |
 
 The tests are in `tests/tesseract_kinematics/test_kinematics_utils.py` and
