@@ -222,7 +222,7 @@
     "trimesh": "4.12.2"
   },
   "upstream": {
-    "tesseract-robotics/tesseract": "e5c79c0cf95372c07080400ef0b73e3e97c34ba2",
+    "tesseract-robotics/tesseract": "5dfd5ae224883d676e50ebb17807899001385be5",
     "tesseract-robotics/tesseract_planning": "4e27d94b160f757e064dbad2a5277657cd33bbf8",
     "tesseract-robotics/trajopt": "98b85d559e9fc7cb60a4dbfeb6d3baa177c94df5"
   }
