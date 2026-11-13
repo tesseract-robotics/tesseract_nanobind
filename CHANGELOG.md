@@ -12,6 +12,7 @@
 - **tesseract is built from `5dfd5ae2`** — upstream `master` `e5c79c0c` plus tesseract#1408 (`calcManipulabilityVolume`), the PR's own branch on the jf--- fork, until it merges. `build_identity.UPSTREAM_SOURCES` and `dependencies.rosinstall` record it.
 - **`calcManipulabilityVolume` and `calcManipulabilityVolume_each`** — Yoshikawa manipulability without the six ellipsoids: bitwise `calcManipulability(J).m.volume`, from one SVD instead of three. `calcManipulabilityVolume_each` takes an (M, 6, n) stack, returns (M,) and releases the GIL; a non-finite jacobian's error names its index. `calcManipulabilityVolume` is tesseract's (tesseract#1408, carried); `_each` is the bindings' batch form. Every decomposition runs inside tesseract: a second SVD compiled into the binding module differed from `m.volume` in the last bits on linux-arm64 when `environment` was imported first. The kinematics API page gains a Manipulability section (definition, rank rule, errors), the user guide's singularity snippet uses these calls instead of `det(J·Jᵀ)`, and `kinematics_analysis_example` shows both.
 - **`kinematics.EmptyJacobianError`** — `isNearSingularity` on a matrix without rows or columns raises it; it is a `ValueError`, as before.
+- **The online planning examples plan one task, and the arm gives way to the person** — make a more impressive online planning demo by dropping the collision cylinder around the arm, making gantry motions more expensive, and tweaking the person's path.
 
 ### Fixed
 

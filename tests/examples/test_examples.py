@@ -13,7 +13,6 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from scipy.spatial.transform import Rotation
 
 import tesseract_robotics.examples
 from tesseract_robotics.examples import online_planning_scene
@@ -27,8 +26,8 @@ from ..planning_validity import (
 
 # End joints of the freespace examples (rad), as in their C++ originals.
 FREESPACE_GOAL = JointGoal.build([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
-# online_planning_example.cpp: target_joint_position << 5.5, 3, 0, 0, 0, 0, 0, 0
-TARGET_8DOF = JointGoal.build([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+# End joints of both online planning examples: the robot's run down the cell (m and rad).
+ONLINE_GOAL = JointGoal.build(list(online_planning_scene.TARGET_JOINTS))
 
 # === Viewer Examples ===
 
@@ -1002,18 +1001,24 @@ def test_online_planning_example():
     for tick, result in zip(outcome["ticks"], outcome["trajectories"], strict=True):
         # The person stood elsewhere for each plan: validate against where it stood then.
         online_planning_scene.move_person(outcome["robot"].env, tick)
-        assert_trajectory_valid(outcome["robot"], result, TARGET_8DOF)
+        assert_trajectory_valid(outcome["robot"], result, ONLINE_GOAL)
+    # The arm, checked against the person, bends around it: start and target hold it at zero,
+    # so any arm motion is avoidance. Measured: 0.35 rad of joint_2 in the tick 19 and 29 plans.
+    arm_motion_rad = max(
+        np.abs(np.array([point.positions for point in result.trajectory])[:, 2:]).max()
+        for result in outcome["trajectories"]
+    )
+    assert arm_motion_rad > ONLINE_ARM_MOTION_RAD
 
 
-# Distance of the final tool from the target after one SQP step per replan, measured over the
-# run's 11 solutions: at most 5.5e-5 m and 5.5e-2 rad (the orientation rows are soft costs).
-SQP_POSITION_TOL_M = 1e-4
-SQP_ORIENTATION_TOL_RAD = 0.06
+# Least arm motion, off the arm's zero start and target joints, that run()'s plans must show
+# [rad]: the arm takes part in avoiding the person, not the gantry alone.
+ONLINE_ARM_MOTION_RAD = 0.1
 
-# run()'s default replanning cycles of online_planning_example, and of the SQP example: one
-# lap of the person's walk.
+# run()'s default replanning cycles of online_planning_example, and of the SQP example: the
+# run's laps of the person's walk.
 ONLINE_ITERATIONS = 5
-SQP_REPLANS = online_planning_scene.ticks_per_lap()
+SQP_REPLANS = online_planning_scene.ticks_per_run()
 
 
 @pytest.mark.planning
@@ -1026,20 +1031,14 @@ def test_online_planning_sqp_example():
     result = PlanningResult(
         successful=True, trajectory=[TrajectoryPoint(list(names), row) for row in final]
     )
-    # A few SQP steps per tick do not promise hard feasibility: the plan may sit inside the estop
-    # zones' 0.1 m margin. Limits and the goal are checked here; that the zones stay apart on
-    # every tick is test_online_planning_sqp_example's.
-    assert_trajectory_valid(robot, result, check_collision=False)
-    # The goal is the target tool pose, not the joint vector: the 8-axis chain is redundant.
-    target = robot.fk("manipulator", TARGET_8DOF.positions, "tool0")
-    reached = robot.fk("manipulator", final[-1], "tool0")
-    position_error = np.linalg.norm(
-        np.asarray(reached.translation) - np.asarray(target.translation)
-    )
-    relative = np.asarray(reached.linear).T @ np.asarray(target.linear)
-    orientation_error = Rotation.from_matrix(relative).magnitude()
-    assert position_error <= SQP_POSITION_TOL_M
-    assert orientation_error <= SQP_ORIENTATION_TOL_RAD
+    # A few SQP steps per tick do not promise hard feasibility: the plan may sit inside the 0.1 m
+    # margin. Limits and the goal are checked here; that every tick keeps the margin is
+    # test_online_planning_sqp_example's.
+    assert_trajectory_valid(robot, result, ONLINE_GOAL, check_collision=False)
+    # As in the task composer variant, any arm motion is avoidance. Measured: 0.43 rad of
+    # joint_2 at the ticks the person reaches the near end.
+    arm_motion_rad = np.abs(np.asarray(outcome["plans"])[:, :, 2:]).max()
+    assert arm_motion_rad > ONLINE_ARM_MOTION_RAD
 
 
 @pytest.mark.planning

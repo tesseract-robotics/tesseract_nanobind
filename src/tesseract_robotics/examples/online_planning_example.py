@@ -4,8 +4,9 @@ This is not a port of tesseract_planning's `online_planning_example.cpp`. That e
 builds one `TrajOptQPProblem` and advances a `TrustRegionSQPSolver` one step per
 replan, with the human moved by hand through a joint state publisher; the faithful
 port is `online_planning_sqp_example.py`. This one plans the same gantry + ABB IRB2400
-scene (start, target, model) from scratch through `TrajOptPipeline` each cycle, with
-a person walking a scripted loop, to show what a full pipeline call costs per replan.
+model from scratch through `TrajOptPipeline` each cycle, to show what a full pipeline call
+costs per replan. Both Python examples plan the same task (online_planning_scene.py): the robot
+runs down the cell while a person walks up to its arm and back.
 
 Scene (tesseract_support `online_planning_example`):
 - Gantry: `gantry_axis_1`, `gantry_axis_2`, prismatic.
@@ -14,14 +15,9 @@ Scene (tesseract_support `online_planning_example`):
   obstacle moves with `Environment.setState` and no collision manager is rebuilt. A figure to
   scale stands in its cylinder (online_planning_scene.py, shared with the SQP example).
 
-Differences from the C++ example, all deliberate:
-- Every cycle is an independent pipeline call: no warm start, no incremental SQP step.
-- The person walks online_planning_scene's loop; the plans are spread evenly over one lap.
-- The C++ collision settings (margin 0.1 m, coefficient 10) come from
-  `create_trajopt_default_profiles`, not from this file.
-
 Related examples:
-- online_planning_sqp_example.py: the SQP port of the C++ example.
+- online_planning_sqp_example.py: the same task through the low-level SQP API, after the C++
+  example.
 - freespace_ompl_example.py: static environment planning with OMPL.
 - basic_cartesian_example.py: TrajOpt for Cartesian paths.
 """
@@ -43,7 +39,33 @@ from tesseract_robotics.planning import (
     StateTarget,
     TaskComposer,
 )
-from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
+from tesseract_robotics.planning.profiles import (
+    TRAJOPT_DEFAULT_NAMESPACE,
+    create_trajopt_default_profiles,
+    create_trajopt_profile_pair,
+)
+
+# How far beyond the margin the collision cost collects contacts [m], so it sees the person
+# coming before the margin is reached.
+COLLISION_COST_BUFFER_M = 0.05
+
+
+def create_profiles(velocity_weights):
+    """`create_trajopt_default_profiles`, its DEFAULT composite profile set for the person.
+
+    The hard collision constraint keeps its zero margin; the soft cost drives the arm
+    `online_planning_scene.COLLISION_MARGIN_M` clear of the person. The velocity cost weighs
+    each joint by `velocity_weights` (one per `manipulator` joint).
+    """
+    profiles = create_trajopt_default_profiles()
+    composite, _ = create_trajopt_profile_pair()
+    composite.velocity_coeff = np.asarray(velocity_weights, dtype=np.float64)
+    cost = composite.collision_cost_config
+    cost.contact_manager_config.default_margin = scene.COLLISION_MARGIN_M
+    cost.collision_margin_buffer = COLLISION_COST_BUFFER_M
+    # Replaces the DEFAULT composite profile create_trajopt_default_profiles registered
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", composite)
+    return profiles
 
 
 def run(
@@ -55,13 +77,13 @@ def run(
 ):
     """Run online planning example with a walking person.
 
-    Plans `num_iterations` times, spread evenly over one lap of the person's walk, and times
-    each plan.
+    Plans `num_iterations` times, spread evenly over `scene.LAPS_PER_RUN` laps of the person's
+    walk, and times each plan.
 
     Args:
         pipeline: Planning pipeline ("TrajOptPipeline" or "TrajOptIfoptPipeline")
-        num_iterations: Number of replanning cycles, spread evenly over one lap; the demo
-            recording plans once per tick (`scene.ticks_per_lap()`)
+        num_iterations: Number of replanning cycles, spread evenly over the run's laps; the demo
+            recording plans once per tick (`scene.ticks_per_run()`)
         num_planners: Parallel planners (unused for TrajOpt, relevant for OMPL)
         composer: Composer to plan with. Without one, each call builds a new
             composer and loads the task composer plugins again (seconds per
@@ -91,22 +113,21 @@ def run(
     # =========================================================================
     # STEP 2: Define Start and Target States
     # =========================================================================
-    # Start position: all zeros (gantry at origin, arm in home pose)
-    start_position = np.zeros(len(joint_names))
+    # The robot runs down the cell along x, the arm at zero at both ends
+    start_position = np.array(scene.START_JOINTS)
+    target_position = np.array(scene.TARGET_JOINTS)
     robot.set_joints(start_position, joint_names=joint_names)
     scene.add_person(robot)
-
-    # online_planning_example.cpp: target_joint_position << 5.5, 3, 0, 0, 0, 0, 0, 0
-    target_position = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    # The arm's links, not the robot's estop zone, are checked against the person
+    scene.check_arm_against_person(robot)
 
     # =========================================================================
     # STEP 3: Configure Planning Pipeline
     # =========================================================================
-    # Default profiles provide reasonable TrajOpt settings:
-    # - Collision margin and coefficients
-    # - Joint velocity/acceleration limits
-    # - Optimization parameters
-    profiles = create_trajopt_default_profiles()
+    # The default TrajOpt profiles (collision, smoothing, optimization parameters), with the
+    # collision cost's margin raised to keep the arm 0.1 m clear of the person, and a gantry
+    # step costing more than an arm step
+    profiles = create_profiles(scene.velocity_weights(robot))
 
     # TaskComposer orchestrates the planning pipeline
     # TrajOptPipeline: interpolation -> TrajOpt optimization -> time parameterization
@@ -115,7 +136,7 @@ def run(
 
     trajectories = []
     timings = []
-    ticks = [round(i * scene.ticks_per_lap() / num_iterations) for i in range(num_iterations)]
+    ticks = [round(i * scene.ticks_per_run() / num_iterations) for i in range(num_iterations)]
 
     # =========================================================================
     # STEP 4: Replanning Loop
@@ -160,9 +181,16 @@ def run(
     # STEP 5: Report Statistics
     # =========================================================================
     avg_time = float(np.mean(timings))
+    arm = np.array(
+        [
+            np.abs([p.positions[2:] for p in result.trajectory]).max(axis=0)
+            for result in trajectories
+        ]
+    ).max(axis=0)
     print("\nOnline Planning Summary:")
     print(f"  Iterations: {num_iterations}")
     print(f"  Average planning time: {avg_time:.3f}s ({1.0 / avg_time:.1f} Hz)")
+    print(f"  Arm motion: up to {arm.max():.2f} rad ({joint_names[2 + int(arm.argmax())]})")
 
     return {
         "trajectories": trajectories,
@@ -175,7 +203,7 @@ def run(
 
 
 def recording_rows(results):
-    """One lap of the walk, one row per tick, showing the plan made last before that tick.
+    """The run's laps of the walk, one row per tick, showing the plan made last before it.
 
     Columns: the manipulator joints, then `scene.HUMAN_JOINTS`, then the time [s].
     """
@@ -183,7 +211,7 @@ def recording_rows(results):
     plan_ticks = results["ticks"]
     plan_of_tick = [
         max(i for i, start in enumerate(plan_ticks) if start <= tick)
-        for tick in range(scene.ticks_per_lap())
+        for tick in range(scene.ticks_per_run())
     ]
     return scene.playback_rows(plans, plan_of_tick)
 
@@ -194,13 +222,21 @@ def recording_joint_names(results):
 
 
 def main() -> int:
-    results = run()
+    # One plan per tick of the run, so the replay shows at each tick the plan made for it
+    results = run(num_iterations=scene.ticks_per_run())
 
-    from tesseract_robotics.viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer, Trajectory
+
+    print("\n=== Viewer ===")
+    print("Person: walks up to the arm and back; the robot sweeps along the plan of each tick")
+
+    env = results["robot"].env
+    scene.style_for_viewer(env)
+    walk = Trajectory.from_rows(recording_joint_names(results), recording_rows(results))
 
     with TesseractViewer() as viewer:
-        viewer.update_environment(results["robot"].env)
-        viewer.update_trajectory(results["trajectories"][-1].raw_results)
+        viewer.update_environment(env)
+        viewer.update_trajectory(walk)
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 

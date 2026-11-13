@@ -6,27 +6,28 @@ from tests.docs.doc_assets import sqp_scene
 globals().update(sqp_scene(robot))
 -->
 
-Two examples replan a gantry robot's trajectory while a person walks through the cell.
-`online_planning_sqp_example` is a port of tesseract_planning's C++ `online_planning_example.cpp`:
-it builds one `TrajOptQPProblem` and, every tick, moves the person and re-solves it with
-`TrustRegionSQPSolver`, starting from the previous solution. `online_planning_example` is not a
-port: it does the same job through the task composer, running a whole pipeline per plan.
+Two examples replan a gantry robot's trajectory while a person walks up to its arm. They plan
+the same task. `online_planning_sqp_example` follows tesseract_planning's C++
+`online_planning_example.cpp`: it builds one `TrajOptQPProblem` and, every tick, moves the person
+and re-solves it with `TrustRegionSQPSolver`, starting from the previous solution.
+`online_planning_example` does the same job through the task composer, running a whole pipeline
+per plan.
 
-## The person
+## The task
 
-The scene models the person as a cylinder, radius 0.5 m and 2 m tall, on two prismatic joints;
-the robot keeps its own 2 m estop cylinder, on the gantry, out of it. In the C++ example someone
-drags the person's joints by hand. Both Python examples share a scripted walk instead
-(`online_planning_scene.py`): a closed loop at 1.3 m/s, a comfortable adult walking speed, one
-replan every 0.1 s, the spacing of the C++ example's planned waypoints. The lower half of the
-loop comes within 1.42 m of the straight path to the target, so the plan bends away from the
-person on every lap; the loop keeps clear of the plan's start and target, which stay fixed.
+Both examples take their task from `online_planning_scene.py`. The robot runs 5.5 m down the cell
+on the gantry's x axis, its arm at zero at both ends and pointing across the cell, towards the
+person. The person, a cylinder 0.5 m in radius and 2 m tall on two prismatic joints, walks
+0.8 m straight towards the arm and back at 1.3 m/s, a comfortable adult walking speed, halfway
+down the robot's run; it never crosses the run. One replan every 0.1 s, the spacing of the C++
+example's planned waypoints, so a lap takes 12 ticks; the examples run four laps. The person stays
+in the arm's way: the straight plan would come within the margin on 9 ticks of every 12, and at
+the near end run the arm 0.39 m into the person. In the C++ example someone drags the person's
+joints by hand, and the target also moves the gantry 3 m across the cell.
 
-Inside the cylinder stands a figure 1.75 m tall, built from spheres, capsules and boxes with
-segment lengths from standard ratios of stature. It is visual only: the planner sees the
-cylinder. The figure faces one way throughout, because the scene gives the person no rotation.
-The recordings show the robot sweeping along the plan in force at each tick, forward and back,
-as the C++ example replays its current plan.
+To generate more impressive arm motion, gantry steps cost more than an arm step. Each joint's
+velocity cost is weighted by the inverse of its velocity limit (`velocity_weights`). The URDF
+rates the gantry at 0.2 and 0.5 m/s against 2.6 to 7.9 rad/s for the arm.
 
 ## Overview
 
@@ -81,10 +82,12 @@ are the real shipped source, split into three regions: `setup`, `problem`,
 ### Problem construction
 
 The problem is a `TrajOptQPProblem`, built as tesseract_planning's
-`online_planning_example.cpp` builds it. The start and target poses and one collision constraint
-per step are constraint sets, and the joint velocity is a squared cost. Continuous mode sets the
+`online_planning_example.cpp` builds it, with the target as joints. The start and target joints
+and one collision constraint per step are constraint sets, and the joint velocity is a squared
+cost, weighted per joint. Continuous mode sets the
 collision check type to `LVS_DISCRETE`, which its evaluator requires; the C++ reference sets
-`DISCRETE` there and throws.
+`DISCRETE` there and throws. Each collision constraint keeps 10 contacts as rows, not the C++
+default 3, because several of the arm's links can touch the person and the floor at once.
 
 ```python title="online_planning_sqp_example.py (problem)"
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:problem"
@@ -107,8 +110,8 @@ tesseract_online_planning_sqp_example
     Manipulator joints (8): ['gantry_axis_1', 'gantry_axis_2', 'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
     Building optimization problem (collision: discrete)...
     Running initial global solve...
-    Initial solve: cost=3.4399, time=<ms>
-    Online replanning (52 iterations)...
+    Initial solve: cost=35.9975, time=<ms>
+    Online replanning (48 iterations)...
     Replan timing: avg=<ms> (<Hz>)
     Trajectory: 12 waypoints x 8 joints
     ```
@@ -166,7 +169,7 @@ solver.setBoxSize(0.01)  # Reset trust region
 - Use `solver.solve(problem)` on the first tick for global convergence.
 - Use `solver.stepSQPSolver()` per tick afterwards for incremental optimization. The C++ example
   takes one step per loop, as fast as the solver runs. At a 0.1 s tick and walking speed one step
-  of the 0.01 trust box lets the person into the plan's margin, so the example takes up to
+  of the 0.01 trust box runs the arm into the person, so the example takes up to
   `SQP_STEPS_PER_TICK` (10) steps a tick and stops at the first that converges.
 
 ### 5. Sparse collision checking

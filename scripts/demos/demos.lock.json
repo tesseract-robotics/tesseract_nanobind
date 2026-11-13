@@ -11,8 +11,6 @@
     "freespace_ompl_example": "f5246c50f1c0b31fc7f25faf2ca1f4636f3adc1277f32e66a3455db582e9faa8",
     "geometry_showcase_example": "e6b3e7f28897851b33bd3357d7f1f360560affe1b852a844be9aa13f704f56a8",
     "glass_upright_example": "935aa3c9a2361f93409fa3d935393584bf25e858910505edee56ce0a61012ca6",
-    "online_planning_example": "0f8744e8ccfe1e78cd5b787418efdf619087b316a959fc9bb1c47a928b1d2ff3",
-    "online_planning_sqp_example": "d7d1583bf7569b57b807fa2aafdbe5170baaf9817fca460b495cc754157fdab8",
     "pick_and_place_example": "1d476a01ae03decf8326747b1c80d1c5ec7e19fc4870cb598b03262a800202c7",
     "pointcloud_octree_collision_example": "c6f1667650fed631005f2efa8d42b2f9d424c136b71b58c6a38ae9b7f561204e",
     "puzzle_piece_auxillary_axes_example": "c39d9987ab6247ecccc652eac1cffff035f31d16785f03c99cca027eed83c242",
@@ -108,21 +106,21 @@
     },
     "online_planning_example": {
       "identity": {
-        "inputs_sha256": "abd54614242f6144af441c2b95ec4d69b732221b67be4c04170a1cc5adcf1409",
-        "package_version": "0.35.0.9.dev774",
+        "inputs_sha256": "1ce74713717fe84354f61fd40e9409071f0c9e4750e3683d9db10ea0e98953b1",
+        "package_version": "0.1.dev1522",
         "viser_version": "1.1.1"
       },
-      "recording_sha256": "a9ebd4ef1b29fce5b6303390adb9cb8544d412f8099563332a5c7ca3d0c4bf5f",
-      "size_bytes": 231818
+      "recording_sha256": "348c26b75b954e7a3bf453772557d28cf480381f3ae8c9ab9002c829da3962b4",
+      "size_bytes": 245131
     },
     "online_planning_sqp_example": {
       "identity": {
-        "inputs_sha256": "7c2bbf4e4a4c738744127d7074cba2fa2ec03722024994a8db683f2a526e9d37",
-        "package_version": "0.35.0.9.dev774",
+        "inputs_sha256": "c159f21eff9fe0ef510949636478e8e1443e115c09a2b0387f4f9bec564c72c4",
+        "package_version": "0.1.dev1522",
         "viser_version": "1.1.1"
       },
-      "recording_sha256": "67e95699dcbe5aa23309e479e7daa70f6beeabe1e458afdc824438b27dc770b7",
-      "size_bytes": 277227
+      "recording_sha256": "c35d8e6b1157aaf7ef9a00cacd56092e3e3656830a823dc5d60ce78919268fda",
+      "size_bytes": 273239
     },
     "pick_and_place_example": {
       "identity": {

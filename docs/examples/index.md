@@ -112,7 +112,7 @@ Replanning while the world changes.
 
     **[Online planning](online-planning.md#overview)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_example.py)
 
-    Replans the trajectory while a person walks a loop through the cell.
+    Replans the gantry's run while a person walks up to the arm and back.
 
     `tesseract_online_planning_example`
 

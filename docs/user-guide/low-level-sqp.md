@@ -58,10 +58,11 @@ the URDF limits.
 
 ## Build and solve a problem
 
-The example builds the problem upstream's `online_planning_example.cpp` builds: a
-`TrajOptQPProblem` over the `NodesVariables`, the start and target poses and one collision
-constraint per step as constraint sets, the joint velocity as a squared cost, then
-`problem.setup()`. Call `setup()` after the last set is added.
+The example builds the problem upstream's `online_planning_example.cpp` builds, with the target
+as joints rather than a pose: a `TrajOptQPProblem` over the `NodesVariables`, the start and
+target joints and one collision constraint per step as constraint sets, the joint velocity as a
+squared cost weighted per joint, then `problem.setup()`. Call `setup()` after the last set is
+added.
 
 ```python
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:setup"
@@ -221,23 +222,29 @@ solver.stepSQPSolver()
 A built problem does not see the environment change. Each collision evaluator keeps its own
 contact manager, and fixes the pose of every link outside the manipulator when it is built:
 `env.setState(...)` afterwards moves the obstacle in the environment, not in the problem.
-On the online planning scene (the person walking a lap, start at zero, 12 steps, solved once
-with the person at tick 0), the held problem's summed constraint violation stays near zero
-(about 3e-5) however the person moves, while a problem rebuilt at the worst tick of the lap
-reads about 5 (discrete) and 6 (LVS continuous). The held problem does not see the move, so this
+On the online planning scene (the robot's run down the cell, the person walking a lap, 12
+steps, solved once with the person at tick 0), the held problem's summed constraint violation
+stays at zero however the person moves, while a problem rebuilt at the worst tick of the lap
+reads about 2.5 (discrete) and 4.5 (LVS continuous). The held problem does not see the move, so this
 is not the evaluator's cache. The example therefore rebuilds the problem every tick, as
 upstream's `online_planning_example.cpp` does (the rebuild block is lines 349-357, under a
 TODO comment). Hold one problem only when nothing outside the manipulator moves.
 
-The example's coefficients are upstream's, a starting point for that scene rather than tuned
-guidance:
-
 | Term | Kind | Value |
 |---|---|---|
 | `JointPosConstraint` on the first node | constraint | coefficient 5 per joint |
-| `CartPosConstraint` on the last node | constraint | default coefficients |
-| `JointVelConstraint`, zero target | `SQUARED` cost | coefficient 1 |
+| `JointPosConstraint` on the last node | constraint | coefficient 5 per joint (upstream: `CartPosConstraint` on the target pose) |
+| `JointVelConstraint`, zero target | `SQUARED` cost | per joint: `joint_1`'s velocity limit over the joint's, 13.1 and 5.2 for the gantry, 0.33 to 1 for the arm (upstream: 1) |
 | Collision, `TrajOptCollisionConfig(0.1, 10)` | constraint | 0.1 m margin, coefficient 10, `collision_margin_buffer` 0.10 m |
+| Collision rows, `max_num_cnt` | constraint size | 10 per waypoint (upstream: the default 3) |
+
+A pose target with these weights goes wrong: the 8-axis chain is redundant, and once the gantry
+costs more than the arm the solver reaches for the pose with the arm to save gantry travel,
+twisting it (1.5 rad of `joint_4`) and leaving a link inside the margin.
+
+A collision constraint keeps only its `max_num_cnt` contacts as rows. Give it at least as many
+as can be in contact at once: on the online planning scene, with the default 3, the solver
+converged with an arm link 0.03 m inside the margin.
 
 ## What goes wrong
 

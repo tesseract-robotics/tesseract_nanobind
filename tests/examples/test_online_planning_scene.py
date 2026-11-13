@@ -1,4 +1,6 @@
-"""The online planning person: to scale, inside its envelope, walking a loop the plan can avoid.
+"""The online planning task: the person to scale inside its envelope, walking up to the arm
+and back beside the robot's run, checked against the arm's links rather than the robot's estop
+zone, and the velocity weights that make a gantry step cost more than an arm step.
 
 The envelope is tesseract_support's `human_estop_zone` cylinder. Its visual spans the floor to
 2 m; its collision geometry has the same radius but is centred on the floor, so it spans -1 to
@@ -11,20 +13,30 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics.collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactResultVector,
+    ContactTestType,
+)
 from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.examples import online_planning_scene as scene
 from tesseract_robotics.geometry import Box, Capsule, Cylinder, Sphere
-from tesseract_robotics.planning import Robot
+from tesseract_robotics.planning import EnvironmentCommandError, Robot
 
 # The cell between the gantry's rails (y = 0 and 6 m, 0.5 m square posts) and inside its outer
 # posts (x = -0.5 and 6.7 m) [m]; the person's centre keeps its 0.5 m envelope radius off them.
 CELL_X_M = (-0.25 + 0.5, 6.45 - 0.5)
 CELL_Y_M = (0.25 + 0.5, 5.75 - 0.5)
-# Gantry flange (x, y) at the start and target joints, joint zero at (0.2, 0.92) [m].
-FLANGE_START_M = np.array([0.2, 0.92])
-FLANGE_TARGET_M = np.array([5.7, 3.92])
-# Robot zone radius + person zone radius + the examples' 0.1 m collision margin [m].
-ZONE_CLEARANCE_M = 2.0 + 0.5 + 0.1
+# Waypoints of the straight start-to-target plan: the SQP example's.
+STRAIGHT_WAYPOINTS = 12
+# Contact distance reported up to this far [m]: past the whole cell, so every link reports.
+REPORT_DISTANCE_M = 10.0
+# Gantry links the SRDF leaves unchecked against the person: they run above its cylinder.
+GANTRY_LINKS = ("gantry_axis_1", "gantry_axis_2")
+# The gantry's prismatic joints, in the `manipulator` group.
+GANTRY_JOINTS = ("gantry_axis_1", "gantry_axis_2")
 # Comfortable walking speeds of adults 20 to 79 (Bohannon 1997) [m/s].
 COMFORTABLE_SPEED_M_S = (1.27, 1.46)
 
@@ -35,7 +47,27 @@ def robot():
         "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     )
     scene.add_person(robot)
+    scene.check_arm_against_person(robot)
     return robot
+
+
+def _arm_clearance_m(robot, joints) -> float:
+    """Closest distance between the robot's links and the person's cylinder at `joints` [m]."""
+    env = robot.env
+    env.setState(dict(zip(robot.get_joint_names("manipulator"), map(float, joints), strict=True)))
+    manager = env.getDiscreteContactManager()
+    manager.setActiveCollisionObjects(env.getActiveLinkIds())
+    manager.setDefaultCollisionMargin(REPORT_DISTANCE_M)
+    manager.setCollisionObjectsTransform(env.getState().link_transforms)
+    results = ContactResultMap()
+    manager.contactTest(results, ContactRequest(ContactTestType.ALL))
+    contacts = ContactResultVector()
+    results.flattenMoveResults(contacts)
+    return min(
+        contact.distance
+        for contact in contacts
+        if scene.ENVELOPE_LINK in [link.name() for link in contact.link_ids]
+    )
 
 
 def _extent(geometry, origin) -> tuple[float, float, float]:
@@ -93,7 +125,7 @@ def test_the_person_is_visual_only_and_rides_the_envelope(robot):
     assert person_xy == pytest.approx(scene.walk_position_m(7))
 
 
-def test_the_walk_is_a_closed_loop_at_walking_speed():
+def test_the_walk_returns_to_its_start_at_walking_speed():
     n = scene.ticks_per_lap()
     points = np.array([scene.walk_position_m(k) for k in range(n + 1)])
     steps = np.linalg.norm(np.diff(points, axis=0), axis=1)
@@ -105,25 +137,78 @@ def test_the_walk_is_a_closed_loop_at_walking_speed():
     assert steps.max() == pytest.approx(speed * scene.TICK_S)
 
 
-def test_the_walk_stays_in_the_cell_and_leaves_start_and_target_free():
-    points = np.array([scene.walk_position_m(k) for k in range(scene.ticks_per_lap())])
+def test_the_arm_not_the_robot_zone_is_checked_against_the_person(robot):
+    acm = robot.env.getAllowedCollisionMatrix()
+    assert scene.ROBOT_ZONE_LINK not in [link.name() for link in robot.env.getLinkIds()]
+    for link in scene.ARM_LINKS:
+        assert not acm.isCollisionAllowed((link, scene.ENVELOPE_LINK)), link
+    for link in GANTRY_LINKS:
+        assert acm.isCollisionAllowed((link, scene.ENVELOPE_LINK)), link
+
+
+def test_a_second_arm_check_raises_before_changing_anything(robot):
+    commands = len(robot.env.getCommandHistory())
+    with pytest.raises(EnvironmentCommandError):
+        scene.check_arm_against_person(robot)
+    assert len(robot.env.getCommandHistory()) == commands
+
+
+def test_a_run_shows_the_robot_down_the_cell_and_back():
+    """A run is whole laps, long enough for a recording to sweep a plan forward and back."""
+    assert scene.ticks_per_run() == scene.LAPS_PER_RUN * scene.ticks_per_lap()
+    assert scene.ticks_per_run() >= 2 * (STRAIGHT_WAYPOINTS - 1)
+
+
+def test_the_walk_stays_in_the_cell_and_leaves_start_and_target_free(robot):
+    ticks = range(scene.ticks_per_lap())
+    points = np.array([scene.walk_position_m(k) for k in ticks])
 
     assert CELL_X_M[0] <= points[:, 0].min() and points[:, 0].max() <= CELL_X_M[1]
     assert CELL_Y_M[0] <= points[:, 1].min() and points[:, 1].max() <= CELL_Y_M[1]
-    for flange in (FLANGE_START_M, FLANGE_TARGET_M):
-        assert np.linalg.norm(points - flange, axis=1).min() > ZONE_CLEARANCE_M
+    for joints in (scene.START_JOINTS, scene.TARGET_JOINTS):
+        clearances = []
+        for k in ticks:
+            scene.move_person(robot.env, k)
+            clearances.append(_arm_clearance_m(robot, joints))
+        assert min(clearances) > scene.COLLISION_MARGIN_M
 
 
-def test_the_walk_crosses_into_the_straight_path():
-    """Part of the lap is closer to the straight start-to-target path than the zones allow."""
-    points = np.array([scene.walk_position_m(k) for k in range(scene.ticks_per_lap())])
-    direction = (FLANGE_TARGET_M - FLANGE_START_M) / np.linalg.norm(
-        FLANGE_TARGET_M - FLANGE_START_M
+def test_the_walk_never_crosses_the_robots_run(robot):
+    """The person's cylinder stays on the +y side of the gantry flange's line down the cell."""
+    names = robot.get_joint_names("manipulator")
+    robot.env.setState(dict(zip(names, scene.START_JOINTS, strict=True)))
+    flange_y_m = np.asarray(robot.env.getState().link_transforms["gantry_flange"].translation)[1]
+    envelope_radius_m, _, _ = _cylinder(
+        robot.env.getSceneGraph().getLink(scene.ENVELOPE_LINK).collision
     )
-    offset = points - FLANGE_START_M
-    distance = np.abs(offset[:, 0] * direction[1] - offset[:, 1] * direction[0])
-    assert distance.min() < ZONE_CLEARANCE_M
-    assert distance.max() > ZONE_CLEARANCE_M
+    nearest_y_m = min(scene.walk_position_m(k)[1] for k in range(scene.ticks_per_lap()))
+    assert nearest_y_m - envelope_radius_m > flange_y_m
+
+
+def test_the_person_walks_into_the_straight_plans_way(robot):
+    """Part of the lap the straight plan's arm runs into the person; the rest it stays clear."""
+    straight = ti.interpolate(
+        np.array(scene.START_JOINTS), np.array(scene.TARGET_JOINTS), STRAIGHT_WAYPOINTS
+    )
+    clearances = []
+    for k in range(scene.ticks_per_lap()):
+        scene.move_person(robot.env, k)
+        clearances.append(min(_arm_clearance_m(robot, q) for q in straight))
+    assert min(clearances) < 0.0
+    assert max(clearances) > scene.COLLISION_MARGIN_M
+
+
+def test_a_gantry_step_costs_more_than_an_arm_step(robot):
+    """Weights are the inverse velocity limits, the reference joint at 1."""
+    names = robot.get_joint_names("manipulator")
+    limits = robot.env.getKinematicGroup("manipulator").getLimits().velocity_limits[:, 1]
+    weights = scene.velocity_weights(robot)
+
+    assert weights[names.index(scene.WEIGHT_REFERENCE_JOINT)] == pytest.approx(1.0)
+    assert weights * limits == pytest.approx(np.full(len(names), weights[0] * limits[0]))
+    gantry = [names.index(name) for name in GANTRY_JOINTS]
+    arm = [i for i in range(len(names)) if i not in gantry]
+    assert weights[gantry].min() > weights[arm].max()
 
 
 def test_playback_sweeps_each_plan_forward_and_back_while_the_person_walks():
