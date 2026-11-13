@@ -423,13 +423,7 @@
       "wont_fix": "Its body is `assert(false)` (octree.h:83)."
     },
     "SignedDistanceField.__init__": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.getBandClamp": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.getDistanceAndGradient": {
-      "issue": "#429"
+      "wont_fix": "`Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`; `bytes` is the Python form of the sparse constructor's `std::vector<std::uint8_t>`."
     },
     "SignedDistanceField.getDomain": {
       "wont_fix": "`Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`."
@@ -440,30 +434,6 @@
     "SignedDistanceField.getDomainMin": {
       "wont_fix": "`Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`."
     },
-    "SignedDistanceField.getGradient": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.getGradientInterpolation": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.getInterpolation": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.getNVDB": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.isSparse": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.setGradientInterpolation": {
-      "issue": "#429"
-    },
-    "SignedDistanceField.setInterpolation": {
-      "issue": "#429"
-    },
-    "SignedDistanceFieldInterpolation": {
-      "issue": "#429"
-    },
     "createMeshFromAsset": {
       "wont_fix": "Takes an assimp `aiScene`; assimp is never exposed to Python."
     },
@@ -471,7 +441,7 @@
       "wont_fix": "Takes an assimp `aiScene`/`aiNode`; assimp is never exposed to Python."
     },
     "getSignedDistanceFieldNVDBGridNames": {
-      "issue": "#429"
+      "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
     },
     "readSignedDistanceFieldNVDB": {
       "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
@@ -480,7 +450,7 @@
       "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
     },
     "readSparseSignedDistanceFieldNVDB": {
-      "issue": "#429"
+      "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
     }
   },
   "kinematics": {

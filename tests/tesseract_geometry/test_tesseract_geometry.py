@@ -442,6 +442,123 @@ def test_signed_distance_field_vdb_round_trip(write, read):
     nptest.assert_allclose(scaled.getScale(), [3, 3, 3])
 
 
+@pytest.mark.parametrize(
+    "method",
+    [
+        tesseract_geometry.SignedDistanceFieldInterpolation.TRILINEAR,
+        tesseract_geometry.SignedDistanceFieldInterpolation.TRICUBIC,
+    ],
+    ids=["trilinear", "tricubic"],
+)
+def test_signed_distance_field_gradient_matches_finite_difference(method):
+    grid = _sphere_grid().ravel(order="F")
+    geom = tesseract_geometry.SignedDistanceField(SDF_MIN, SDF_MAX, SDF_DIMS, grid)
+    assert geom.getInterpolation() == tesseract_geometry.SignedDistanceFieldInterpolation.TRILINEAR
+    geom.setInterpolation(method)
+    assert geom.getInterpolation() == method
+    # The gradient follows the distance's method unless set apart.
+    assert geom.getGradientInterpolation() == method
+
+    # Off the lattice and away from cell faces, where both methods are differentiable.
+    point = np.array([0.31, -0.22, 0.17])
+    distance, gradient = geom.getDistanceAndGradient(point)
+    assert distance == pytest.approx(geom.getDistance(point))
+    nptest.assert_allclose(gradient, geom.getGradient(point))
+    h = 1e-5
+    finite = [
+        (geom.getDistance(point + h * axis) - geom.getDistance(point - h * axis)) / (2 * h)
+        for axis in np.eye(3)
+    ]
+    nptest.assert_allclose(gradient, finite, atol=1e-4)
+    # And it points away from the sphere's centre, as the analytic gradient does (within ~35 degrees:
+    # the lattice is coarse, 0.25 between samples).
+    assert np.dot(gradient / np.linalg.norm(gradient), point / np.linalg.norm(point)) > 0.8
+
+
+def test_signed_distance_field_gradient_interpolation_is_set_apart():
+    geom = tesseract_geometry.SignedDistanceField(
+        SDF_MIN, SDF_MAX, SDF_DIMS, _sphere_grid().ravel(order="F")
+    )
+    geom.setGradientInterpolation(tesseract_geometry.SignedDistanceFieldInterpolation.TRICUBIC)
+    assert geom.getInterpolation() == tesseract_geometry.SignedDistanceFieldInterpolation.TRILINEAR
+    assert (
+        geom.getGradientInterpolation()
+        == tesseract_geometry.SignedDistanceFieldInterpolation.TRICUBIC
+    )
+    assert not geom.isSparse()
+    assert geom.getNVDB() == b""
+    assert geom.getBandClamp() == 0.0
+    assert geom.getLevels() == []
+
+
+def _sphere_nvdb(dims):
+    """The sphere sampled on an n^3 lattice over [SDF_MIN, SDF_MAX], as NanoVDB bytes."""
+    axes = [np.linspace(SDF_MIN[i], SDF_MAX[i], dims) for i in range(3)]
+    x, y, z = np.meshgrid(*axes, indexing="ij")
+    grid = (np.sqrt(x**2 + y**2 + z**2) - SDF_RADIUS).ravel(order="F")
+    field = tesseract_geometry.SignedDistanceField(
+        SDF_MIN, SDF_MAX, np.array([dims] * 3, dtype=np.int32), grid
+    )
+    return tesseract_geometry.writeSignedDistanceFieldNVDB(field)
+
+
+def test_sparse_signed_distance_field_reads_one_grid():
+    fine = _sphere_nvdb(17)
+    sdf = tesseract_geometry.readSparseSignedDistanceFieldNVDB(fine, 0.0, np.array([2.0, 2.0, 2.0]))
+
+    assert sdf.isSparse()
+    assert sdf.getLevels() == []
+    assert sdf.getBandClamp() == 0.0
+    assert len(sdf.getNVDB()) > 0
+    nptest.assert_allclose(sdf.getScale(), [2, 2, 2])
+    # Queries are in the field's local (grid) frame; the scale is the backends' business.
+    distance, gradient = sdf.getDistanceAndGradient(np.array([0.75, 0.0, 0.0]))
+    assert distance == pytest.approx(0.25, abs=0.01)
+    # On a lattice node the trilinear gradient takes one cell's slope, ~0.08 off-axis here.
+    nptest.assert_allclose(gradient, [1.0, 0.0, 0.0], atol=0.1)
+    with pytest.raises(RuntimeError):
+        sdf.getDistances()
+    # Outside the grid there is no answer.
+    assert sdf.getDistance(np.array([5.0, 5.0, 5.0])) == np.inf
+
+    sdf.setInterpolation(tesseract_geometry.SignedDistanceFieldInterpolation.TRICUBIC)
+    assert sdf.getInterpolation() == tesseract_geometry.SignedDistanceFieldInterpolation.TRICUBIC
+    assert (
+        sdf.getGradientInterpolation()
+        == tesseract_geometry.SignedDistanceFieldInterpolation.TRICUBIC
+    )
+
+    # The same grid from its bytes; a two-grid file (concatenated files) needs a grid named or indexed.
+    same = tesseract_geometry.SignedDistanceField(fine, 0.0, np.array([2.0, 2.0, 2.0]))
+    assert tesseract_geometry.isIdentical(
+        same,
+        tesseract_geometry.readSparseSignedDistanceFieldNVDB(fine, 0.0, np.array([2.0, 2.0, 2.0])),
+    )
+    two = fine + _sphere_nvdb(9)
+    assert len(tesseract_geometry.getSignedDistanceFieldNVDBGridNames(two)) == 2
+    with pytest.raises(RuntimeError):
+        tesseract_geometry.readSparseSignedDistanceFieldNVDB(two, 0.0)
+    second = tesseract_geometry.readSparseSignedDistanceFieldNVDB(two, 0.0, np.ones(3), 1)
+    assert second.getDistance(np.array([0.75, 0.0, 0.0])) == pytest.approx(0.25, abs=0.02)
+
+
+def test_sparse_signed_distance_field_levels():
+    fine = tesseract_geometry.SignedDistanceField(_sphere_nvdb(17), 0.0)
+    coarse = tesseract_geometry.SignedDistanceField(_sphere_nvdb(9), 0.0)
+    levels = tesseract_geometry.SignedDistanceField([fine, coarse])
+    assert levels.isSparse()
+    assert len(levels.getLevels()) == 2
+    p = np.array([0.75, 0.0, 0.0])
+    assert levels.getDistance(p) == pytest.approx(fine.getDistance(p))
+    with pytest.raises(RuntimeError):  # coarse first
+        tesseract_geometry.SignedDistanceField([coarse, fine])
+    dense = tesseract_geometry.SignedDistanceField(
+        SDF_MIN, SDF_MAX, SDF_DIMS, _sphere_grid().ravel(order="F")
+    )
+    with pytest.raises(RuntimeError):  # not a sparse field
+        tesseract_geometry.SignedDistanceField([fine, dense])
+
+
 def test_geometry_uuid_is_canonical_string():
     s = tesseract_geometry.Box(1, 1, 1).getUUID()
     assert isinstance(s, str)

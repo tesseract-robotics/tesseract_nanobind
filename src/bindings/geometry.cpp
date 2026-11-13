@@ -464,6 +464,13 @@ NB_MODULE(geometry, m) {
              "How the mesh was made; the URDF parser sets CONVERTED for tesseract:make_convex")
         .def("setCreationMethod", &tg::ConvexMesh::setCreationMethod, "method"_a, "Set how the mesh was made");
 
+    nb::enum_<tg::SignedDistanceFieldInterpolation>(m, "SignedDistanceFieldInterpolation",
+                                                    "How a grid-backed or sparse field is read between its samples")
+        .value("TRILINEAR", tg::SignedDistanceFieldInterpolation::TRILINEAR,
+               "2x2x2 samples; the gradient jumps at cell faces (the default)")
+        .value("TRICUBIC", tg::SignedDistanceFieldInterpolation::TRICUBIC,
+               "4x4x4 samples, Catmull-Rom; the gradient is continuous");
+
     // SignedDistanceField - volumetric signed distance field (negative inside the surface)
     nb::class_<tg::SignedDistanceField, tg::Geometry>(m, "SignedDistanceField")
         .def("__init__", [](tg::SignedDistanceField* self,
@@ -483,6 +490,23 @@ NB_MODULE(geometry, m) {
         "dimensions.prod() values, negative inside the surface.\n\n"
         "distances is flat and ordered x-fastest: index = i + nx*(j + ny*k). From a numpy grid built\n"
         "with np.meshgrid(..., indexing='ij'), pass grid.ravel(order='F').")
+        .def("__init__", [](tg::SignedDistanceField* self, const nb::bytes& nvdb, double band_clamp,
+                            const Eigen::Vector3d& scale) {
+            const auto* begin = reinterpret_cast<const std::uint8_t*>(nvdb.c_str());
+            new (self) tg::SignedDistanceField(std::vector<std::uint8_t>(begin, begin + nvdb.size()), band_clamp, scale);
+        }, "nvdb"_a, "band_clamp"_a, "scale"_a = Eigen::Vector3d::Ones(),
+        "Create a sparse field: one NanoVDB FloatGrid (a one-grid file, or the bare grid) read in place.\n\n"
+        "band_clamp is the distance, in grid units, past which the stored values stop growing (0: they\n"
+        "never do). Where the field cannot answer, or reads at or past the clamp outside the surface, it\n"
+        "has no answer: +inf. Use readSparseSignedDistanceFieldNVDB to pick one grid of a file with several.")
+        .def("__init__", [](tg::SignedDistanceField* self, const std::vector<tg::SignedDistanceField::ConstPtr>& levels) {
+            new (self) tg::SignedDistanceField(levels);
+        }, "levels"_a,
+        "Stack sparse fields of ONE surface as levels by resolution, finest first.\n\n"
+        "A query asks each level in turn, and the first that can answer does; a finer level gives way at\n"
+        "its band clamp. This is not a union: separate objects belong in separate fields. Raises if a\n"
+        "level is not a sparse single-grid field, has a different scale from the first, or is coarser\n"
+        "than the level before it.")
         .def("getDomainMin", [](const tg::SignedDistanceField& self) -> Eigen::Vector3d {
             return self.getDomain().min();
         }, "Get the minimum corner of the sampled domain (local frame)")
@@ -496,12 +520,40 @@ NB_MODULE(geometry, m) {
             return Eigen::Map<const Eigen::VectorXd>(d.data(), static_cast<Eigen::Index>(d.size()));
         }, "Get the sampled signed distances, flat and x-fastest (index = i + nx*(j + ny*k)).\n"
            "Reshape with .reshape(field.getDimensions(), order='F') for a 3D view.\n"
-           "Discretizes a function-backed field on first call.")
+           "Discretizes a function-backed field on first call. Raises for a sparse field, which has no\n"
+           "dense grid.")
         .def("getScale", &tg::SignedDistanceField::getScale, "Get the local scaling applied to the field")
         .def("getDistance", &tg::SignedDistanceField::getDistance, "point"_a,
              "Get the signed distance at a point in the field's local frame.\n"
-             "A function-backed field evaluates its sampler directly; a grid-backed field\n"
-             "trilinearly interpolates. The point is clamped to the domain.")
+             "A function-backed field evaluates its sampler directly; a grid-backed field interpolates\n"
+             "(see setInterpolation), with the point clamped to the domain. A sparse field returns +inf\n"
+             "where it has no answer.")
+        .def("getGradient", &tg::SignedDistanceField::getGradient, "point"_a,
+             "Get the gradient of the signed distance at a point in the field's local frame (not normalized)")
+        .def("getDistanceAndGradient", [](const tg::SignedDistanceField& self, const Eigen::Vector3d& point) {
+            Eigen::Vector3d gradient;
+            const double distance = self.getDistanceAndGradient(point, gradient);
+            return std::make_pair(distance, gradient);
+        }, "point"_a, "Get (distance, gradient) at a point in the field's local frame, from one lookup")
+        .def("isSparse", &tg::SignedDistanceField::isSparse,
+             "Whether this is a sparse field: one NanoVDB grid, or levels of them")
+        .def("getNVDB", [](const tg::SignedDistanceField& self) {
+            const std::vector<std::uint8_t>& nvdb = self.getNVDB();
+            return nb::bytes(nvdb.data(), nvdb.size());
+        }, "A sparse field's grid as its bare NanoVDB grid buffer (empty for a dense, function-backed or\n"
+           "multi-level field; a multi-level field's grids are its levels')")
+        .def("getBandClamp", &tg::SignedDistanceField::getBandClamp,
+             "A sparse field's band clamp (0 for a dense, function-backed or multi-level field)")
+        .def("getLevels", &tg::SignedDistanceField::getLevels,
+             "A multi-level field's levels, finest first (empty otherwise)")
+        .def("setInterpolation", &tg::SignedDistanceField::setInterpolation, "interpolation"_a,
+             "Choose how distances (and, unless setGradientInterpolation overrides it, gradients) are read\n"
+             "between samples")
+        .def("getInterpolation", &tg::SignedDistanceField::getInterpolation, "How the distance is read")
+        .def("setGradientInterpolation", &tg::SignedDistanceField::setGradientInterpolation, "interpolation"_a,
+             "Read the gradient with a different method from the distance")
+        .def("getGradientInterpolation", &tg::SignedDistanceField::getGradientInterpolation,
+             "How the gradient is read (defaults to the distance's method)")
         .def("isDiscretized", &tg::SignedDistanceField::isDiscretized,
              "Whether the dense sample grid has been materialized")
         .def("discretize", &tg::SignedDistanceField::discretize,
@@ -695,12 +747,31 @@ NB_MODULE(geometry, m) {
     m.def("writeSignedDistanceFieldNVDB", [](const tg::SignedDistanceField& sdf) {
         return writeBytes([](const tg::SignedDistanceField& f) { return tg::writeSignedDistanceFieldNVDB(f); }, sdf);
     }, "sdf"_a,
-    "Serialize a field as a standard NanoVDB FloatGrid file");
+    "Serialize a field as a standard NanoVDB file: one FloatGrid, or a multi-level field's levels' grids in order");
 
     m.def("readSignedDistanceFieldNVDB", [](const nb::bytes& data, const Eigen::Vector3d& scale) {
         return tg::readSignedDistanceFieldNVDB(reinterpret_cast<const std::uint8_t*>(data.c_str()), data.size(), scale);
     }, "data"_a, "scale"_a = Eigen::Vector3d::Ones(),
     "Reconstruct a field from NanoVDB FloatGrid bytes (exactly one axis-aligned, uniformly scaled grid)");
+
+    m.def("getSignedDistanceFieldNVDBGridNames", [](const nb::bytes& data) {
+        return tg::getSignedDistanceFieldNVDBGridNames(reinterpret_cast<const std::uint8_t*>(data.c_str()), data.size());
+    }, "data"_a, "The names of the grids in NanoVDB bytes, in file order");
+
+    m.def("readSparseSignedDistanceFieldNVDB",
+          [](const nb::bytes& data, double band_clamp, const Eigen::Vector3d& scale, const std::string& grid_name) {
+        return tg::readSparseSignedDistanceFieldNVDB(
+            reinterpret_cast<const std::uint8_t*>(data.c_str()), data.size(), band_clamp, scale, grid_name);
+    }, "data"_a, "band_clamp"_a, "scale"_a = Eigen::Vector3d::Ones(), "grid_name"_a = "",
+    "Read one FloatGrid of NanoVDB bytes as a sparse field kept in its stored form, by name when the\n"
+    "file holds several (the name can be left out when it holds one). band_clamp is in grid units.");
+
+    m.def("readSparseSignedDistanceFieldNVDB",
+          [](const nb::bytes& data, double band_clamp, const Eigen::Vector3d& scale, std::size_t grid_index) {
+        return tg::readSparseSignedDistanceFieldNVDB(
+            reinterpret_cast<const std::uint8_t*>(data.c_str()), data.size(), band_clamp, scale, grid_index);
+    }, "data"_a, "band_clamp"_a, "scale"_a, "grid_index"_a,
+    "Read the FloatGrid at grid_index (file order) of NanoVDB bytes as a sparse field");
 
     // Utilities
     m.def("isIdentical", &tg::isIdentical, "geom1"_a, "geom2"_a,
