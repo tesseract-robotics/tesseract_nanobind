@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **Sparse and multi-level `SignedDistanceField`** — a field can keep one NanoVDB grid as stored and read it in place (`SignedDistanceField(nvdb, band_clamp, scale)`, `readSparseSignedDistanceFieldNVDB` by grid name or index, `getSignedDistanceFieldNVDBGridNames`), or stack sparse fields of one surface by resolution, finest first (`SignedDistanceField(levels)`). Also bound: `isSparse`, `getNVDB`, `getBandClamp`, `getLevels`, `getGradient`, `getDistanceAndGradient`, and the `SignedDistanceFieldInterpolation` enum with `set`/`getInterpolation` and `set`/`getGradientInterpolation`. `getDistances` raises for a sparse field, which has no dense grid, and `getDistance` returns `inf` where it has no answer. tesseract is now built from upstream `master` `e5c79c0c`, which has tesseract-robotics/tesseract#1390 and #1391 (and #1396, so the fork branch is no longer needed).
+
 ## [0.36.0.0rc1] - 2026-11-11 — pre-release on upstream master plus our open PRs
 
 Pre-release: `pip install --pre tesseract-robotics-nanobind`. The wheels build tesseract, trajopt and tesseract_planning from `nanobind-0.36` branches on the jf--- forks, each upstream `master` plus the open upstream PRs we filed, so the release does not wait on upstream review. `tesseract_robotics.build_identity.UPSTREAM_SOURCES` records the SHAs and PRs, and `dependencies.rosinstall` pins them:

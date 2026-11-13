@@ -309,7 +309,17 @@ class ConvexMesh(PolygonMesh):
     def setCreationMethod(self, method: ConvexMesh.CreationMethod) -> None:
         """Set how the mesh was made"""
 
+class SignedDistanceFieldInterpolation(enum.Enum):
+    """How a grid-backed or sparse field is read between its samples"""
+
+    TRILINEAR = 0
+    """2x2x2 samples; the gradient jumps at cell faces (the default)"""
+
+    TRICUBIC = 1
+    """4x4x4 samples, Catmull-Rom; the gradient is continuous"""
+
 class SignedDistanceField(Geometry):
+    @overload
     def __init__(self, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')] | Sequence[int], distances: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ...) -> None:
         """
         Create a field from signed distances sampled on a regular grid.
@@ -320,6 +330,27 @@ class SignedDistanceField(Geometry):
 
         distances is flat and ordered x-fastest: index = i + nx*(j + ny*k). From a numpy grid built
         with np.meshgrid(..., indexing='ij'), pass grid.ravel(order='F').
+        """
+
+    @overload
+    def __init__(self, nvdb: bytes, band_clamp: float, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ...) -> None:
+        """
+        Create a sparse field: one NanoVDB FloatGrid (a one-grid file, or the bare grid) read in place.
+
+        band_clamp is the distance, in grid units, past which the stored values stop growing (0: they
+        never do). Where the field cannot answer, or reads at or past the clamp outside the surface, it
+        has no answer: +inf. Use readSparseSignedDistanceFieldNVDB to pick one grid of a file with several.
+        """
+
+    @overload
+    def __init__(self, levels: Sequence[SignedDistanceField]) -> None:
+        """
+        Stack sparse fields of ONE surface as levels by resolution, finest first.
+
+        A query asks each level in turn, and the first that can answer does; a finer level gives way at
+        its band clamp. This is not a union: separate objects belong in separate fields. Raises if a
+        level is not a sparse single-grid field, has a different scale from the first, or is coarser
+        than the level before it.
         """
 
     def getDomainMin(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
@@ -335,7 +366,8 @@ class SignedDistanceField(Geometry):
         """
         Get the sampled signed distances, flat and x-fastest (index = i + nx*(j + ny*k)).
         Reshape with .reshape(field.getDimensions(), order='F') for a 3D view.
-        Discretizes a function-backed field on first call.
+        Discretizes a function-backed field on first call. Raises for a sparse field, which has no
+        dense grid.
         """
 
     def getScale(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
@@ -344,9 +376,52 @@ class SignedDistanceField(Geometry):
     def getDistance(self, point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> float:
         """
         Get the signed distance at a point in the field's local frame.
-        A function-backed field evaluates its sampler directly; a grid-backed field
-        trilinearly interpolates. The point is clamped to the domain.
+        A function-backed field evaluates its sampler directly; a grid-backed field interpolates
+        (see setInterpolation), with the point clamped to the domain. A sparse field returns +inf
+        where it has no answer.
         """
+
+    def getGradient(self, point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """
+        Get the gradient of the signed distance at a point in the field's local frame (not normalized)
+        """
+
+    def getDistanceAndGradient(self, point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> tuple[float, Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
+        """
+        Get (distance, gradient) at a point in the field's local frame, from one lookup
+        """
+
+    def isSparse(self) -> bool:
+        """Whether this is a sparse field: one NanoVDB grid, or levels of them"""
+
+    def getNVDB(self) -> bytes:
+        """
+        A sparse field's grid as its bare NanoVDB grid buffer (empty for a dense, function-backed or
+        multi-level field; a multi-level field's grids are its levels')
+        """
+
+    def getBandClamp(self) -> float:
+        """
+        A sparse field's band clamp (0 for a dense, function-backed or multi-level field)
+        """
+
+    def getLevels(self) -> list[SignedDistanceField]:
+        """A multi-level field's levels, finest first (empty otherwise)"""
+
+    def setInterpolation(self, interpolation: SignedDistanceFieldInterpolation) -> None:
+        """
+        Choose how distances (and, unless setGradientInterpolation overrides it, gradients) are read
+        between samples
+        """
+
+    def getInterpolation(self) -> SignedDistanceFieldInterpolation:
+        """How the distance is read"""
+
+    def setGradientInterpolation(self, interpolation: SignedDistanceFieldInterpolation) -> None:
+        """Read the gradient with a different method from the distance"""
+
+    def getGradientInterpolation(self) -> SignedDistanceFieldInterpolation:
+        """How the gradient is read (defaults to the distance's method)"""
 
     def isDiscretized(self) -> bool:
         """Whether the dense sample grid has been materialized"""
@@ -557,11 +632,29 @@ def readSignedDistanceFieldVDB(data: bytes, scale: Annotated[NDArray[numpy.float
     """
 
 def writeSignedDistanceFieldNVDB(sdf: SignedDistanceField) -> bytes:
-    """Serialize a field as a standard NanoVDB FloatGrid file"""
+    """
+    Serialize a field as a standard NanoVDB file: one FloatGrid, or a multi-level field's levels' grids in order
+    """
 
 def readSignedDistanceFieldNVDB(data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ...) -> SignedDistanceField:
     """
     Reconstruct a field from NanoVDB FloatGrid bytes (exactly one axis-aligned, uniformly scaled grid)
+    """
+
+def getSignedDistanceFieldNVDBGridNames(data: bytes) -> list[str]:
+    """The names of the grids in NanoVDB bytes, in file order"""
+
+@overload
+def readSparseSignedDistanceFieldNVDB(data: bytes, band_clamp: float, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., grid_name: str = '') -> SignedDistanceField:
+    """
+    Read one FloatGrid of NanoVDB bytes as a sparse field kept in its stored form, by name when the
+    file holds several (the name can be left out when it holds one). band_clamp is in grid units.
+    """
+
+@overload
+def readSparseSignedDistanceFieldNVDB(data: bytes, band_clamp: float, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], grid_index: int) -> SignedDistanceField:
+    """
+    Read the FloatGrid at grid_index (file order) of NanoVDB bytes as a sparse field
     """
 
 def isIdentical(geom1: Geometry, geom2: Geometry) -> bool:

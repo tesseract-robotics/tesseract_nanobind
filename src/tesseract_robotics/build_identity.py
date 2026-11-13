@@ -23,10 +23,11 @@ class UpstreamSource:
 UPSTREAM_SOURCES: tuple[UpstreamSource, ...] = (
     UpstreamSource(
         repository="tesseract-robotics/tesseract",
-        fork="jf---/tesseract",
-        sha="4cf644d704bd8961c7cdaf193f72488fa501f5c0",
-        base_master_sha="a9c22066",
-        carried_pull_requests=(1396,),
+        # upstream master itself: #1396 has merged, so the branch carries nothing
+        fork="tesseract-robotics/tesseract",
+        sha="e5c79c0cf95372c07080400ef0b73e3e97c34ba2",
+        base_master_sha="e5c79c0c",
+        carried_pull_requests=(),
     ),
     UpstreamSource(
         repository="tesseract-robotics/tesseract_planning",
