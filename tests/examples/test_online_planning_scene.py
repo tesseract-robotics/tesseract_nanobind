@@ -219,3 +219,25 @@ def test_playback_sweeps_each_plan_forward_and_back_while_the_person_walks():
     for tick, row in enumerate(rows):
         assert row[1:3] == pytest.approx(scene.human_joint_values(tick).tolist())
         assert row[3] == pytest.approx(tick * scene.TICK_S)
+
+
+def test_a_plan_is_swept_forward_and_back_one_waypoint_a_tick():
+    assert [scene.sweep_waypoint(tick, 4) for tick in range(8)] == [0, 1, 2, 3, 2, 1, 0, 1]
+
+
+def test_the_person_is_placed_where_asked(robot):
+    """What the SQP example's slider sets: the person at a world (x, y), off its scripted walk."""
+    position_m = (scene.WALK_X_M, 0.5 * (scene.WALK_NEAR_Y_M + scene.WALK_FAR_Y_M))
+    scene.place_person(robot.env, position_m)
+    transforms = robot.env.getState().link_transforms
+    assert np.asarray(transforms[scene.ENVELOPE_LINK].translation)[:2] == pytest.approx(position_m)
+
+
+def test_the_person_walks_towards_its_goal_one_ticks_step_at_a_time():
+    """A slider dragged end to end moves the person at walking speed, as the scripted walk."""
+    step_m = scene.WALKING_SPEED_M_S * scene.TICK_S
+    far, near = scene.WALK_FAR_Y_M, scene.WALK_NEAR_Y_M
+    assert scene.walk_towards(far, near) == pytest.approx(far - step_m)
+    assert scene.walk_towards(near, far) == pytest.approx(near + step_m)
+    # Within one step it lands on the goal.
+    assert scene.walk_towards(far, far - 0.5 * step_m) == pytest.approx(far - 0.5 * step_m)

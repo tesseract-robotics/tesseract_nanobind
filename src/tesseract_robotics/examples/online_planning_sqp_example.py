@@ -40,7 +40,9 @@ See online_planning_scene.py
 """
 
 # --8<-- [start:setup]
+import argparse
 import sys
+import threading
 import time
 
 import numpy as np
@@ -68,6 +70,17 @@ SQP_STEPS_PER_TICK = 10
 # person and the floor at once. With the config's default 3 the solver converged with a link
 # 0.03 m inside the margin; with 10 every tick keeps it, measured.
 COLLISION_ROWS_PER_WAYPOINT = 10
+# Waypoints per plan.
+STEPS = 12
+
+# Under `--sliders`: the view the slider is laid out for (the demo manifest's camera). From
+# there the robot runs away from the viewer, and screen-right is world -y, towards the arm.
+VIEW_POSITION_M = (-4.0, 3.0, 2.0)
+VIEW_LOOK_AT_M = (3.5, 3.0, 1.0)
+VIEW_FOV_RAD = 0.75
+# The slider's step along the person's walk [m].
+PERSON_SLIDER_STEP_M = 0.01
+MS_PER_S = 1e3
 
 
 class SolverDidNotConvergeError(RuntimeError):
@@ -235,8 +248,91 @@ def build_optimization_problem(
 # --8<-- [end:problem]
 
 
+def start_cell():
+    """The robot at the start of its run, and the person, checked against the arm.
+
+    The person stands at its joints' zero: place it before the first solve.
+
+    Returns:
+        `(robot, joint_names)`: the `Robot`, and its `manipulator` group's joints
+    """
+    robot = Robot.from_tesseract_support(
+        "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
+    joint_names = robot.get_joint_names("manipulator")
+    robot.set_joints(np.array(scene.START_JOINTS), joint_names=joint_names)
+    scene.add_person(robot)
+    scene.check_arm_against_person(robot)
+    return robot, joint_names
+
+
+# --8<-- [start:sqp_loop]
+def initial_solve(problem, verbose=False):
+    """Create the SQP solver, and solve `problem` from scratch with it, before the first tick.
+
+    Returns:
+        The solver, for `replan` to step each tick
+
+    Raises:
+        SolverDidNotConvergeError: the solve did not end in `SQPStatus.CONVERGED`.
+    """
+    qp_solver = tsqp.OSQPEigenSolver()
+    solver = tsqp.TrustRegionSQPSolver(qp_solver)
+    solver.verbose = verbose
+    solver.params.initial_trust_box_size = TRUST_BOX_SIZE
+    solver.solve(problem)
+    if solver.getStatus() != tsqp.SQPStatus.CONVERGED:
+        raise SolverDidNotConvergeError(
+            f"initial solve ended {tsqp.toString(solver.getStatus())}, expected SQP_CONVERGED"
+        )
+    return solver
+
+
+def replan(
+    solver,
+    robot,
+    joint_names,
+    plan,
+    target_pos,
+    *,
+    use_continuous_collision=False,
+    extra_constraints=None,
+    sqp_steps_per_tick=SQP_STEPS_PER_TICK,
+):
+    """One tick: rebuild the problem seeded with `plan`, the last solution, and step from it.
+
+    The start stays pinned at `plan[0]`. Takes SQP steps until one converges, at most
+    `sqp_steps_per_tick`; the solver leaves the new problem's variables at its best values.
+
+    Returns:
+        The new problem's data (see build_optimization_problem): keep it while the plan is used
+    """
+    problem_data = build_optimization_problem(
+        robot,
+        joint_names,
+        plan[0],
+        target_pos,
+        len(plan),
+        use_continuous_collision,
+        extra_constraints,
+        initial_trajectory=plan,
+    )
+    # Incremental optimization: a few SQP steps, from the seed
+    solver.init(problem_data["problem"])
+    for _ in range(sqp_steps_per_tick):
+        converged = solver.stepSQPSolver()
+        # Reset box size (trust region loop can shrink it to zero)
+        solver.setBoxSize(TRUST_BOX_SIZE)
+        if converged:
+            break
+    return problem_data
+
+
+# --8<-- [end:sqp_loop]
+
+
 def run(
-    steps=12,
+    steps=STEPS,
     verbose=False,
     use_continuous_collision=False,
     extra_constraints=None,
@@ -261,21 +357,15 @@ def run(
     """
     if num_replan is None:
         num_replan = scene.ticks_per_run()
-    # Load robot model
-    robot = Robot.from_tesseract_support(
-        "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
-    )
-    joint_names = robot.get_joint_names("manipulator")
+    # Load robot model, with the person checked against the arm
+    robot, joint_names = start_cell()
     print(f"Manipulator joints ({len(joint_names)}): {joint_names}")
 
     # Define start and target: the robot runs down the cell along x, the arm at zero at both ends
     start_pos = np.array(scene.START_JOINTS)
     target_pos = np.array(scene.TARGET_JOINTS)
 
-    robot.set_joints(start_pos, joint_names=joint_names)
-    # The person, at the walk's first point for the initial solve, checked against the arm
-    scene.add_person(robot)
-    scene.check_arm_against_person(robot)
+    # The person, at the walk's first point for the initial solve
     scene.move_person(robot.env, 0)
 
     # Build initial problem
@@ -293,23 +383,11 @@ def run(
     problem = problem_data["problem"]
     problem.print()
 
-    # --8<-- [start:sqp_loop]
-    # Create SQP solver with OSQP
-    box_size = TRUST_BOX_SIZE
-    qp_solver = tsqp.OSQPEigenSolver()
-    solver = tsqp.TrustRegionSQPSolver(qp_solver)
-    solver.verbose = verbose
-    solver.params.initial_trust_box_size = box_size
-
     # Initial global solve
     print("Running initial global solve...")
     t0 = time.perf_counter()
-    solver.solve(problem)
+    solver = initial_solve(problem, verbose)
     solve_time = time.perf_counter() - t0
-    if solver.getStatus() != tsqp.SQPStatus.CONVERGED:
-        raise SolverDidNotConvergeError(
-            f"initial solve ended {tsqp.toString(solver.getStatus())}, expected SQP_CONVERGED"
-        )
     x = solver.getResults().best_var_vals
     cost = problem.getTotalExactCost()
     print(f"Initial solve: cost={cost:.4f}, time={solve_time * 1000:.1f}ms")
@@ -327,28 +405,18 @@ def run(
         # The solver leaves the problem's variables at best_var_vals: one row per waypoint
         traj = ti.toTrajArray(problem_data["vars_list"])
 
-        # Rebuild the problem seeded with the last solution
+        # Rebuild the problem seeded with the last solution, and step from it
         t0 = time.perf_counter()
-        problem_data = build_optimization_problem(
+        problem_data = replan(
+            solver,
             robot,
             joint_names,
-            traj[0],
+            traj,
             target_pos,
-            steps,
-            use_continuous_collision,
-            extra_constraints,
-            initial_trajectory=traj,
+            use_continuous_collision=use_continuous_collision,
+            extra_constraints=extra_constraints,
+            sqp_steps_per_tick=sqp_steps_per_tick,
         )
-        problem = problem_data["problem"]
-
-        # Incremental optimization: a few SQP steps, from the seed
-        solver.init(problem)
-        for _ in range(sqp_steps_per_tick):
-            converged = solver.stepSQPSolver()
-            # Reset box size (trust region loop can shrink it to zero)
-            solver.setBoxSize(box_size)
-            if converged:
-                break
 
         x = solver.getResults().best_var_vals
         dt = time.perf_counter() - t0
@@ -356,9 +424,8 @@ def run(
         trajectories.append(x.copy())
 
         if verbose:
-            cost = problem.getTotalExactCost()
+            cost = problem_data["problem"].getTotalExactCost()
             print(f"  Tick {tick}: cost={cost:.4f}, time={dt * 1000:.1f}ms")
-    # --8<-- [end:sqp_loop]
 
     avg_time = np.mean(timings[1:]) * 1000
     print(f"Replan timing: avg={avg_time:.1f}ms ({1000 / avg_time:.0f} Hz)")
@@ -391,7 +458,108 @@ def recording_joint_names(results):
     return [*results["joint_names"], *scene.HUMAN_JOINTS]
 
 
-def main() -> int:
+def face_view(viewer) -> None:
+    """Start the live viewer on the view the slider is laid out for."""
+    camera = viewer.server.initial_camera
+    camera.position = VIEW_POSITION_M
+    camera.look_at = VIEW_LOOK_AT_M
+    camera.fov = VIEW_FOV_RAD
+
+
+# --8<-- [start:sliders]
+def drive_with_slider(viewer, robot, joint_names, solver, plan, stop: threading.Event) -> None:
+    """Replan once a tick with the person where its slider sends it, until `stop` is set.
+
+    The slider runs along the person's walk, from its far end towards the arm. The person walks
+    there at walking speed, one tick's step at a time, and the robot sweeps along the plan in
+    force, a waypoint per tick, as the replay shows it.
+
+    Args:
+        viewer: A `TesseractViewer` showing `robot.env`.
+        robot, joint_names: From `start_cell`.
+        solver: From `initial_solve`, which solved `plan`.
+        plan: The initial `(steps, joints)` plan, with the person at the walk's far end.
+        stop: Set to end the loop.
+    """
+    gui = viewer.server.gui
+    walk_m = scene.WALK_FAR_Y_M - scene.WALK_NEAR_Y_M
+    person = gui.add_slider(
+        "Person, towards the arm [m]",
+        min=0.0,
+        max=walk_m,
+        step=PERSON_SLIDER_STEP_M,
+        initial_value=0.0,
+    )
+    status = gui.add_text("Replan", initial_value="", disabled=True)
+    target_pos = np.array(scene.TARGET_JOINTS)
+    names = [*joint_names, *scene.HUMAN_JOINTS]
+    y_m = scene.WALK_FAR_Y_M
+    tick = 0
+    while not stop.is_set():
+        started = time.perf_counter()
+        y_m = scene.walk_towards(y_m, scene.WALK_FAR_Y_M - float(person.value))
+        position = (scene.WALK_X_M, y_m)
+        scene.place_person(robot.env, position)
+        problem_data = replan(solver, robot, joint_names, plan, target_pos)
+        plan = ti.toTrajArray(problem_data["vars_list"])
+        replan_ms = (time.perf_counter() - started) * MS_PER_S
+        waypoint = scene.sweep_waypoint(tick, len(plan))
+        viewer.update_joint_positions(names, [*plan[waypoint], *scene.human_joints_at(position)])
+        status.value = f"{replan_ms:.0f} ms of the {scene.TICK_S * MS_PER_S:.0f} ms tick"
+        tick += 1
+        stop.wait(max(0.0, scene.TICK_S - (time.perf_counter() - started)))
+
+
+# --8<-- [end:sliders]
+
+
+def run_with_slider() -> int:
+    """`--sliders`: solve with the person at its walk's far end, then follow the slider."""
+    robot, joint_names = start_cell()
+    scene.move_person(robot.env, 0)
+    problem_data = build_optimization_problem(
+        robot,
+        joint_names,
+        np.array(scene.START_JOINTS),
+        np.array(scene.TARGET_JOINTS),
+        STEPS,
+        use_continuous_collision=False,
+    )
+    solver = initial_solve(problem_data["problem"])
+    plan = ti.toTrajArray(problem_data["vars_list"])
+
+    from tesseract_robotics.viewer import TesseractViewer
+
+    scene.style_for_viewer(robot.env)
+    with TesseractViewer() as viewer:
+        viewer.update_environment(robot.env)
+        face_view(viewer)
+        stop = threading.Event()
+        driver = threading.Thread(
+            target=drive_with_slider,
+            args=(viewer, robot, joint_names, solver, plan, stop),
+            daemon=True,
+        )
+        driver.start()
+        print(f"Viewer at {viewer.url}: the person's slider is in its control panel")
+        input("Press Enter to exit...")
+        stop.set()
+        driver.join()
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Online planning with the low-level SQP API")
+    parser.add_argument(
+        "--sliders",
+        action="store_true",
+        help="move the person yourself with a slider, the robot replanning live, instead of "
+        "replaying its walk",
+    )
+    args = parser.parse_args(argv)
+    if args.sliders:
+        return run_with_slider()
+
     results = run(verbose=False)
 
     if results.get("trajectories"):
