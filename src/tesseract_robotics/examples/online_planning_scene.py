@@ -266,14 +266,41 @@ def walk_position_m(tick: int) -> NDArray[np.float64]:
     return np.array([WALK_X_M, y])
 
 
+def walk_towards(y_m: float, goal_y_m: float) -> float:
+    """The person's y after one tick walking from `y_m` towards `goal_y_m` [m].
+
+    One tick's step at `WALKING_SPEED_M_S` at most: the scripted walk's step, which the SQP
+    example's replans are measured to keep the margin against.
+    """
+    reach_m = WALKING_SPEED_M_S * TICK_S
+    return y_m + float(np.clip(goal_y_m - y_m, -reach_m, reach_m))
+
+
+def human_joints_at(position_m: ArrayLike) -> NDArray[np.float64]:
+    """`HUMAN_JOINTS` values that put the person at world (x, y) `position_m` [m]."""
+    return np.asarray(position_m, dtype=np.float64) - np.asarray(HUMAN_ORIGIN_M)
+
+
 def human_joint_values(tick: int) -> NDArray[np.float64]:
     """`HUMAN_JOINTS` values that put the person at `walk_position_m(tick)` [m]."""
-    return walk_position_m(tick) - np.asarray(HUMAN_ORIGIN_M)
+    return human_joints_at(walk_position_m(tick))
+
+
+def place_person(env: Environment, position_m: ArrayLike) -> None:
+    """Set the person's joints so it stands at world (x, y) `position_m` [m]."""
+    env.setState(dict(zip(HUMAN_JOINTS, human_joints_at(position_m).tolist(), strict=True)))
 
 
 def move_person(env: Environment, tick: int) -> None:
     """Set the person's joints to where the walk is at `tick`."""
-    env.setState(dict(zip(HUMAN_JOINTS, human_joint_values(tick).tolist(), strict=True)))
+    place_person(env, walk_position_m(tick))
+
+
+def sweep_waypoint(tick: int, waypoints: int) -> int:
+    """The waypoint tick `tick` shows of a plan of `waypoints`: forward, then back, repeating."""
+    period = 2 * (waypoints - 1)
+    phase = tick % period
+    return phase if phase < waypoints else period - phase
 
 
 def playback_rows(plans: Sequence[ArrayLike], plan_of_tick: Sequence[int]) -> list[list[float]]:
@@ -294,8 +321,6 @@ def playback_rows(plans: Sequence[ArrayLike], plan_of_tick: Sequence[int]) -> li
     rows = []
     for tick, index in enumerate(plan_of_tick):
         plan = np.asarray(plans[index], dtype=np.float64)
-        period = 2 * (len(plan) - 1)
-        phase = tick % period
-        waypoint = phase if phase < len(plan) else period - phase
+        waypoint = sweep_waypoint(tick, len(plan))
         rows.append([*plan[waypoint].tolist(), *human_joint_values(tick).tolist(), tick * TICK_S])
     return rows

@@ -95,6 +95,10 @@ default 3, because several of the arm's links can touch the person and the floor
 
 ### SQP loop
 
+`initial_solve` solves the first plan from scratch. Then, every tick, `run` moves the person one
+step along its walk and calls `replan`, which rebuilds the problem seeded with the last plan and
+steps the solver from there.
+
 ```python title="online_planning_sqp_example.py (sqp_loop)"
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:sqp_loop"
 ```
@@ -119,6 +123,18 @@ tesseract_online_planning_sqp_example
     Between the second and third line, `problem.print()` dumps the problem's state, as the C++
     reference does. Before the first solve, trajopt prints zero counts and uninitialized
     bounds there.
+
+### Move the person yourself
+
+```bash
+tesseract_online_planning_sqp_example --sliders
+```
+
+With `--sliders` the robot replans live, once per 0.1 s tick, while you move the person from the viewer's control panel.
+
+```python title="online_planning_sqp_example.py (sliders)"
+--8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:sliders"
+```
 
 ## Key concepts
 
@@ -247,7 +263,7 @@ with TesseractViewer() as viewer:
 
 `online_planning_example.py` replans through the task composer instead: each plan runs a whole
 pipeline, with profiles and the high-level API, at the cost of rebuilding the problem every
-time. It is not a port of the C++ example; the SQP example above is.
+time.
 See [`online_planning_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_example.py):
 
 ```bash
@@ -259,6 +275,9 @@ tesseract_online_planning_example
 ```bash
 # Low-level SQP (discrete collision)
 tesseract_online_planning_sqp_example
+
+# The same, moving the person yourself with a slider
+tesseract_online_planning_sqp_example --sliders
 
 # Task Composer based
 tesseract_online_planning_example
