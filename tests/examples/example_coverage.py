@@ -94,12 +94,17 @@ def _kind(path: Path) -> ExampleKind:
     return ExampleKind.ENTRY if defines_main else ExampleKind.HELPER
 
 
-def package_dir(package: str) -> Path:
-    """The directory of `package`, found without importing it."""
+def _package_location(package: str) -> Path:
+    """The directory of `package` as the import system spells it, found without importing it."""
     spec = importlib.util.find_spec(package)
     if spec is None or not spec.submodule_search_locations:
         raise ModuleNotFoundError(f"examples package {package!r} not found")
-    return Path(next(iter(spec.submodule_search_locations))).resolve()
+    return Path(next(iter(spec.submodule_search_locations)))
+
+
+def package_dir(package: str) -> Path:
+    """The resolved directory of `package`, found without importing it."""
+    return _package_location(package).resolve()
 
 
 def discover(package: str) -> list[ExampleModule]:
@@ -173,7 +178,9 @@ class _Recorder:
     """Records which functions defined under one directory start executing."""
 
     def __init__(self, root: Path) -> None:
-        self._prefix = str(root)
+        # `co_filename` spells the path as the import system does; a site-packages reached
+        # through a symlink differs from its resolved form, so both are matched.
+        self._prefixes = (str(root), str(root.resolve()))
         self.executed: set[tuple[str, str]] = set()
         self._tool = _free_tool_id()
         sys.monitoring.use_tool_id(self._tool, TOOL_NAME)
@@ -181,7 +188,7 @@ class _Recorder:
         sys.monitoring.set_events(self._tool, sys.monitoring.events.PY_START)
 
     def _on_start(self, code: CodeType, _offset: int) -> object:
-        if code.co_filename.startswith(self._prefix):
+        if code.co_filename.startswith(self._prefixes):
             self.executed.add((code.co_filename, code.co_qualname))
         return sys.monitoring.DISABLE
 
@@ -226,7 +233,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config.stash[STATE] = _State(
         package=package,
         testdir=(config.rootpath / config.getini(TESTDIR_INI)).resolve(),
-        recorder=_Recorder(package_dir(package)),
+        recorder=_Recorder(_package_location(package)),
     )
 
 

@@ -6,6 +6,7 @@ plugin end to end under xdist, where the executed sets come from the workers.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -135,3 +136,17 @@ def test_partial_session_does_not_judge(pytester, monkeypatch, selection):
     _fake_project(pytester, monkeypatch, FAKE_PACKAGE | FAKE_TESTS)
     result = _run(pytester, *selection)
     assert result.ret == pytest.ExitCode.OK
+
+
+def test_examples_imported_through_a_symlink_are_recorded(pytester, monkeypatch):
+    """A site-packages reached through a symlink: `co_filename` is the unresolved path."""
+    _fake_project(pytester, monkeypatch, FAKE_TESTS | ORPHAN_TEST)
+    real = pytester.path / "real_site"
+    for name, text in FAKE_PACKAGE.items():
+        path = real / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    (pytester.path / "linked_site").symlink_to(real, target_is_directory=True)
+    monkeypatch.setenv("PYTHONPATH", f"{pytester.path / 'linked_site'}{os.pathsep}{REPO_ROOT}")
+    result = _run(pytester, "fake_tests")
+    assert result.ret == pytest.ExitCode.OK, result.stdout.str()
