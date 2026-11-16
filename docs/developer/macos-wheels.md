@@ -4,7 +4,7 @@ Notes captured during the 0.35.0.x release-pipeline hardening
 ([PR #98](https://github.com/tesseract-robotics/tesseract_nanobind/pull/98)),
 recorded so future maintainers don't re-diagnose them.
 
-The macOS builds run on `macos-15` (arm64) and `macos-15-intel` (x86_64), and
+The macOS build runs on `macos-15` (arm64; Intel macOS wheels were dropped for 0.36), and
 have sharp edges
 the Linux build doesn't. The dangerous part: each one fragments a *release*
 rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
@@ -48,7 +48,7 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     | `macos-13` | Intel x86_64 | deprecation path |
     | `macos-14` | **arm64** | what we built on up to 0.35.0.x |
     | `macos-15` | **arm64** | what we build arm64 on |
-    | `macos-15-intel` | Intel x86_64 | what we build x86_64 on (schedule, tags, manual runs) |
+    | `macos-15-intel` | Intel x86_64 | built x86_64 for 0.36.0.0rc1 only |
 
     We ship `macosx_15_0_arm64` (up to 0.35.0.x, `macosx_14_0_arm64`). "Lowering the macOS version" to `macos-13`/`-12`
     to dodge a runner problem (e.g. the upload flakiness above) does **not** keep

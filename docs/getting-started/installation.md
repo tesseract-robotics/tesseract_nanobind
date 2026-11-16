@@ -30,7 +30,7 @@ print(f"Loaded: {len(robot.get_joint_names('manipulator'))} joints")
 | OS | Architectures | Minimum |
 | -- | ------------- | ------- |
 | Linux | x86_64, aarch64 | `manylinux_2_39`: Ubuntu 24.04, Debian 13 (Ubuntu 22.04 stays on 0.35.0.8) |
-| macOS | arm64, x86_64 | macOS 15.0 (`macosx_15_0`, imposed by the bundled `libomp`) |
+| macOS | arm64 | macOS 15.0 (`macosx_15_0`, imposed by the bundled `libomp`) |
 | Windows | x86_64 | |
 
 **Python versions:** 3.12–3.15, from one `cp312-abi3` stable-ABI wheel per platform.

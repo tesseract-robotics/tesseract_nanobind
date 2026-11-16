@@ -36,7 +36,7 @@ pip install --pre tesseract-robotics-nanobind
 One `cp312-abi3` wheel per platform covers Python 3.12 to 3.15:
 
 - Linux: x86_64 and aarch64, `manylinux_2_39` (Ubuntu 24.04+, Debian 13+)
-- macOS: arm64 and x86_64, macOS 15.0 or later
+- macOS: arm64 (Apple silicon), macOS 15.0 or later
 - Windows: x86_64
 
 ## Examples
