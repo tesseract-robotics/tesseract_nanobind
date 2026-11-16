@@ -156,7 +156,7 @@ jobs:
         python3 -m venv check-venv
         source check-venv/bin/activate
         python -m pip install --upgrade pip
-        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0 ty==0.0.101
+        python -m pip install tesseract_nanobind/test-wheels/*.whl nanobind==2.12.0 ty==0.0.101
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
     - name: typecheck
@@ -389,7 +389,7 @@ jobs:
         python -m venv check-venv
         source check-venv/Scripts/activate
         python -m pip install --upgrade pip
-        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
+        python -m pip install tesseract_nanobind/test-wheels/*.whl nanobind==2.12.0
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
     - name: fetch the TWC workcell the rail tests load
@@ -640,7 +640,7 @@ jobs:
         ${{ steps.setup-python.outputs.python-path }} -m venv check-venv
         source check-venv/bin/activate
         python -m pip install --upgrade pip
-        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
+        python -m pip install tesseract_nanobind/test-wheels/*.whl nanobind==2.12.0
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
     - name: fetch the TWC workcell the rail tests load
@@ -725,6 +725,7 @@ jobs:
         support = [r for r in requirements if r.name == name + "-support"]
         assert len(support) == 1, support
         assert str(support[0].specifier) == "==" + version(name), support
+        assert support[0].marker is None, support  # a plain install brings it, not an extra
         assert version(name + "-support") == version(name)
         EOF
 

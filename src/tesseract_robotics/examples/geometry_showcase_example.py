@@ -472,7 +472,7 @@ def run(**kwargs):
 
     z_row3 = z_base + GRID_ROW3_RISE_M
 
-    # tesseract's support data (the `[support]` extra) has example meshes; without it
+    # tesseract's support data (tesseract-robotics-nanobind-support) has example meshes; without it
     # get_tesseract_support_path() raises SupportDataNotFoundError, naming the fix.
     tesseract_support = get_tesseract_support_path()
 

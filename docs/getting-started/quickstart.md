@@ -5,10 +5,10 @@ inverse kinematics, a collision check, then three planners on the same program. 
 in order in one Python session; each builds on the names the previous ones defined.
 
 ```bash
-pip install --pre "tesseract-robotics-nanobind[support]"
+pip install --pre tesseract-robotics-nanobind
 ```
 
-The `[support]` extra installs tesseract's example robots. [Installation](installation.md) covers
+This also installs tesseract's example robots (`tesseract-robotics-nanobind-support`). [Installation](installation.md) covers
 platforms and source builds.
 
 ## Load a robot
@@ -18,7 +18,7 @@ from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
-# Resolves package://tesseract/... URLs to the [support] extra's files
+# Resolves package://tesseract/... URLs to tesseract-robotics-nanobind-support's files
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 

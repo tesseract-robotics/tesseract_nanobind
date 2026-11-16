@@ -7,7 +7,7 @@ functions, which callers pass on explicitly:
     get_task_composer_config_path(): the task composer plugin config (bundled in the wheel)
     get_tesseract_resource_path(): the directory holding tesseract's `support` package, for
         GeneralResourceLocator(paths=[...]) or GeneralResourceLocator.addPath(); it comes from
-        the tesseract-robotics-nanobind-support wheel (the `[support]` extra)
+        the tesseract-robotics-nanobind-support wheel, a dependency of the bindings
     get_tesseract_support_path(): tesseract's support/ directory itself (urdf/, meshes/, sdf/)
 
 Plugins need no configuration: the plugin factory libraries are linked into the extension
@@ -67,7 +67,7 @@ def get_data_path() -> Path:
     return path
 
 
-# Import name of the tesseract-robotics-nanobind-support wheel (the [support] extra).
+# Import name of the tesseract-robotics-nanobind-support wheel.
 SUPPORT_PACKAGE = "tesseract_robotics_support"
 
 
@@ -84,18 +84,18 @@ def get_tesseract_resource_path() -> Path:
     GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     ```
 
-    The one source is the tesseract-robotics-nanobind-support distribution, installed by the
-    `[support]` extra and by the development environment's `install` task.
+    The one source is the tesseract-robotics-nanobind-support distribution, a dependency of
+    the bindings wheel, installed in development by the `install` task.
 
     Raises:
         SupportDataNotFoundError: the support distribution is not installed.
     """
-    # The [support] extra is optional: absent means no spec. A present but broken install raises
+    # Absent (installed with --no-deps, or removed) means no spec. A present but broken install raises
     # its own error from the unguarded import instead of reading as absent.
     if importlib.util.find_spec(SUPPORT_PACKAGE) is None:
         raise SupportDataNotFoundError(
             "tesseract's support data (robot models and meshes) is not installed: "
-            "pip install 'tesseract-robotics-nanobind[support]'"
+            "pip install tesseract-robotics-nanobind-support"
         )
     return importlib.import_module(SUPPORT_PACKAGE).data_dir()
 

@@ -284,8 +284,8 @@ class Robot:
         Load robot from tesseract's support package.
 
         Convenience method for loading standard test robots. `locator` must resolve
-        `package://tesseract/support/...`, e.g. with the support data installed
-        (`pip install 'tesseract-robotics-nanobind[support]'`):
+        `package://tesseract/support/...`, e.g. with the support data
+        (tesseract-robotics-nanobind-support, a dependency of the bindings):
 
         ```python
         locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])

@@ -253,7 +253,7 @@ Resolves `package://` URLs to file paths.
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
 
-# tesseract's support data (the [support] extra) as a search path
+# tesseract's support data (tesseract-robotics-nanobind-support) as a search path
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 
 # Resolve package URL

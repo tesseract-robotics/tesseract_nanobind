@@ -4,6 +4,7 @@
 
 ### Breaking changes
 
+- **`pip install tesseract-robotics-nanobind` installs the robot models; the `[support]` extra is gone** — in rc1 `tesseract-robotics-nanobind-support` came only with `[support]`, so a plain install had no `package://tesseract/support/...` robots and `get_tesseract_resource_path()` raised `SupportDataNotFoundError`. The bindings now depend on it, pinned `==` their own version; it stays a separate wheel so the ~40 MB of meshes, which rarely change, are their own download. `pip install "tesseract-robotics-nanobind[support]"` still works and warns that the extra does not exist. The dependency list moved from `[project] dependencies` to `[tool.scikit-build.metadata.dependencies] requires`, which `scripts/support_metadata.py` extends with the pin.
 - **A non-finite jacobian raises `NonFiniteJacobianError`** — in rc1, `calcManipulability` read a jacobian with a NaN or infinite entry as volume 0.0 and `isNearSingularity` as `True`: the SVD flags the input and its rank reads 0, so a blown-up FK chain looked like a singularity. Both now raise `kinematics.NonFiniteJacobianError`, a `ValueError` whose message names the first such entry. Neither function exists in 0.35, so code moving from 0.35 is not affected.
 
 ### Changes

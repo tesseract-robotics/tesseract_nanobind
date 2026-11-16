@@ -2,9 +2,9 @@
 
 An import test caught `tesseract_robotics.planning` importing `yaml`
 without `pyyaml` in `[project] dependencies`: a plain `pip install` of the wheel
-failed on `import tesseract_robotics.planning`. An import counts as declared when a
-`[project] dependencies` entry or an extra (`support`, from `scripts/support_metadata.py`)
-names its distribution.
+failed on `import tesseract_robotics.planning`. An import counts as declared when the
+dependencies `scripts/support_metadata.py` generates (the `requires` list in
+`[tool.scikit-build.metadata.dependencies]` plus the support wheel pin) name its distribution.
 """
 
 import ast
@@ -42,11 +42,35 @@ def _top_level_imports(path: Path) -> set[str]:
     return names
 
 
-def test_third_party_imports_are_declared() -> None:
+SUPPORT_DISTRIBUTION = "tesseract-robotics-nanobind-support"
+PROVIDER_KEYS = {"provider", "provider-path"}
+
+
+def _requirements(version: str) -> list[Requirement]:
+    """The wheel's Requires-Dist, as scikit-build-core builds it for `version`."""
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
-    extras = dynamic_metadata("optional-dependencies", {}, {"version": "0"})
-    specs = [*pyproject["project"]["dependencies"], *(s for reqs in extras.values() for s in reqs)]
-    declared = {canonicalize_name(Requirement(spec).name) for spec in specs}
+    config = pyproject["tool"]["scikit-build"]["metadata"]["dependencies"]
+    settings = {k: v for k, v in config.items() if k not in PROVIDER_KEYS}
+    return [
+        Requirement(s) for s in dynamic_metadata("dependencies", settings, {"version": version})
+    ]
+
+
+def test_support_wheel_is_a_hard_dependency() -> None:
+    """`pip install tesseract-robotics-nanobind` installs the support wheel of the same version."""
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
+    assert "optional-dependencies" not in pyproject["project"].get("dynamic", [])
+    assert "optional-dependencies" not in pyproject["project"]
+    pins = [
+        r for r in _requirements("1.2.3.4") if canonicalize_name(r.name) == SUPPORT_DISTRIBUTION
+    ]
+    assert len(pins) == 1, pins
+    assert str(pins[0].specifier) == "==1.2.3.4"
+    assert pins[0].marker is None and not pins[0].extras
+
+
+def test_third_party_imports_are_declared() -> None:
+    declared = {canonicalize_name(r.name) for r in _requirements("0")}
     module_to_dists = packages_distributions()
 
     missing: dict[str, list[str]] = {}
@@ -60,4 +84,4 @@ def test_third_party_imports_are_declared() -> None:
                 dists.add(canonicalize_name(OWN_DISTRIBUTIONS[module]))
             if not dists & declared:
                 missing.setdefault(module, []).append(relative)
-    assert missing == {}, f"imported but not in [project] dependencies or extras: {missing}"
+    assert missing == {}, f"imported but not a declared dependency: {missing}"

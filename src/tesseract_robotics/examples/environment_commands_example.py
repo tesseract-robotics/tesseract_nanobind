@@ -197,7 +197,7 @@ def run() -> dict[str, Any]:
 def run_in(fixture_root: Path) -> dict[str, Any]:
     """The example, with the calibration fixture package written under `fixture_root`."""
     # --8<-- [start:locators]
-    # The directory that holds the `tesseract` package (the `[support]` extra's data)
+    # The directory that holds the `tesseract` package (tesseract-robotics-nanobind-support)
     share = get_tesseract_resource_path()
     # `paths`, plus the TESSERACT_RESOURCE_PATH, ROS_PACKAGE_PATH and AMENT_PREFIX_PATH variables
     locator = GeneralResourceLocator(paths=[share])

@@ -22,7 +22,7 @@ from tesseract_robotics.geometry import Box
 from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link, SceneGraph, Visual
 from tesseract_robotics.urdf import parseURDFFile, writeURDFFile
 
-locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 
 scene_graph = parseURDFFile(urdf, locator)

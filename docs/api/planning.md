@@ -16,7 +16,7 @@ from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
 # Bundled test robots
-locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # From URDF/SRDF (package:// or file:// URLs)

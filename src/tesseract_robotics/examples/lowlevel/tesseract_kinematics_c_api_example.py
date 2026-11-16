@@ -120,7 +120,7 @@ from tesseract_robotics.kinematics import KinGroupIKInput, KinGroupIKInputs
 # tesseract_support package. The KDL solver is a numerical solver and does not require additional configuration.
 
 # This example uses the GeneralResourceLocator to find resources on the file system. It is given the
-# directory of tesseract's support data (`pip install 'tesseract-robotics-nanobind[support]'`) as a
+# directory of tesseract's support data (tesseract-robotics-nanobind-support) as a
 # search path; it also searches the TESSERACT_RESOURCE_PATH, ROS_PACKAGE_PATH and AMENT_PREFIX_PATH
 # environment variables, so a tesseract checkout works too:
 #

@@ -42,7 +42,7 @@ a `Robot`. [Concepts](../concepts/index.md#the-environment) shows how the pieces
     from tesseract_robotics.planning import Robot
 
     # Available: abb_irb2400, lbr_iiwa_14_r820, ...
-    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
     robot = Robot.from_tesseract_support("abb_irb2400", locator)
     env = robot.env
     ```

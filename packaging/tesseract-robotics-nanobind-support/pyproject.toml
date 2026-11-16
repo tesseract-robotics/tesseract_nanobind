@@ -1,5 +1,6 @@
 # tesseract's support data (robot models, meshes, plugin configs) as a pure-data wheel, so the
-# bindings wheel stays small. Installed with `pip install tesseract-robotics-nanobind[support]`.
+# bindings wheel stays small. `pip install tesseract-robotics-nanobind` installs it: the bindings
+# depend on it at their own version.
 #
 # The data is copied at build time (setup.py) from an installed tesseract prefix:
 # <prefix>/share/tesseract/{package.xml,support/}, where <prefix> is TESSERACT_CPP_PREFIX, the

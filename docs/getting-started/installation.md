@@ -6,14 +6,14 @@ and no conda. Contributors build from source with pixi.
 ## Users: install from PyPI
 
 ```bash
-pip install --pre "tesseract-robotics-nanobind[support]"
+pip install --pre tesseract-robotics-nanobind
 ```
 
 `--pre` installs the current release candidate, `0.36.0.0rc1`; drop it once 0.36.0.0 is final.
-The wheel bundles all C++ dependencies (~30 MB). No compiler needed. The `[support]` extra
-installs tesseract's example robots and meshes as a separate wheel,
-`tesseract-robotics-nanobind-support` (~40 MB); the examples and these pages load robots from it.
-Leave it out if you only load your own robots.
+The wheel bundles all C++ dependencies (~30 MB). No compiler needed. It
+depends on a second wheel at the same version, `tesseract-robotics-nanobind-support` (~40 MB):
+tesseract's example robots and meshes, which the examples and these pages load. It is separate so
+the bindings and the data split the download.
 
 ```python
 from tesseract_robotics import get_tesseract_resource_path

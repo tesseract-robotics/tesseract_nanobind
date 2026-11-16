@@ -1,4 +1,4 @@
-"""`get_tesseract_resource_path`: the [support] extra is optional, a broken one is an error."""
+"""`get_tesseract_resource_path`: a missing support wheel raises by name, a broken one is an error."""
 
 import importlib
 import importlib.util
@@ -13,14 +13,16 @@ from tesseract_robotics import (
 )
 
 
-def test_without_the_extra_it_raises_by_name(monkeypatch):
+def test_without_the_support_wheel_it_raises_by_name(monkeypatch):
     real_find_spec = importlib.util.find_spec
     monkeypatch.setattr(
         importlib.util,
         "find_spec",
         lambda name, *a: None if name == SUPPORT_PACKAGE else real_find_spec(name, *a),
     )
-    with pytest.raises(SupportDataNotFoundError, match=r"\[support\]"):
+    with pytest.raises(
+        SupportDataNotFoundError, match="pip install tesseract-robotics-nanobind-support"
+    ):
         get_tesseract_resource_path()
 
 

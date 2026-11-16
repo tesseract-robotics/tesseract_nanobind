@@ -116,7 +116,7 @@ from tesseract_robotics.state_solver import OFKTStateSolver
 # used for most scenes.
 
 # This example uses the GeneralResourceLocator to find resources on the file system. It is given the
-# directory of tesseract's support data (`pip install 'tesseract-robotics-nanobind[support]'`) as a
+# directory of tesseract's support data (tesseract-robotics-nanobind-support) as a
 # search path; it also searches the TESSERACT_RESOURCE_PATH, ROS_PACKAGE_PATH and AMENT_PREFIX_PATH
 # environment variables, so a tesseract checkout works too:
 #

@@ -467,7 +467,7 @@ message(STATUS "===============================================")
 # from <cpp-prefix>/share, where the tesseract install puts it:
 #   task_composer config  -> share/tesseract_planning/task_composer/config
 # tesseract's support data (robot models, meshes) is not: it is its own wheel,
-# packaging/tesseract-robotics-nanobind-support (the `[support]` extra).
+# packaging/tesseract-robotics-nanobind-support, a dependency of this wheel.
 if(DEFINED TESSERACT_CPP_PREFIX)
   set(TASK_COMPOSER_CFG_SRC "${TESSERACT_CPP_PREFIX}/share/tesseract_planning/task_composer/config")
   if(WIN32 AND NOT EXISTS "${TASK_COMPOSER_CFG_SRC}")

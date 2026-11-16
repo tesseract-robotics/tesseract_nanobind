@@ -44,7 +44,7 @@ own. The wrapper is `tesseract_robotics.planning.TaskComposer`; the bound C++ ty
         CartesianTarget, JointTarget, MotionProgram, Pose, Robot, TaskComposer,
     )
 
-    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
     robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
     program = (

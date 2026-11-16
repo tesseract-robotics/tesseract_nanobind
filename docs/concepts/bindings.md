@@ -105,7 +105,7 @@ assert locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf
 ```
 
 `get_tesseract_resource_path()` is the directory of tesseract's example robots (the
-`[support]` extra), `get_tesseract_support_path()` is its `support/` directory, and
+`tesseract-robotics-nanobind-support` wheel), `get_tesseract_support_path()` is its `support/` directory, and
 `get_task_composer_config_path()` is the task composer configuration the wheel bundles.
 
 ## Plugins

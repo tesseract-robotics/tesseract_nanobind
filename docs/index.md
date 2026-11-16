@@ -17,7 +17,7 @@ Yaskawa INFORM, URScript). One wheel per platform covers Python 3.12 and later.
 ## Plan and watch a trajectory
 
 ```bash
-pip install --pre "tesseract-robotics-nanobind[support]"
+pip install --pre tesseract-robotics-nanobind
 ```
 
 <!-- snippet: skip (the README's hero block, which runs; tests/docs/test_readme_structure.py keeps the two identical) -->

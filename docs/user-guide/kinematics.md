@@ -27,7 +27,7 @@ A kinematic group defines a chain of joints for FK/IK calculations:
 ```python
 from tesseract_robotics.planning import Robot
 
-locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 manip = robot.env.getKinematicGroup("manipulator")
 
@@ -194,7 +194,7 @@ from tesseract_robotics.motion_planners import (
     isWithinJointLimits,
 )
 
-locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 manip = robot.env.getKinematicGroup("manipulator")
 

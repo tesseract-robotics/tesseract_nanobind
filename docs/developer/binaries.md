@@ -52,7 +52,7 @@ flowchart LR
 5. The platform's repair tool bundles the dependency closure.
 6. The Linux x86_64 job also builds `tesseract-robotics-nanobind-support`, a `py3-none-any`
    wheel of tesseract's robot models and meshes (`packaging/tesseract-robotics-nanobind-support`),
-   copied from `ws/install/share/tesseract`. The bindings install it with the `[support]` extra.
+   copied from `ws/install/share/tesseract`. The bindings depend on it, pinned to their own version.
    It declares `Apache-2.0 AND BSD-3-Clause`, tesseract's `package.xml` licenses, and ships
    upstream's `LICENSE.Apache-2.0` and `LICENSE.BSD-3-Clause` (`licenses/`) as `License-File`s (#368).
 
@@ -118,7 +118,7 @@ search paths. Data is found through functions the caller uses explicitly:
   `TESSERACT_TASK_COMPOSER_CONFIG_FILE` when set, else the config the wheel bundles in
   `tesseract_robotics/data/`, else `share/` of `TESSERACT_CPP_PREFIX` (the pixi dev env sets it) for an editable install.
 - **Support data.** tesseract's robot models and meshes are a separate wheel,
-  `tesseract-robotics-nanobind-support` (the `[support]` extra), built from the same prefix by
+  `tesseract-robotics-nanobind-support` (a dependency of the bindings, `==` their version), built from the same prefix by
   `packaging/tesseract-robotics-nanobind-support`. `get_tesseract_resource_path()` returns its
   directory (or `TESSERACT_CPP_PREFIX`'s `share/`), to pass to
   `GeneralResourceLocator(paths=[...])` or `addPath()`; `get_tesseract_support_path()` is its

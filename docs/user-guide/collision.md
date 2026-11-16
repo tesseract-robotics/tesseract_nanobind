@@ -51,7 +51,7 @@ from tesseract_robotics.collision import (
 )
 import numpy as np
 
-locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 joint_names = [f"joint_{i + 1}" for i in range(6)]
 joints = np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])

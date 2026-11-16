@@ -481,7 +481,7 @@ For most users the `tesseract_robotics.planning` module is simpler:
 ```python
 from tesseract_robotics.planning import Robot, TaskComposer, plan_freespace
 
-locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # One-liner — picks pipeline defaults per entry point

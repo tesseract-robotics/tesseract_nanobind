@@ -17,7 +17,7 @@ from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.srdf import SRDFModel
 from tesseract_robotics.urdf import parseURDFFile
 
-locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the tesseract-robotics-nanobind-support wheel
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
 

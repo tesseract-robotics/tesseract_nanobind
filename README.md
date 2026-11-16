@@ -28,10 +28,10 @@ CI runs over 4,300 tests against every wheel it builds.
 ## Installation
 
 ```bash
-pip install --pre "tesseract-robotics-nanobind[support]"
+pip install --pre tesseract-robotics-nanobind
 ```
 
-`--pre` selects the current release candidate, `0.36.0.0rc1`; drop it once 0.36.0.0 is final. The `[support]` extra adds tesseract's example robots and meshes (`tesseract-robotics-nanobind-support`), which the examples and the Quick Start load. Leave it out if you only use your own robots.
+`--pre` selects the current release candidate, `0.36.0.0rc1`; drop it once 0.36.0.0 is final. It also installs tesseract's example robots and meshes, `tesseract-robotics-nanobind-support` (a separate wheel at the same version), which the examples and the Quick Start load.
 
 One `cp312-abi3` wheel per platform covers Python 3.12 to 3.15:
 
