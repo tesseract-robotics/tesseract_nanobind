@@ -5,6 +5,8 @@ import gc
 import socket
 import threading
 import time
+import urllib.request
+from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -98,6 +100,19 @@ def _open_viewer() -> tuple[TesseractViewer, int]:
     return viewer, viewer.server.get_port()
 
 
+def _get_page(port: int) -> None:
+    """A full HTTP request and response, not a bare TCP connect.
+
+    A connect-then-close the server has not yet seen EOF on when `close()` stops viser's loop
+    leaves the accepted transport unclosed; it is collected in a later test as a ResourceWarning,
+    an error under `filterwarnings = error` (CI, linux-arm64 py3.13). A served response is a
+    connection websockets finishes and closes itself.
+    """
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=CONNECT_TIMEOUT_S) as reply:
+        assert reply.status == HTTPStatus.OK
+        reply.read()
+
+
 def _wait_player(viewer: TesseractViewer, iterations: int) -> None:
     assert viewer.wait_player_iterations(iterations, PLAYER_ADVANCE_TIMEOUT_S)
 
@@ -145,7 +160,7 @@ def viewer():
 def test_serving_on_construction():
     viewer, port = _open_viewer()
     try:
-        socket.create_connection(("127.0.0.1", port), timeout=CONNECT_TIMEOUT_S).close()
+        _get_page(port)
         assert viewer.url == f"http://127.0.0.1:{port}"
     finally:
         viewer.close()
@@ -238,7 +253,7 @@ def test_serve_forever_closes_on_keyboard_interrupt(monkeypatch):
     viewer, port = _open_viewer()
 
     def interrupt(_seconds):
-        socket.create_connection(("127.0.0.1", port), timeout=CONNECT_TIMEOUT_S).close()
+        _get_page(port)
         raise KeyboardInterrupt
 
     with monkeypatch.context() as patch:
