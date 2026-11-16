@@ -220,7 +220,11 @@ def run():
 
 
 def main() -> int:
-    results = run()
+    try:
+        results = run()
+    except PlanningFailedError as error:
+        print(error, file=sys.stderr)
+        return 1
 
     from tesseract_robotics.viewer import TesseractViewer
 

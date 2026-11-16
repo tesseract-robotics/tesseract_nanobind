@@ -127,13 +127,27 @@ def _canned_results() -> dict[str, object]:
     [
         "lowlevel.puzzle_piece_auxillary_axes_c_api_example",
         "lowlevel.puzzle_piece_c_api_example",
-        "lowlevel.tesseract_planning_composer_c_api_example",
     ],
 )
 def test_main_exits_one_when_run_reports_failure(module_name, monkeypatch):
     """These run()s return False when planning fails; main must not index it."""
     module = importlib.import_module(f"tesseract_robotics.examples.{module_name}")
     monkeypatch.setattr(module, "run", lambda: False)
+    assert module.main() == 1
+
+
+def test_composer_main_exits_one_when_planning_fails(monkeypatch):
+    """The composer example's run() raises PlanningFailedError; main turns it into exit 1."""
+    from tesseract_robotics.examples.lowlevel.example_support import PlanningFailedError
+
+    module = importlib.import_module(
+        "tesseract_robotics.examples.lowlevel.tesseract_planning_composer_c_api_example"
+    )
+
+    def failing_run():
+        raise PlanningFailedError("FreespacePipeline failed")
+
+    monkeypatch.setattr(module, "run", failing_run)
     assert module.main() == 1
 
 
