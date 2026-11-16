@@ -71,8 +71,8 @@ copies by path. No plugin directory is configured and no YAML is patched.
 
 | | Linux | macOS | Windows |
 |---|---|---|---|
-| Runner | `ubuntu-24.04` (x86_64), `ubuntu-24.04-arm` (aarch64) | `macos-15-intel` (x86_64), `macos-15` (arm64) | `windows-2022` (x64) |
-| vcpkg triplet | `x64-linux-dynamic-release`, `arm64-linux-dynamic-release` | `x64-osx-dynamic-release`, `arm64-osx-dynamic-release` | `x64-windows-release` |
+| Runner | `ubuntu-24.04` (x86_64), `ubuntu-24.04-arm` (aarch64) | `macos-15` (arm64) | `windows-2022` (x64) |
+| vcpkg triplet | `x64-linux-dynamic-release`, `arm64-linux-dynamic-release` | `arm64-osx-dynamic-release` | `x64-windows-release` |
 | Repair | `auditwheel repair --plat manylinux_2_39_*` | `repair_macos_wheel.py --lib-dir ...` | `delvewheel repair` |
 | Never bundled | `libstdc++`, `libgcc_s`, glibc (manylinux policy) | system libraries | `msvcp140.dll`, `vcomp140.dll` |
 | Platform gotchas | [Linux wheels](linux-wheels.md) | [macOS wheels](macos-wheels.md) | [Windows wheels](windows-wheels.md) |

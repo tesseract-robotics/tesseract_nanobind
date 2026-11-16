@@ -41,10 +41,8 @@ changes can legitimately invalidate many translation units. Local cache tests do
 not establish end-to-end CI timings; compare cold and warm workflow runs before
 claiming a measured speedup.
 
-Routine PR and branch builds cover Linux x64/ARM64, Windows x64 and macOS ARM64.
-Intel macOS remains enabled on weekly refreshes and release tags; manual builds
-can enable `include-intel-macos`. Its fresh-runner wheel test follows the same
-selection, so routine runs do not wait for an artifact they did not build.
+Every build covers Linux x64/ARM64, Windows x64 and macOS ARM64. Intel macOS
+wheels were dropped for 0.36.
 
 The macOS compile and repair steps are measured separately. Repair uses the
 batched Mach-O implementation from #136, adapted to the vcpkg/plugin-anchor

@@ -31,10 +31,6 @@ on:
         description: Rebuild the native stack while reusing vcpkg binary packages
         type: boolean
         default: false
-      include-intel-macos:
-        description: Also build and test legacy Intel macOS wheels
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -436,14 +432,10 @@ jobs:
       fail-fast: false
       matrix:
         config:
-        - arch: x64
-          runner: macos-15-intel
-          brew_prefix: /usr/local
+        # arm64 only: Intel macOS wheels were dropped for 0.36.
         - arch: arm64
           runner: macos-15
           brew_prefix: /opt/homebrew
-        # Keep Intel release coverage, without putting it on every PR's critical path.
-        exclude: ${{ (github.event_name == 'schedule' || github.ref_type == 'tag' || inputs.include-intel-macos) && fromJSON('[]') || fromJSON('[{"config":{"arch":"x64","runner":"macos-15-intel","brew_prefix":"/usr/local"}}]') }}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -692,8 +684,6 @@ jobs:
           - {runner: ubuntu-24.04-arm, artifact: linux-arm64}
           - {runner: windows-2022, artifact: win-x64}
           - {runner: macos-15, artifact: macos-arm64}
-          - {runner: macos-15-intel, artifact: macos-x64}
-        exclude: ${{ (github.event_name == 'schedule' || github.ref_type == 'tag' || inputs.include-intel-macos) && fromJSON('[]') || fromJSON('[{"config":{"runner":"macos-15-intel","artifact":"macos-x64"}}]') }}
     steps:
     - uses: actions/checkout@v6
       with:
