@@ -65,7 +65,13 @@ IK_TARGET_OFFSET_RAD = 0.1
 IK_JOINT_POS_RAD = (0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0)
 
 
-def main():
+def run() -> dict:
+    """Forward kinematics of the IIWA, then inverse kinematics back to a nearby pose.
+
+    Returns:
+        `robot`, `joint_pos` (the seed), `tool0_pose` (its FK), `target_pose` and
+        `ik_solutions` (joint vectors that reach `target_pose`).
+    """
     # --8<-- [start:fk_ik]
     # =========================================================================
     # STEP 1: Load Robot with Kinematic Solver
@@ -114,7 +120,19 @@ def main():
     for i, sol in enumerate(ik_solutions):
         print(f"Solution {i}: {sol}")
     # --8<-- [end:fk_ik]
+    return {
+        "robot": robot,
+        "joint_pos": joint_pos,
+        "tool0_pose": tool0_pose,
+        "target_pose": target_pose,
+        "ik_solutions": ik_solutions,
+    }
+
+
+def main() -> int:
+    run()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

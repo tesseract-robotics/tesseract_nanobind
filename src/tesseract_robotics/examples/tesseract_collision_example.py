@@ -76,7 +76,13 @@ SWEEP_LAST_STEP = 5
 SWEEP_STEP_DEG = 5
 
 
-def main():
+def run() -> dict:
+    """Sweep joint_1 past an obstacle sphere and collect the contacts at each step.
+
+    Returns:
+        `sweep`: one entry per step, `{"joint_1_rad": float, "contacts": [(link_a, link_b,
+        distance_m), ...]}`.
+    """
     # =========================================================================
     # STEP 1: Environment Setup
     # =========================================================================
@@ -135,6 +141,7 @@ def main():
     joint_pos = np.zeros(JOINT_COUNT)
 
     # Sweep joint_1 (base rotation) to move arm toward/away from obstacle
+    sweep = []
     for i in range(SWEEP_FIRST_STEP, SWEEP_LAST_STEP):
         joint_pos[0] = i * np.deg2rad(SWEEP_STEP_DEG)  # -25 to +20 degrees
         print(f"Contact check at robot position: {joint_pos}")
@@ -160,6 +167,15 @@ def main():
         # Flatten nested map structure into simple vector for iteration
         result_vector = ContactResultVector()
         contact_result_map.flattenMoveResults(result_vector)
+        sweep.append(
+            {
+                "joint_1_rad": float(joint_pos[0]),
+                "contacts": [
+                    (r.link_ids[0], r.link_ids[1], r.distance)
+                    for r in (result_vector[j] for j in range(len(result_vector)))
+                ],
+            }
+        )
 
         # Interpret results
         print(f"Found {len(result_vector)} contact results")
@@ -171,7 +187,13 @@ def main():
             print(f"\tLink A: {contact_result.link_ids[0]}")
             print(f"\tLink B: {contact_result.link_ids[1]}")
         print()
+    return {"sweep": sweep}
+
+
+def main() -> int:
+    run()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

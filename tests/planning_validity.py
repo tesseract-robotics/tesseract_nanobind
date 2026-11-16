@@ -13,7 +13,9 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -27,7 +29,7 @@ from tesseract_robotics.collision import (
 )
 from tesseract_robotics.common import Isometry3d
 from tesseract_robotics.environment import checkTrajectory
-from tesseract_robotics.planning import PlanningResult, Pose, Robot
+from tesseract_robotics.planning import Pose, Robot
 
 # Slack on a joint limit (rad). The planners enforce limits as optimizer constraints, which
 # trajopt's sco solver satisfies to its constraint tolerance, cnt_tolerance = 1e-4.
@@ -76,6 +78,29 @@ class CartesianGoal:
     pose: Isometry3d
     tip_link: str
     tcp_offset: Isometry3d | None = None
+
+
+class PlannedState(Protocol):
+    """One waypoint: joint names and their positions (rad or m)."""
+
+    @property
+    def joint_names(self) -> Sequence[str]: ...
+
+    @property
+    def positions(self) -> np.ndarray: ...
+
+
+class PlannedPath(Protocol):
+    """What the checks read of a plan: `PlanningResult`, or the low-level examples' result."""
+
+    @property
+    def successful(self) -> bool: ...
+
+    @property
+    def message(self) -> str: ...
+
+    @property
+    def trajectory(self) -> Sequence[PlannedState]: ...
 
 
 class TrajectoryInvalidError(AssertionError):
@@ -136,7 +161,7 @@ def _check_goal(
 
 def assert_trajectory_valid(
     robot: Robot,
-    result: PlanningResult,
+    result: PlannedPath,
     goal: JointGoal | CartesianGoal | None = None,
     *,
     group: str = "manipulator",

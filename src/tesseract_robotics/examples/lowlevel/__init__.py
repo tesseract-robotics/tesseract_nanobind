@@ -9,8 +9,8 @@ from .puzzle_piece_auxillary_axes_c_api_example import (
 )
 from .puzzle_piece_c_api_example import run as puzzle_piece_c_api_example
 from .scene_graph_c_api_example import run as scene_graph_c_api_example
-from .tesseract_collision_c_api_example import main as tesseract_collision_c_api_example
-from .tesseract_kinematics_c_api_example import main as tesseract_kinematics_c_api_example
+from .tesseract_collision_c_api_example import run as tesseract_collision_c_api_example
+from .tesseract_kinematics_c_api_example import run as tesseract_kinematics_c_api_example
 from .tesseract_planning_composer_c_api_example import (
     run as tesseract_planning_composer_c_api_example,
 )

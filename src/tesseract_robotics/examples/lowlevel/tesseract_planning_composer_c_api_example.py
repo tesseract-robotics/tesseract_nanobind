@@ -109,7 +109,11 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import Environment
-from tesseract_robotics.examples.lowlevel.example_support import locate_file
+from tesseract_robotics.examples.lowlevel.example_support import (
+    EnvironmentInitError,
+    PlanningFailedError,
+    locate_file,
+)
 from tesseract_robotics.motion_planners_ompl import (
     OMPLRealVectorMoveProfile,
     RRTConnectConfigurator,
@@ -145,7 +149,7 @@ def run():
     srdf = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.srdf")
     env = Environment()
     if not env.init(urdf, srdf, locator):
-        raise RuntimeError("failed to initialize abb_irb2400")
+        raise EnvironmentInitError("failed to initialize abb_irb2400")
     print(f"Loaded {env.getName()}")
 
     # A seed away from the all-zero singularity.
@@ -198,8 +202,7 @@ def run():
     future = executor.run(task, data)
     future.wait()
     if not future.context.isSuccessful():
-        print("Planning failed")
-        return False
+        raise PlanningFailedError(f"{PIPELINE} failed")
     print("Planning successful!")
 
     results = AnyPoly_as_CompositeInstruction(future.context.data_storage.getData(output_key))
@@ -218,8 +221,6 @@ def run():
 
 def main() -> int:
     results = run()
-    if not results:
-        return 1
 
     from tesseract_robotics.viewer import TesseractViewer
 

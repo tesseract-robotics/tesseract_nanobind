@@ -74,6 +74,46 @@ pixi run test                              # full suite, parallel
 pixi shell && pytest tests -x --testmon    # incremental (only changed)
 ```
 
+### Every example is a test
+
+A full test session fails when it leaves an example unexecuted, and the failure names the file
+([#445](https://github.com/tesseract-robotics/tesseract_nanobind/issues/445)). Examples are what
+a new user runs first; an example no test runs can break unnoticed.
+
+Nothing needs registering. The gate, `tests/examples/example_coverage.py`, finds every module
+under `tesseract_robotics.examples` (subpackages included) at the end of the session and checks
+which of their functions ran:
+
+- A module that defines `main` is an example: its `main()` or `run()` must have run.
+- Any other module (`online_planning_scene`, `lowlevel/example_support`) is a helper: at least one
+  of its functions must have run. Importing a module does not count.
+
+To add an example, put the file in `src/tesseract_robotics/examples/` and write a test in
+`tests/examples/` that calls its `run()` and asserts on what it returns: a valid trajectory
+(`tests/planning_validity.py`), contact distances, FK poses. Without the test, the next full run
+ends with:
+
+```text
+=========================== example coverage (#445) ============================
+1 example module(s) not executed by the test suite. ...
+  .../src/tesseract_robotics/examples/my_new_example.py: main() / run() never ran
+```
+
+The gate judges only a session that collected every `test_*.py` under `tests/examples` and
+deselected none of its tests. `pixi run test` and CI's `test-artifacts` job are judged; a single
+file, a node id, `-k`, `-m`, `--lf` or `--testmon` is not, so targeted runs don't fail on examples
+they did not ask for. To run the gate locally:
+
+```bash
+pixi run python -m pytest tests/examples -n auto
+```
+
+A passing judged run prints `example coverage: all N example modules executed`. Recording uses
+`sys.monitoring` on a free tool id, so it runs alongside coverage tools and debuggers. Under xdist
+each worker sends what it recorded to the controller, which judges. With
+`TESSERACT_TESTS_WITHOUT_TWC=1` the TWC viewer test skips, so the gate names
+`twc_workcell_positioner_viewer.py`; that is the opt-out's cost, shown on purpose.
+
 ### Documentation snippets
 
 `tests/docs/test_getting_started_snippets.py` runs every `python` fence of the README, the docs

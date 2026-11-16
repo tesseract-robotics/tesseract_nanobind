@@ -41,6 +41,10 @@ class CommandRejectedError(RuntimeError):
     """`Environment.applyCommand` returned False."""
 
 
+class PlanningFailedError(RuntimeError):
+    """A planner or a task composer pipeline reported failure."""
+
+
 class ResourceNotFoundError(FileNotFoundError):
     """The resource locator resolved no file for a URL."""
 
@@ -200,13 +204,25 @@ def run_pipeline(
         return PipelineResult(False, f"{pipeline} failed")
 
     results = AnyPoly_as_CompositeInstruction(future.context.data_storage.getData(output_key))
-    trajectory = [
-        TrajectoryState([jid.name() for jid in state.getJointIds()], np.array(state.getPosition()))
-        for state in (
-            instr.asMoveInstruction().getWaypoint().asStateWaypoint()
-            for instr in results
-            if instr.isMoveInstruction()
-            and instr.asMoveInstruction().getWaypoint().isStateWaypoint()
-        )
-    ]
-    return PipelineResult(True, "Planning successful", results, trajectory)
+    return PipelineResult(True, "Planning successful", results, trajectory_states(results))
+
+
+def trajectory_states(program: CompositeInstruction) -> list[TrajectoryState]:
+    """The state waypoints of a planned program, in order, descending into sub-programs.
+
+    A raster program nests one composite per segment; a pipeline's output is flat.
+    """
+    states: list[TrajectoryState] = []
+    for instr in program:
+        if instr.isCompositeInstruction():
+            states += trajectory_states(instr.asCompositeInstruction())
+        elif (
+            instr.isMoveInstruction() and instr.asMoveInstruction().getWaypoint().isStateWaypoint()
+        ):
+            state = instr.asMoveInstruction().getWaypoint().asStateWaypoint()
+            states.append(
+                TrajectoryState(
+                    [jid.name() for jid in state.getJointIds()], np.array(state.getPosition())
+                )
+            )
+    return states
