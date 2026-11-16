@@ -21,6 +21,10 @@ from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.planning.toolpaths import zigzag_square
 
+# `example_coverage` fails a full session that leaves an example unexecuted (#445); it is
+# registered here so the xdist controller, which collects nothing, loads it too.
+pytest_plugins = ["pytester", "tests.examples.example_coverage"]
+
 # Arbitrary nonzero value; any fixed seed works (zero is rejected by OMPL once
 # generation has started). Changing it just selects a different fixed path.
 OMPL_RNG_SEED = 25
