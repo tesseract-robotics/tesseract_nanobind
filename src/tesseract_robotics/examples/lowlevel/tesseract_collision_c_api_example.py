@@ -98,7 +98,11 @@ from tesseract_robotics.common import (
     Translation3d,
 )
 from tesseract_robotics.environment import AddLinkCommand, Environment
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
+from tesseract_robotics.examples.lowlevel.example_support import (
+    CommandRejectedError,
+    EnvironmentInitError,
+    locate_file,
+)
 from tesseract_robotics.geometry import Sphere
 from tesseract_robotics.scene_graph import (
     Collision,
@@ -135,7 +139,13 @@ SWEEP_LAST_STEP = 5
 SWEEP_STEP_DEG = 5
 
 
-def main():
+def run() -> dict:
+    """Sweep joint_1 past an obstacle sphere and collect the contacts at each step.
+
+    Returns:
+        `sweep`: one entry per step, `{"joint_1_rad": float, "contacts": [(link_a, link_b,
+        distance_m), ...]}`.
+    """
     # =========================================================================
     # STEP 1: Environment Initialization
     # =========================================================================
@@ -189,7 +199,8 @@ def main():
 
     # Apply command to modify environment - this updates the scene graph
     add_sphere_command = AddLinkCommand(sphere_link, sphere_joint)
-    env.applyCommand(add_sphere_command)
+    if not env.applyCommand(add_sphere_command):
+        raise CommandRejectedError("the environment rejected the sphere link")
 
     # =========================================================================
     # STEP 3: Configure State Solver
@@ -219,6 +230,7 @@ def main():
     # STEP 5: Collision Query Loop
     # =========================================================================
     # Sweep joint_1 (base rotation) to move robot toward/away from obstacle
+    sweep = []
     for i in range(SWEEP_FIRST_STEP, SWEEP_LAST_STEP):
         robot_joint_pos[0] = i * np.deg2rad(SWEEP_STEP_DEG)  # -25 to +20 degrees
         print(f"Contact check at robot position: {robot_joint_pos}")
@@ -245,6 +257,15 @@ def main():
         # Flatten to simple vector for easier iteration
         result_vector = ContactResultVector()
         contact_result_map.flattenMoveResults(result_vector)
+        sweep.append(
+            {
+                "joint_1_rad": float(robot_joint_pos[0]),
+                "contacts": [
+                    (r.link_ids[0], r.link_ids[1], r.distance)
+                    for r in (result_vector[j] for j in range(len(result_vector)))
+                ],
+            }
+        )
 
         # Interpret contact results
         print(f"Found {len(result_vector)} contact results")
@@ -259,7 +280,13 @@ def main():
             print(f"\tLink A: {contact_result.link_ids[0]}")
             print(f"\tLink B: {contact_result.link_ids[1]}")
         print()
+    return {"sweep": sweep}
+
+
+def main() -> int:
+    run()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

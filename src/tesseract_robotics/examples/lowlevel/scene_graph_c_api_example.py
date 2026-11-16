@@ -35,7 +35,11 @@ from tesseract_robotics.environment import (
     MoveJointCommand,
     MoveLinkCommand,
 )
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
+from tesseract_robotics.examples.lowlevel.example_support import (
+    CommandRejectedError,
+    EnvironmentInitError,
+    locate_file,
+)
 from tesseract_robotics.scene_graph import Joint, JointType
 
 
@@ -89,18 +93,17 @@ def run():
     # MoveJointCommand(joint_name, new_parent_link)
     # This preserves the joint but changes parent_link_id
     move_joint_cmd = MoveJointCommand("joint_a4", "base_link")
-    if env.applyCommand(move_joint_cmd):
-        print("  Command applied successfully!")
-        # Verify the change took effect
-        joint = env.getSceneGraph().getJoint("joint_a4")
-        if joint:
-            print(f"  New parent: {joint.parent_link_id}")
-    else:
-        print("  Failed to apply command")
+    if not env.applyCommand(move_joint_cmd):
+        raise CommandRejectedError("MoveJointCommand('joint_a4', 'base_link') was rejected")
+    print("  Command applied successfully!")
+    # Verify the change took effect
+    joint_a4_parent = env.getSceneGraph().getJoint("joint_a4").parent_link_id
+    print(f"  New parent: {joint_a4_parent}")
 
     # Reinitialize environment for clean state in next example
     env = Environment()
-    env.init(urdf_path, srdf_path, locator)
+    if not env.init(urdf_path, srdf_path, locator):
+        raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     # =========================================================================
     # Example 2: MoveLinkCommand
@@ -126,22 +129,22 @@ def run():
 
     # MoveLinkCommand replaces the joint connecting to child_link_name
     move_link_cmd = MoveLinkCommand(new_joint)
-    if env.applyCommand(move_link_cmd):
-        print("  Command applied successfully!")
-        print("  Link 4 now attached to link_1 via joint 'moved_link_joint'")
-        # Verify the new joint exists in scene graph
-        joint = env.getSceneGraph().getJoint("moved_link_joint")
-        if joint:
-            print(f"  New joint parent: {joint.parent_link_id}")
-            print(f"  New joint child: {joint.child_link_id}")
-    else:
-        print("  Failed to apply command")
+    if not env.applyCommand(move_link_cmd):
+        raise CommandRejectedError("MoveLinkCommand('moved_link_joint') was rejected")
+    print("  Command applied successfully!")
+    print("  Link 4 now attached to link_1 via joint 'moved_link_joint'")
+    # Verify the new joint exists in scene graph
+    joint = env.getSceneGraph().getJoint("moved_link_joint")
+    print(f"  New joint parent: {joint.parent_link_id}")
+    print(f"  New joint child: {joint.child_link_id}")
 
     # =========================================================================
     # Example 3: Scene Graph Queries
     # Demonstrates traversal and inspection of the kinematic structure
     # =========================================================================
     print("\n--- Example 3: Scene Graph Queries ---")
+    # The environment of Example 2, with link_4 re-attached.
+    scene_graph = env.getSceneGraph()
     print(f"Number of links: {scene_graph.getLinks().__len__()}")
     print(f"Number of joints: {scene_graph.getJoints().__len__()}")
 
@@ -168,7 +171,12 @@ def run():
             if joint.parent_link_id == link_name:
                 stack.append((joint.child_link_id, depth + 1))
 
-    return {"env": env, "success": True}
+    return {
+        "env": env,
+        "success": True,
+        "joint_a4_parent": joint_a4_parent,
+        "tree_links": visited,
+    }
 
 
 def main() -> int:

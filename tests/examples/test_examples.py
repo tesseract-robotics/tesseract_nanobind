@@ -16,10 +16,17 @@ import pytest
 
 import tesseract_robotics.examples
 from tesseract_robotics.examples import online_planning_scene
+from tesseract_robotics.examples.lowlevel.example_support import (
+    PipelineResult,
+    trajectory_states,
+)
+from tesseract_robotics.examples.pythonic_api_example import FACTORY_YAW_RAD
 from tesseract_robotics.planning import Robot
 from tesseract_robotics.planning.composer import PlanningResult, TrajectoryPoint
 
 from ..planning_validity import (
+    CARTESIAN_ORIENTATION_TOL_RAD,
+    CARTESIAN_POSITION_TOL_M,
     JointGoal,
     assert_trajectory_valid,
 )
@@ -56,14 +63,60 @@ def test_abb_irb2400_viewer():
 # === High-Level API Examples ===
 
 
+# Both collision examples query one scene with Bullet: measured identical distances.
+COLLISION_PORT_PARITY_TOL_M = 1e-9
+# OPW is closed form: the FK of each IK solution meets the target to double precision
+# (measured 4e-12 m), so a loose bound still separates a right solution from a wrong one.
+OPW_IK_TOL = 1e-9
+# Joint positions of the pythonic example's program ends: the all-zero configuration [rad].
+PYTHONIC_HOME = JointGoal.build([0.0] * 6)
+
+
+def _rotation_angle(a, b) -> float:
+    relative = np.asarray(a.linear).T @ np.asarray(b.linear)
+    return float(np.arccos(np.clip((np.trace(relative) - 1.0) / 2.0, -1.0, 1.0)))
+
+
+# The package re-exports each example's run() under the module's name, so the module itself
+# is fetched by import_module.
+collision_example = importlib.import_module(
+    "tesseract_robotics.examples.tesseract_collision_example"
+)
+
+
+def _assert_collision_sweep(sweep) -> None:
+    """The sweep of joint_1 starts clear of the sphere and runs link_4 through it at zero."""
+    ex = collision_example
+    assert len(sweep) == ex.SWEEP_LAST_STEP - ex.SWEEP_FIRST_STEP
+    assert sweep[0]["contacts"] == [], "the first step, -25 deg, is clear of the sphere"
+    for step in sweep:
+        for link_a, link_b, distance in step["contacts"]:
+            assert "sphere_link" in (str(link_a), str(link_b))
+            assert distance <= ex.COLLISION_MARGIN_M
+    (at_zero,) = [step for step in sweep if step["joint_1_rad"] == 0.0]
+    penetrating = {str(b) for a, b, d in at_zero["contacts"] if d < 0} | {
+        str(a) for a, b, d in at_zero["contacts"] if d < 0
+    }
+    assert "link_4" in penetrating
+
+
 @pytest.mark.basic
 def test_collision_example():
-    tesseract_robotics.examples.tesseract_collision_example()
+    _assert_collision_sweep(tesseract_robotics.examples.tesseract_collision_example()["sweep"])
 
 
 @pytest.mark.basic
 def test_kinematics_example():
-    tesseract_robotics.examples.tesseract_kinematics_example()
+    outcome = tesseract_robotics.examples.tesseract_kinematics_example()
+    robot, target = outcome["robot"], outcome["target_pose"]
+    (solution,) = outcome["ik_solutions"]
+    reached = robot.fk("manipulator", solution, tip_link="tool0")
+    gap = np.linalg.norm(np.asarray(reached.translation) - np.asarray(target.translation))
+    assert gap <= CARTESIAN_POSITION_TOL_M
+    assert _rotation_angle(reached, target) <= CARTESIAN_ORIENTATION_TOL_RAD
+    # The seed's own FK is not the target: IK had to move.
+    seed_gap = np.asarray(outcome["tool0_pose"].translation) - np.asarray(target.translation)
+    assert np.linalg.norm(seed_gap) > CARTESIAN_POSITION_TOL_M
 
 
 @pytest.mark.basic
@@ -892,9 +945,23 @@ def test_plugin_configuration_example():
     assert factory["num_pipelines"] > 0
 
 
+GEOMETRY_SHOWCASE_LINKS = (
+    "box_link",
+    "sphere_link",
+    "cylinder_link",
+    "capsule_link",
+    "cone_link",
+    "mesh_link",
+    "convex_mesh_link",
+    "loaded_mesh_link",
+    "loaded_convex_link",
+)
+
+
 @pytest.mark.basic
 def test_geometry_showcase_example():
-    tesseract_robotics.examples.geometry_showcase_example()
+    robot = tesseract_robotics.examples.geometry_showcase_example()["robot"]
+    assert set(GEOMETRY_SHOWCASE_LINKS) <= set(robot.get_link_names())
 
 
 @pytest.mark.basic
@@ -906,7 +973,9 @@ def test_pointcloud_octree_collision_example():
 
     repo_root = Path(__file__).resolve().parents[2]
     cloud = repo_root / "docs" / "assets" / "sample.ply"
-    tesseract_robotics.examples.pointcloud_octree_collision_example(cloud)
+    outcome = tesseract_robotics.examples.pointcloud_octree_collision_example(cloud)
+    assert outcome["colliding_contacts"] > 0
+    assert outcome["aware_contacts"] == 0
 
 
 @pytest.mark.basic
@@ -926,7 +995,9 @@ def test_pointcloud_octree_fine_resolutions_plan(resolution):
 def test_sdf_collision_example():
     # Self-contained: the example generates its own URDF/SRDF/contact-manager YAML
     # into a temp dir, so there is no support-data dependency to thread through.
-    tesseract_robotics.examples.sdf_collision_example()
+    outcome = tesseract_robotics.examples.sdf_collision_example()
+    assert outcome["field"].isDiscretized()
+    assert outcome["proxy"].calcNumSubShapes() > 0
 
 
 @pytest.mark.planning
@@ -1186,22 +1257,45 @@ def test_chain_example():
 # === Low-Level API Examples ===
 
 
+def _lowlevel_result(outcome) -> PipelineResult:
+    """A low-level example's output program as a result `assert_trajectory_valid` takes."""
+    program = outcome["trajectory"]
+    return PipelineResult(outcome["success"], "", program, trajectory_states(program))
+
+
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_collision_example():
-    tesseract_robotics.examples.tesseract_collision_c_api_example()
+    low = tesseract_robotics.examples.tesseract_collision_c_api_example()["sweep"]
+    _assert_collision_sweep(low)
+    high = tesseract_robotics.examples.tesseract_collision_example()["sweep"]
+    for low_step, high_step in zip(low, high, strict=True):
+        assert low_step["joint_1_rad"] == high_step["joint_1_rad"]
+        low_contacts = {(str(a), str(b)): d for a, b, d in low_step["contacts"]}
+        high_contacts = {(str(a), str(b)): d for a, b, d in high_step["contacts"]}
+        assert low_contacts.keys() == high_contacts.keys()
+        for pair, distance in low_contacts.items():
+            assert abs(distance - high_contacts[pair]) <= COLLISION_PORT_PARITY_TOL_M
 
 
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_kinematics_example():
-    tesseract_robotics.examples.tesseract_kinematics_c_api_example()
+    outcome = tesseract_robotics.examples.tesseract_kinematics_c_api_example()
+    assert outcome["solutions"], "OPW found no IK solution"
+    for reached in outcome["solution_tool0"]:
+        np.testing.assert_allclose(reached, outcome["target"], rtol=0, atol=OPW_IK_TOL)
 
 
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_scene_graph_example():
-    tesseract_robotics.examples.scene_graph_c_api_example()
+    outcome = tesseract_robotics.examples.scene_graph_c_api_example()
+    assert outcome["joint_a4_parent"] == "base_link"
+    moved = outcome["env"].getSceneGraph().getJoint("moved_link_joint")
+    assert (moved.parent_link_id, moved.child_link_id) == ("link_1", "link_4")
+    # The traversal from the root reaches every link of the edited graph.
+    assert outcome["tree_links"] == set(outcome["env"].getLinkIds())
 
 
 @pytest.mark.lowlevel
@@ -1225,7 +1319,8 @@ def test_lowlevel_glass_upright_example():
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_puzzle_piece_example():
-    tesseract_robotics.examples.puzzle_piece_c_api_example()
+    outcome = tesseract_robotics.examples.puzzle_piece_c_api_example()
+    assert_trajectory_valid(Robot.build(outcome["env"]), outcome["result"])
 
 
 @pytest.mark.lowlevel
@@ -1243,36 +1338,49 @@ def test_lowlevel_car_seat_example():
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_puzzle_piece_auxillary_axes_example():
-    tesseract_robotics.examples.puzzle_piece_auxillary_axes_c_api_example()
+    outcome = tesseract_robotics.examples.puzzle_piece_auxillary_axes_c_api_example()
+    assert_trajectory_valid(Robot.build(outcome["env"]), outcome["result"], group="manipulator_aux")
 
 
 @pytest.mark.planning
 def test_pythonic_api_example():
-    assert tesseract_robotics.examples.pythonic_api_example() == 0
+    outcome = tesseract_robotics.examples.pythonic_api_example()
+    assert_trajectory_valid(outcome["robot"], outcome["result"], PYTHONIC_HOME)
+    # One pose two ways: a quarter turn about z as a quaternion, and rotation_z of the
+    # rounded FACTORY_YAW_RAD; they differ by the rounding alone.
+    built, factored = outcome["from_quaternion"], outcome["from_factories"]
+    np.testing.assert_allclose(built.translation, factored.translation, rtol=0, atol=0)
+    assert _rotation_angle(built, factored) == pytest.approx(
+        np.pi / 2 - FACTORY_YAW_RAD, abs=OPW_IK_TOL
+    )
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_planning_composer_example():
-    tesseract_robotics.examples.tesseract_planning_composer_c_api_example()
+    outcome = tesseract_robotics.examples.tesseract_planning_composer_c_api_example()
+    assert_trajectory_valid(Robot.build(outcome["env"]), _lowlevel_result(outcome))
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_planning_lowlevel_example():
-    tesseract_robotics.examples.tesseract_planning_lowlevel_c_api_example()
+    outcome = tesseract_robotics.examples.tesseract_planning_lowlevel_c_api_example()
+    assert_trajectory_valid(Robot.build(outcome["env"]), _lowlevel_result(outcome))
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_descartes_raster_example():
-    tesseract_robotics.examples.descartes_raster_c_api_example()
+    outcome = tesseract_robotics.examples.descartes_raster_c_api_example()
+    assert_trajectory_valid(Robot.build(outcome["env"]), _lowlevel_result(outcome))
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_trajopt_ifopt_example():
-    tesseract_robotics.examples.tesseract_planning_lowlevel_trajopt_ifopt_example()
+    outcome = tesseract_robotics.examples.tesseract_planning_lowlevel_trajopt_ifopt_example()
+    assert_trajectory_valid(Robot.build(outcome["env"]), _lowlevel_result(outcome))
 
 
 # OMPL seeds whose TrajOptIfopt trajectory TOTG could not parameterize ("Negative path
@@ -1289,7 +1397,8 @@ def test_lowlevel_trajopt_ifopt_example_on_seeds_that_broke_totg(seed):
     from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 
     RNG_setSeed(seed)
-    tesseract_robotics.examples.tesseract_planning_lowlevel_trajopt_ifopt_example()
+    outcome = tesseract_robotics.examples.tesseract_planning_lowlevel_trajopt_ifopt_example()
+    assert_trajectory_valid(Robot.build(outcome["env"]), _lowlevel_result(outcome))
 
 
 # OMPL seeds (of 1-100) whose TrajOpt-smoothed path touched the sphere and failed the

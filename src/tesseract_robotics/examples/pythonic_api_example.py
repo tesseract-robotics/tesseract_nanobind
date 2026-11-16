@@ -111,7 +111,13 @@ TARGET_1_XYZ_M = (0.8, -0.2, 0.8)
 TARGET_2_XYZ_M = (0.8, 0.2, 0.8)
 
 
-def main() -> int:
+def run() -> dict:
+    """Load the IRB 2400, add obstacles, and plan a freespace program through them.
+
+    Returns:
+        `robot`, `fk_at_zeros` (tool0 pose at all-zero joints), `from_quaternion` and
+        `from_factories` (one pose built two ways) and `result` (the freespace plan).
+    """
     print("=" * BANNER_WIDTH)
     print("Pythonic API Example")
     print("=" * BANNER_WIDTH)
@@ -277,11 +283,20 @@ def main() -> int:
     # for analysis, interpolation, or export. to_numpy() returns (N, num_joints).
     trajectory_array = result.to_numpy()
     print(f"   Trajectory shape: {trajectory_array.shape}")
+    return {
+        "robot": robot,
+        "fk_at_zeros": pose,
+        "from_quaternion": t1,
+        "from_factories": t2,
+        "result": result,
+    }
 
+
+def main() -> int:
+    run()
     print("\n" + "=" * BANNER_WIDTH)
     print("Example completed!")
     print("=" * BANNER_WIDTH)
-
     return 0
 
 

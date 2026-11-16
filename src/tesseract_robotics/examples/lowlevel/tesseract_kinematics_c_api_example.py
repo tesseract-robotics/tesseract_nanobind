@@ -137,7 +137,13 @@ TOOL0_XYZ_M = (0.7, -0.1, 1.0)
 TOOL0_QUAT_XYZW = (0.0, 0.7171, 0.0, 0.70711)
 
 
-def main():
+def run() -> dict:
+    """Forward kinematics of the IRB 2400 with OPW, then every IK solution of a second pose.
+
+    Returns:
+        `tool0` (4x4 FK at `JOINT_POS_DEG`), `target` (4x4 IK target), `solutions` (joint
+        vectors) and `solution_tool0` (4x4 FK of each solution).
+    """
     # =========================================================================
     # STEP 1: Environment Initialization
     # =========================================================================
@@ -220,6 +226,13 @@ def main():
     print(f"Found {len(ik_result)} solutions")
     for i in range(len(ik_result)):
         print(f"Solution {i}: {ik_result[i].flatten()}")
+    solutions = [np.array(ik_result[i]).flatten() for i in range(len(ik_result))]
+    outcome = {
+        "tool0": np.array(tool0_transform.matrix),
+        "target": np.array(tool0_transform2.matrix),
+        "solutions": solutions,
+        "solution_tool0": [np.array(kin_group.calcFwdKin(q)["tool0"].matrix) for q in solutions],
+    }
 
     # =========================================================================
     # CLEANUP: Prevent GC order segfaults
@@ -232,7 +245,13 @@ def main():
     del ik_result, ik, iks, fwdkin_result, tool0_transform
     del kin_group, env, locator
     gc.collect()
+    return outcome
+
+
+def main() -> int:
+    run()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
