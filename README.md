@@ -23,7 +23,7 @@ A Python layer adds a `planning API`, `constraints written in Python` for the on
 (`trajopt_ifopt.python_constraints`), a browser viewer and controller program emitters (ABB
 `RAPID`, KUKA `KRL`, Fanuc `TP`, Yaskawa `INFORM`, Universal Robots `URScript`).
 
-CI runs over 4,300 tests against every wheel it builds.
+CI runs over 4,700 tests against every wheel it builds.
 
 ## Installation
 
