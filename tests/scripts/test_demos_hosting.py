@@ -87,11 +87,21 @@ def test_a_tampered_asset_fails_and_leaves_nothing_behind(tmp_path):
     assert not (out / "recordings/shown.viser").exists()
 
 
-def test_a_missing_asset_fails(tmp_path):
+def test_an_asset_not_in_the_release_is_skipped_with_a_warning(tmp_path, capsys):
     base = _release(tmp_path)
     (tmp_path / "release" / _sha(FILES["posters/shown.png"])).unlink()
-    with pytest.raises(fetch.AssetDownloadError):
-        fetch.fetch_all([SHOWN], _lock(FILES), base, tmp_path / "demos")
+    out = tmp_path / "demos"
+    fetch.fetch_all([SHOWN], _lock(FILES), base, out)
+    assert not (out / "posters/shown.png").exists()
+    assert (out / "recordings/shown.viser").read_bytes() == b"shown recording"
+    assert "::warning::posters/shown.png" in capsys.readouterr().out
+
+
+def test_a_published_entry_missing_from_the_lock_is_skipped_with_a_warning(capsys):
+    full = _lock(FILES)
+    no_poster = lock.DemoLock.build("1.1.1", full.client_sha256, full.recordings, {})
+    assert "posters/shown.png" not in fetch.wanted([SHOWN], no_poster)
+    assert "::warning::" in capsys.readouterr().out
 
 
 def test_a_file_already_matching_the_lock_is_not_downloaded(tmp_path):
@@ -158,6 +168,13 @@ def test_a_published_entry_without_a_player_on_its_page_is_named(tmp_path):
     site = _site(tmp_path)
     (site / "examples/p/index.html").write_text("no player")
     assert any("shown" in p for p in check_site.missing_files(site, [SHOWN]))
+
+
+def test_a_published_entry_whose_recording_was_not_fetched_needs_no_player(tmp_path):
+    site = _site(tmp_path, drop=["demos/recordings/shown.viser"])
+    (site / "examples/p/index.html").write_text("no player")
+    (site / "index.html").write_text("no player")
+    assert check_site.missing_files(site, [SHOWN]) == []
 
 
 @pytest.mark.parametrize("script", ["fetch.py", "check_site.py", "players.py"])

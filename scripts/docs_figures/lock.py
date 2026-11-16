@@ -6,10 +6,11 @@ The upstream C++ SHAs the bindings were built from are recorded once, as an inpu
 figure, and so is the render platform (OS, CPU architecture, matplotlib, FreeType, numpy and
 trimesh versions) the committed SVGs were rendered on.
 
-`compare` checks a fresh regeneration: the inputs must hash as the lock says on any platform;
-the output bytes must match the committed SVGs and the lock on the render platform, and
-elsewhere each output must be a well-formed SVG (the bytes are platform-dependent there, see
-`render_platform`).
+`compare` checks a fresh regeneration. It fails only on structure: a figure missing from the
+lock, an output set that differs, an uncommitted output, an SVG that is not well-formed or draws
+nothing. Drift (an input hash, the upstream SHAs, or output bytes that differ from the lock) is
+reported as stale, not failed: the figures are documentation, so editing one or bumping
+upstream must not turn CI red (#446). `pixi run docs-figures` re-renders and rewrites the lock.
 """
 
 from __future__ import annotations
@@ -188,22 +189,19 @@ def svg_problems(path: Path) -> list[str]:
     return problems
 
 
-def compare(entries: Mapping[str, FigureEntry], render_dir: Path) -> tuple[bool, list[str]]:
-    """Every disagreement between a fresh regeneration in `render_dir` and the commit.
-
-    Inputs (every file hash and the upstream SHAs) must match the lock on any platform. On the
-    lock's render platform the outputs must match the committed SVGs and the lock bit for bit;
-    on any other platform each output must instead be a well-formed SVG that draws something.
+def compare(entries: Mapping[str, FigureEntry], render_dir: Path) -> tuple[list[str], list[str]]:
+    """Compare a fresh regeneration in `render_dir` with the commit and the lock.
 
     Returns:
-        Whether the bytes were compared (same render platform), and the problems found.
+        `(stale, problems)`. `stale` lists drift from the lock (inputs, upstream SHAs, output
+        bytes on the render platform): informational. `problems` lists structural defects,
+        which fail the check.
     """
     lock = read_lock()
-    problems = []
+    stale: list[str] = []
+    problems: list[str] = []
     if lock["upstream"] != upstream_identity():
-        problems.append(
-            f"upstream SHAs changed: lock {lock['upstream']} != now {upstream_identity()}"
-        )
+        stale.append(f"upstream SHAs changed: lock {lock['upstream']} != now {upstream_identity()}")
     same_platform = lock["render_platform"] == render_platform()
     locked: dict[str, dict[str, dict[str, str]]] = lock["figures"]
     for name, entry in entries.items():
@@ -212,23 +210,20 @@ def compare(entries: Mapping[str, FigureEntry], render_dir: Path) -> tuple[bool,
             continue
         for key, digest in entry.inputs.items():
             if locked[name]["inputs"].get(key) != digest:
-                problems.append(f"{name}: input {key} changed since the lock")
+                stale.append(f"{name}: input {key} changed since the lock")
         for key in set(locked[name]["inputs"]) - set(entry.inputs):
-            problems.append(f"{name}: input {key} is in the lock but no longer used")
+            stale.append(f"{name}: input {key} is in the lock but no longer used")
         if set(entry.outputs) != set(locked[name]["outputs"]):
             problems.append(
                 f"{name}: outputs {sorted(entry.outputs)} != lock {sorted(locked[name]['outputs'])}"
             )
         for key, digest in entry.outputs.items():
-            if not same_platform:
-                problems.extend(svg_problems(render_dir / (REPO_ROOT / key).name))
-                continue
             committed = REPO_ROOT / key
+            problems.extend(svg_problems(render_dir / committed.name))
             if not committed.exists():
                 problems.append(f"{name}: {key} is not committed")
                 continue
-            if sha256(committed) != digest:
-                problems.append(f"{name}: {key} differs from a fresh render")
-            if locked[name]["outputs"].get(key) != digest:
-                problems.append(f"{name}: lock hash of {key} differs from a fresh render")
-    return same_platform, problems
+            problems.extend(svg_problems(committed))
+            if same_platform and sha256(committed) != digest:
+                stale.append(f"{name}: {key} differs from a fresh render")
+    return stale, problems

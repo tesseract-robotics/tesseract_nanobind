@@ -10,13 +10,16 @@ import argparse
 import html
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
+from annotate import warn
 from lock import DemoLock, read_lock
 from manifest import Entry, Status, load_manifest, player_query
 
 REPO = Path(__file__).resolve().parents[2]
-PLAYERS_DIR = REPO / "docs/demos/players"
+DEMOS_DIR = REPO / "docs/demos"
+PLAYERS_DIR = DEMOS_DIR / "players"
 HERO_MODULE = "car_seat_example"
 HERO_SNIPPET = "hero.html"
 # From a page's URL, /<section>/<page>/, to the site root. For `data-src`, which only the
@@ -33,14 +36,6 @@ SMALLEST_SHOWN_MB = 0.1
 _INCLUDE = re.compile(r'^--8<-- "docs/demos/players/(\w+)\.html"$', re.MULTILINE)
 
 
-class MissingRecordingError(RuntimeError):
-    """A published entry has no recording in the lock."""
-
-
-class MissingPosterError(RuntimeError):
-    """An entry with a player has no poster in the lock: it would show as an empty box."""
-
-
 def size_text(size_bytes: int) -> str:
     """A download size for the player's label, which never reads as nothing."""
     if size_bytes < SMALLEST_SHOWN_MB * BYTES_PER_MB:
@@ -48,7 +43,9 @@ def size_text(size_bytes: int) -> str:
     return f"{size_bytes / BYTES_PER_MB:.1f} MB"
 
 
-def _player(entry: Entry, lock: DemoLock, url_root: str, source_root: str) -> str:
+def _player(
+    entry: Entry, lock: DemoLock, url_root: str, source_root: str, with_poster: bool
+) -> str:
     assert entry.camera is not None  # Entry.build: a published or recorded entry has one.
     recording = lock.recordings[entry.module]
     src = f"{url_root}demos/client/index.html?{player_query(entry.module, entry.camera)}"
@@ -58,50 +55,65 @@ def _player(entry: Entry, lock: DemoLock, url_root: str, source_root: str) -> st
     identity = recording.identity
     return (
         f'<button class="demo-player" type="button" data-src="{html.escape(src)}">'
-        f'<img src="{poster}" alt="" loading="lazy">'
-        f'<span class="demo-play">{label}</span></button>\n\n'
+        + (f'<img src="{poster}" alt="" loading="lazy">' if with_poster else "")
+        + f'<span class="demo-play">{label}</span></button>\n\n'
         f"`{entry.module}`, tesseract_robotics {identity.package_version}\n"
     )
 
 
-def snippets(entries: list[Entry], lock: DemoLock, *, preview: bool = False) -> dict[str, str]:
+def _always_present(_: str) -> bool:
+    return True
+
+
+def snippets(
+    entries: list[Entry],
+    lock: DemoLock,
+    *,
+    preview: bool = False,
+    present: Callable[[str], bool] = _always_present,
+) -> dict[str, str]:
     """Every snippet's file name and content.
+
+    A published entry whose recording is not in the lock, or not present, gets an empty snippet;
+    one without a poster plays without it. Both are warned about, not failed (#446).
 
     Args:
         entries: The manifest.
         lock: What is recorded.
         preview: Also give a player to excluded entries with a recording and a camera, so a
             reviewer can see them in place.
-
-    Raises:
-        MissingRecordingError: a published entry has no recording.
-        MissingPosterError: an entry with a player has no poster.
+        present: Whether a file under `docs/demos/` (`recordings/x.viser`, `posters/x.png`) is
+            there to serve; `main` checks the disk after `fetch.py`.
     """
+
+    def recorded(entry: Entry) -> bool:
+        path = f"recordings/{entry.module}.viser"
+        return entry.module in lock.recordings and present(path)
 
     def plays(entry: Entry) -> bool:
         if entry.status is Status.PUBLISHED:
-            return True
-        return preview and entry.camera is not None and entry.module in lock.recordings
+            return recorded(entry)
+        return preview and entry.camera is not None and recorded(entry)
 
-    missing = sorted(
-        e.module
-        for e in entries
-        if e.status is Status.PUBLISHED and e.module not in lock.recordings
-    )
-    if missing:
-        raise MissingRecordingError(f"published without a recording: {missing}")
-    unposed = sorted(e.module for e in entries if plays(e) and e.module not in lock.posters)
-    if unposed:
-        raise MissingPosterError(f"a player without a poster: {unposed}")
+    def poster(entry: Entry) -> bool:
+        return entry.module in lock.posters and present(f"posters/{entry.module}.png")
+
+    for e in entries:
+        if e.status is Status.PUBLISHED and not plays(e):
+            warn(f"recordings/{e.module}.viser: missing; {e.page} builds without its player")
+        elif plays(e) and not poster(e):
+            warn(f"posters/{e.module}.png: missing; the {e.module} player has no poster")
 
     files = {
-        f"{e.module}.html": _player(e, lock, PAGE_URL_TO_ROOT, PAGE_SOURCE_TO_DOCS)
+        f"{e.module}.html": _player(e, lock, PAGE_URL_TO_ROOT, PAGE_SOURCE_TO_DOCS, poster(e))
         if plays(e)
         else ""
         for e in entries
     }
     hero = next((e for e in entries if e.module == HERO_MODULE and plays(e)), None)
-    files[HERO_SNIPPET] = _player(hero, lock, HOME_TO_ROOT, HOME_TO_ROOT) if hero else ""
+    files[HERO_SNIPPET] = (
+        _player(hero, lock, HOME_TO_ROOT, HOME_TO_ROOT, poster(hero)) if hero else ""
+    )
     return files
 
 
@@ -116,7 +128,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--preview", action="store_true", help="include unreviewed recordings")
     args = parser.parse_args(argv)
     PLAYERS_DIR.mkdir(parents=True, exist_ok=True)
-    for name, text in snippets(load_manifest(), read_lock(), preview=args.preview).items():
+    on_disk = snippets(
+        load_manifest(),
+        read_lock(),
+        preview=args.preview,
+        present=lambda path: (DEMOS_DIR / path).is_file(),
+    )
+    for name, text in on_disk.items():
         (PLAYERS_DIR / name).write_text(text, "utf-8")
     return 0
 

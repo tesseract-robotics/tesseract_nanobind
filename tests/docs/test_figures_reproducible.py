@@ -1,15 +1,9 @@
-"""The docs figures reproduce from the repository, and their data functions are right.
+"""The docs figures regenerate from the repository, and their data functions are right.
 
-`pixi run docs-figures --check` regenerates every figure into build/ and compares it with
-`docs/assets/figures/figures.lock.json`; the measured figure renders from its committed JSON,
-so the check never re-measures. What "reproduce" can promise depends on the platform:
-
-- On the lock's render platform (same OS, CPU architecture, matplotlib, FreeType, numpy,
-  trimesh) the output bytes must equal the committed SVGs and the lock's hashes.
-- Elsewhere libm, BLAS and solver round-off may move a coordinate in the last digit an SVG
-  keeps, so equal bytes are not a property of the code. There the check asserts what is: every
-  input hashes as the lock says, and every figure regenerates into a well-formed SVG that draws.
-  This is a different assertion for a different guarantee, not a skip.
+`pixi run docs-figures --check` regenerates every figure into build/. It fails only on
+structure (lock and committed SVGs list the same figures, every SVG is well-formed and draws).
+Drift from `docs/assets/figures/figures.lock.json` (inputs, upstream SHAs, output bytes) is
+reported as stale and never fails: editing a figure or bumping upstream keeps CI green (#446).
 """
 
 import json
@@ -38,8 +32,8 @@ from scripts.docs_figures.time_parameterization import spread
 CHECK_TIMEOUT_S = 300
 
 
-def test_figures_reproduce():
-    """Bit for bit on the render platform; elsewhere matching inputs and well-formed SVGs."""
+def test_figures_regenerate():
+    """Every figure regenerates into a well-formed SVG; drift from the lock is only reported."""
     run = subprocess.run(
         [sys.executable, "-m", "scripts.docs_figures", "--check"],
         cwd=REPO_ROOT,
@@ -130,23 +124,27 @@ def _committed_entries() -> dict[str, lock.FigureEntry]:
     }
 
 
-def test_other_platform_checks_structure_not_bytes(monkeypatch):
-    """Off the render platform, the committed SVGs pass as well-formed and bytes are not compared."""
-    monkeypatch.setattr(lock, "render_platform", lambda: {"system": "elsewhere"})
-    same_platform, problems = lock.compare(_committed_entries(), FIGURES_DIR)
-    assert not same_platform
-    assert problems == []
-
-
-def test_other_platform_still_requires_matching_inputs(monkeypatch):
-    """A changed input fails the check on any platform."""
-    monkeypatch.setattr(lock, "render_platform", lambda: {"system": "elsewhere"})
+def test_drift_from_the_lock_is_stale_not_a_problem(monkeypatch):
+    """A changed input, other upstream SHAs or other bytes are reported, never failed (#446)."""
+    monkeypatch.setattr(
+        lock, "upstream_identity", lambda: {"tesseract-robotics/tesseract": "0" * 40}
+    )
     entries = _committed_entries()
     name, entry = next(iter(entries.items()))
     key = next(iter(entry.inputs))
     entries[name] = lock.FigureEntry(inputs={**entry.inputs, key: "0" * 64}, outputs=entry.outputs)
+    stale, problems = lock.compare(entries, FIGURES_DIR)
+    assert problems == []
+    assert f"{name}: input {key} changed since the lock" in stale
+    assert any(note.startswith("upstream SHAs changed") for note in stale)
+
+
+def test_a_figure_missing_from_the_lock_is_a_problem():
+    entries = _committed_entries()
+    name, entry = next(iter(entries.items()))
+    entries["not_a_figure"] = entry
     _, problems = lock.compare(entries, FIGURES_DIR)
-    assert problems == [f"{name}: input {key} changed since the lock"]
+    assert problems == ["not_a_figure: not in docs/assets/figures/figures.lock.json"]
 
 
 @pytest.mark.parametrize(

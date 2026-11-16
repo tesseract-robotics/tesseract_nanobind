@@ -17,6 +17,8 @@
 
 ### Fixed
 
+- **The wheels build again: the tesseract pin is reachable** — tesseract#1408 was rebased, so `5dfd5ae2` was on no branch of jf---/tesseract and `vcs import` could not check it out on any platform. Branch `nanobind-pin/5dfd5ae2` on the fork keeps it reachable; the build is unchanged.
+- **Docs images no longer turn CI red ([#446])** — `docs-figures --check` and `test_figures_reproducible.py` fail only on structure (a figure missing from the lock or the commit, an SVG that is not well-formed or draws nothing); an edited figure or script, an upstream bump or different bytes are reported as stale. The Docs workflow builds a page without a demo player or poster that the lock or the `demo-assets` release lacks, with a `::warning::` naming the file, instead of failing on a `KeyError`; a download whose bytes differ from the lock still fails.
 - **`calcManipulability` on a jacobian without columns raises `EmptyJacobianError`** — `np.zeros((6, 0))` segfaulted.
 
 ## [0.36.0.0rc1] - 2026-11-11 — pre-release on upstream master plus our open PRs
@@ -1033,3 +1035,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#42]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/42
 [#236]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/236
 [#368]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/368
+[#446]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/446

@@ -86,23 +86,34 @@ def test_a_preview_gives_a_player_to_what_is_recorded_and_awaiting_review():
     assert snippets["left_out.html"] == ""
 
 
-def test_a_published_entry_without_a_recording_fails_loudly():
+def test_a_published_entry_without_a_recording_gets_no_player_and_a_warning(capsys):
     empty = lock.DemoLock.build("1.1.1", "client", {}, {})
-    with pytest.raises(players.MissingRecordingError, match="shown"):
-        players.snippets(ENTRIES, empty)
+    assert players.snippets(ENTRIES, empty)["shown.html"] == ""
+    assert "::warning::" in capsys.readouterr().out
 
 
-def test_a_published_entry_without_a_poster_fails_loudly():
+def test_a_recording_that_was_not_fetched_gets_no_player(capsys):
+    snippets = players.snippets(
+        ENTRIES, LOCK, present=lambda path: path != "recordings/shown.viser"
+    )
+    assert snippets["shown.html"] == ""
+    assert "recordings/shown.viser" in capsys.readouterr().out
+
+
+def test_a_published_entry_without_a_poster_plays_without_one(capsys):
     no_poster = lock.DemoLock.build("1.1.1", "client", LOCK.recordings, {})
-    with pytest.raises(players.MissingPosterError, match="shown"):
-        players.snippets(ENTRIES, no_poster)
+    text = players.snippets(ENTRIES, no_poster)["shown.html"]
+    assert "data-src=" in text
+    assert "<img" not in text
+    assert "::warning::" in capsys.readouterr().out
 
 
-def test_a_preview_without_a_poster_fails_loudly_too():
-    posters = {SHOWN.module: "p", HERO.module: "p"}
-    partial = lock.DemoLock.build("1.1.1", "client", LOCK.recordings, posters)
-    with pytest.raises(players.MissingPosterError, match="in_review"):
-        players.snippets(ENTRIES, partial, preview=True)
+def test_a_poster_that_was_not_fetched_is_left_out():
+    text = players.snippets(ENTRIES, LOCK, present=lambda path: not path.startswith("posters/"))[
+        "shown.html"
+    ]
+    assert "data-src=" in text
+    assert "<img" not in text
 
 
 def _page_text(page: str) -> str:

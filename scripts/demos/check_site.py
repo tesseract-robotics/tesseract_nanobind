@@ -79,6 +79,8 @@ def missing_files(site: Path, entries: list[Entry]) -> list[str]:
     expected += [("", e.module) for e in published if e.module == HERO_MODULE]
     for page_path, module in expected:
         recording = f"{root_path}demos/recordings/{module}.viser"
+        if not (site / recording.removeprefix(root_path)).is_file():
+            continue  # not fetched: players.py left the page without a player, and warned
         if recording not in referenced.get(page_path, set()):
             problems.append(f"{page_path or '/'}: no player for published {module}")
     return problems

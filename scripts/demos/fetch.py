@@ -1,8 +1,10 @@
 """Fetch the published demo files from their release, verified against the lock.
 
 Recordings stay out of git. `demos.lock.json` pins each file's hash and the release holds it
-under that hash, so a re-record adds an asset and an older commit still builds. Standard library
-only: `docs.yml` runs this without installing the package.
+under that hash, so a re-record adds an asset and an older commit still builds. A file the lock
+does not list, or the release does not hold yet, is a warning and is skipped: the page then
+builds without that player or poster (#446). A download whose bytes differ from the lock still
+fails. Standard library only: `docs.yml` runs this without installing the package.
 
 `--stage DIR` is the other direction: it names the local files by hash, ready for
 `gh release upload demo-assets DIR/* --clobber`. The names are hashes, so `--clobber` only
@@ -16,8 +18,10 @@ import shutil
 import sys
 import urllib.error
 import urllib.request
+from http import HTTPStatus
 from pathlib import Path
 
+from annotate import warn
 from lock import DemoLock, read_lock, sha256_bytes
 from manifest import Entry, Status, load_manifest
 
@@ -31,7 +35,7 @@ DOWNLOAD_TIMEOUT_S = 120.0
 
 
 class AssetDownloadError(RuntimeError):
-    """A pinned file is not in the release, or the download failed."""
+    """A download failed for a reason other than the file not being in the release."""
 
 
 class AssetHashError(RuntimeError):
@@ -39,15 +43,35 @@ class AssetHashError(RuntimeError):
 
 
 def wanted(entries: list[Entry], lock: DemoLock) -> dict[str, str]:
-    """What the site needs, path under `docs/demos/` to hash: the client and published entries."""
+    """What the site needs, path under `docs/demos/` to hash: the client and published entries.
+
+    A published entry's recording or poster that the lock does not list is warned about and left
+    out.
+    """
     files = {"client/index.html": lock.client_sha256}
     for entry in entries:
-        if entry.status is Status.PUBLISHED:
-            files[f"recordings/{entry.module}.viser"] = lock.recordings[
-                entry.module
-            ].recording_sha256
-            files[f"posters/{entry.module}.png"] = lock.posters[entry.module]
+        if entry.status is not Status.PUBLISHED:
+            continue
+        recording = lock.recordings.get(entry.module)
+        if recording is None:
+            warn(
+                f"recordings/{entry.module}.viser: not in the demo lock; run `pixi run demo-record`"
+            )
+        else:
+            files[f"recordings/{entry.module}.viser"] = recording.recording_sha256
+        poster = lock.posters.get(entry.module)
+        if poster is None:
+            warn(f"posters/{entry.module}.png: not in the demo lock; run `pixi run demo-posters`")
+        else:
+            files[f"posters/{entry.module}.png"] = poster
     return files
+
+
+def _not_in_release(error: urllib.error.URLError) -> bool:
+    """The release does not hold the file (HTTP 404, or a missing file under a file:// base)."""
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code == HTTPStatus.NOT_FOUND
+    return isinstance(error.reason, FileNotFoundError)
 
 
 def _has_hash(path: Path, sha256: str) -> bool:
@@ -55,10 +79,10 @@ def _has_hash(path: Path, sha256: str) -> bool:
 
 
 def fetch_all(entries: list[Entry], lock: DemoLock, base_url: str, demos_dir: Path) -> None:
-    """Download every wanted file that is not already here.
+    """Download every wanted file that is not already here; warn about any the release lacks.
 
     Raises:
-        AssetDownloadError: a file could not be downloaded.
+        AssetDownloadError: a download failed other than with the file absent from the release.
         AssetHashError: a download does not match the lock; nothing is written for it.
     """
     for name, sha256 in wanted(entries, lock).items():
@@ -69,7 +93,14 @@ def fetch_all(entries: list[Entry], lock: DemoLock, base_url: str, demos_dir: Pa
         try:
             with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT_S) as reply:
                 data = reply.read()
-        except (urllib.error.URLError, TimeoutError) as error:
+        except urllib.error.URLError as error:
+            if _not_in_release(error):
+                warn(
+                    f"{name}: {url} is not in the demo-assets release; upload it (fetch.py --stage)"
+                )
+                continue
+            raise AssetDownloadError(f"{name}: {url}: {error}") from error
+        except TimeoutError as error:
             raise AssetDownloadError(f"{name}: {url}: {error}") from error
         if sha256_bytes(data) != sha256:
             raise AssetHashError(f"{name}: {url} is not the file the lock pins")

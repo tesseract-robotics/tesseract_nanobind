@@ -2,7 +2,7 @@
 
     pixi run docs-figures                 # every figure into docs/assets/figures, and the lock
     pixi run docs-figures frames          # one figure (its lock entry only)
-    pixi run docs-figures --check         # regenerate into build/ and compare (see lock.compare)
+    pixi run docs-figures --check         # regenerate into build/; fail on structure only (see lock.compare)
     pixi run docs-figures --preview DIR   # also PNG previews on each theme's page colour
     pixi run docs-figures-measure NAME    # re-run a figure's benchmark into its data JSON
 
@@ -88,21 +88,13 @@ def main() -> None:
 
     if args.check:
         shutil.rmtree(CHECK_DIR, ignore_errors=True)
-        same_platform, problems = lock.compare(
-            regenerate(names, CHECK_DIR, args.preview), CHECK_DIR
-        )
+        stale, problems = lock.compare(regenerate(names, CHECK_DIR, args.preview), CHECK_DIR)
+        for note in stale:
+            print(f"stale (not an error): {note}", file=sys.stderr)
         if problems:
             print("\n".join(problems), file=sys.stderr)
-            raise lock.FiguresLockError(
-                f"{len(problems)} difference(s); run `pixi run docs-figures` and commit"
-            )
-        if same_platform:
-            print(f"{len(names)} figure(s) reproduce bit for bit")
-        else:
-            print(
-                f"{len(names)} figure(s): inputs match the lock and render to well-formed SVG; "
-                f"bytes not compared, this is not the render platform {lock.read_lock()['render_platform']}"
-            )
+            raise lock.FiguresLockError(f"{len(problems)} structural problem(s) in the figures")
+        print(f"{len(names)} figure(s) render to well-formed SVG; {len(stale)} stale note(s)")
         return
 
     lock.write_lock(regenerate(names, FIGURES_DIR, args.preview))
