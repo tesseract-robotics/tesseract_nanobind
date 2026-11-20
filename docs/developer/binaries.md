@@ -26,7 +26,8 @@ need, colcon, vcs2l, libomp on macOS); there are no conda tesseract packages.
 
 ## Building a wheel
 
-The PyPI wheels contain no conda packages. `.github/workflows/wheels.yml` builds them
+The PyPI wheels contain no conda packages but one: on macOS, the `libomp` of conda-forge's
+`llvm-openmp`, from the locked `default` pixi env. `.github/workflows/wheels.yml` builds them
 the way [tesseract_python](https://github.com/tesseract-robotics/tesseract_python)
 builds its SWIG wheels:
 
@@ -89,7 +90,8 @@ macOS and refuses the wheel (`DeploymentTargetExceededError`, naming each image)
 above the target, rather than raising the tag: a raised tag once came out as
 `macosx_15_3_arm64`, which pip matches on no Mac. Homebrew's `libomp` is built for the
 runner's macOS (15.0), so a wheel that bundles it is refused; conda-forge's `llvm-openmp`
-(the pixi env's `libomp`) is built for 11.0 and passes.
+(the pixi env's `libomp`, which the workflow's macOS leg bundles) is built for 11.0 and
+passes.
 
 ### Tests before publishing
 
@@ -141,8 +143,9 @@ to move the bindings to another environment.
 
 ## Platform runtime behavior
 
-- **libomp under conda (macOS).** The repair bundles Homebrew's `libomp` and
+- **libomp under conda (macOS).** The repair bundles the pixi env's conda-forge `libomp` and
   configures consumers to prefer the Python environment's runtime, then the bundled
   copy. Fresh-wheel and pixi tests verify one runtime in both import orders (#136).
 - **macOS minimum version.** The macOS tag is the declared deployment target; a bundled
-  library built for a newer macOS (Homebrew's `libomp` is one) fails the repair.
+  library built for a newer macOS (Homebrew's `libomp` is one, which is why the wheel
+  bundles conda-forge's) fails the repair.
