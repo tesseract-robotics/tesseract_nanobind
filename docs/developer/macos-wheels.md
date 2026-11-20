@@ -61,9 +61,10 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     **`MACOSX_DEPLOYMENT_TARGET`** (a build-env var, independent of the runner) —
     it sets the wheel's *minimum* macOS (`macosx_13_0_arm64`, …) for broader
     install compatibility without touching the runner or the architecture. Use
-    that, not the runner label. It only lowers the tag as far as every bundled
-    library allows: the repair takes the highest minimum OS of the native closure,
-    and the current Homebrew `libomp` holds it at 15.0 (see below).
+    that, not the runner label. `scripts/native_stack.py` declares it
+    (`OSX_DEPLOYMENT_TARGET`, 12.0) and exports it to colcon and the bindings' build;
+    the repair tags the wheel with it and refuses any bundled library built for a
+    newer macOS, which includes the current Homebrew `libomp` (15.0, see below).
 
 ## STABLE_ABI: the wheel under test is not the Python under test
 
@@ -105,8 +106,10 @@ Descartes planning tests. Both this job and fresh-runner artifact tests gate
 publishing. In the `--lib-dir` mode the wheel workflow uses, the repair leaves
 the plugin YAML unchanged.
 
-The current Homebrew runtime raises both architectures' minimum macOS to
-15.0. A lower deployment target on the bindings cannot lower this requirement.
+The current Homebrew runtime is built for macOS 15.0, above the 12.0 deployment
+target, so the repair refuses a wheel that bundles it
+(`DeploymentTargetExceededError`). The pixi env's conda-forge `libomp` is built
+for 11.0 and passes.
 
 !!! note "Why the bundled-only wheel fails under conda (#136)"
     Wheels up to 0.35.0.8 were repaired by `delocate-wheel`, which bundled `libomp` and

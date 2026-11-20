@@ -38,7 +38,8 @@ TRIPLET_OVERLAYS = WORKFLOWS / "vcpkg_triplets"
 PORT_OVERLAYS = WORKFLOWS / "vcpkg_overlays"
 PORT_OVERLAYS_WINDOWS = WORKFLOWS / "vcpkg_overlays_windows"
 IDENTITY_FILE = ".native-stack-identity.json"
-# Deployment target of the vcpkg_triplets osx triplets and the colcon build (macOS release).
+# Deployment target of the vcpkg_triplets osx triplets, the colcon build and the bindings (macOS
+# release); repair_macos_wheel.py tags the wheel with it.
 OSX_DEPLOYMENT_TARGET = "12.0"
 # Apple's libtool builds static archives (CMake's CMAKE_LIBTOOL); GNU libtool, which the autotools
 # ports need for libtoolize, must not shadow it on PATH.
@@ -150,6 +151,18 @@ class Stack:
             link.symlink_to(APPLE_LIBTOOL)
         return {"PATH": prepend(str(shims), os.environ.get("PATH"))}
 
+    def deployment_target_env(self) -> dict[str, str]:
+        """MACOSX_DEPLOYMENT_TARGET for every compiler and CMake configure a build starts.
+
+        A -DCMAKE_OSX_DEPLOYMENT_TARGET reaches only the top-level projects. trajopt builds
+        osqp, OsqpEigen, piqp and qpOASES through ExternalProject_Add, which does not forward
+        it; their configure takes the target from this variable, and without it they were
+        built for the host's macOS.
+        """
+        if self.host.name != "osx":
+            return {}
+        return {"MACOSX_DEPLOYMENT_TARGET": OSX_DEPLOYMENT_TARGET}
+
     def runtime_library_env(self) -> dict[str, str]:
         """Library search path entries for a process that loads the stack's shared libraries."""
         libs = os.pathsep.join([str(self.vcpkg_prefix / "lib"), str(self.install / "lib")])
@@ -170,6 +183,8 @@ class Stack:
             # without a library search path.
             "TESSERACT_DEV_RPATH": str(self.vcpkg_prefix / "lib"),
             **self.runtime_library_env(),
+            # scikit-build-core also tags the wheel from it.
+            **self.deployment_target_env(),
         }
         if self.host.name == "osx":
             # descartes_light's exported config needs OpenMP; point it at libomp as colcon does.
@@ -356,6 +371,7 @@ def colcon_command(stack: Stack) -> tuple[list[str], dict[str, str]]:
         "CMAKE_PREFIX_PATH": str(stack.vcpkg_prefix),
         **stack.toolchain_env(),
         **stack.runtime_library_env(),
+        **stack.deployment_target_env(),
     }
     ignore = ["tesseract_examples", "gtest"]
     cmake_args = [

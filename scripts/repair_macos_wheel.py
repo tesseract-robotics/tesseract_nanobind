@@ -10,8 +10,10 @@ runtime numpy already loaded (#136), and an env with no `libomp` (uv) gets the b
 
 The vcpkg/anchor mode takes repeated --lib-dir arguments instead of --env-lib.
 It follows linked plugin factories without a manual list, keeps YAML unchanged,
-and raises the wheel's macOS tag to the minimum required by its native closure.
-The original --env-lib mode remains available for older conda-built wheels.
+and tags the wheel for the native stack's macOS deployment target
+(native_stack.OSX_DEPLOYMENT_TARGET), refusing a bundled image built for a newer macOS
+(DeploymentTargetExceededError). The original --env-lib mode remains available for older
+conda-built wheels.
 
 Usage:
     python scripts/repair_macos_wheel.py dist/<wheel>.whl --lib-dir ws/install/lib --out wheelhouse
@@ -28,6 +30,11 @@ import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from native_stack import OSX_DEPLOYMENT_TARGET
+
+# A macOS version as (major, minor, patch), from LC_BUILD_VERSION's minos or a deployment target.
+OsVersion = tuple[int, int, int]
 
 PACKAGE = "tesseract_robotics"
 BUNDLE = f"{PACKAGE}/.dylibs"
@@ -49,6 +56,9 @@ PLUGINS = (
     "libtesseract_task_composer_planning_factories.dylib",
     "libtesseract_task_composer_taskflow_factories.dylib",
 )
+# pip matches only macosx_<major>_0 from macOS 11 (Big Sur) on: a wheel tagged with a nonzero
+# minor there installs on no Mac.
+MACOS_MAJOR_ONLY_TAGS_FROM = 11
 _LOAD_COMMANDS = (
     "LC_LOAD_DYLIB",
     "LC_LOAD_WEAK_DYLIB",
@@ -73,6 +83,14 @@ class UnrepairedWheelError(RuntimeError):
     """The repaired wheel still reaches outside itself."""
 
 
+class DeploymentTargetExceededError(RuntimeError):
+    """A bundled image needs a newer macOS than the declared deployment target."""
+
+
+class UninstallableTagError(RuntimeError):
+    """The deployment target makes a macOS wheel tag pip matches on no Mac."""
+
+
 @dataclass(frozen=True)
 class MachO:
     """The load commands the repair reads from one image."""
@@ -80,7 +98,23 @@ class MachO:
     install_id: str | None
     deps: tuple[str, ...]
     rpaths: tuple[str, ...]
-    minimum_os: tuple[int, int, int] = (0, 0, 0)
+    minimum_os: OsVersion = (0, 0, 0)
+
+
+def parse_os_version(text: str) -> OsVersion:
+    """Parse a dotted macOS version ("12", "12.0", "15.3.1") into (major, minor, patch)."""
+    parts = [int(part) for part in text.split(".")]
+    return (*(parts + [0, 0])[:3],)
+
+
+# The deployment target the wheel is tagged with: the one the native stack is built for.
+DEPLOYMENT_TARGET = parse_os_version(OSX_DEPLOYMENT_TARGET)
+
+
+def format_os_version(version: OsVersion) -> str:
+    """The version as major.minor, with .patch only when nonzero."""
+    major, minor, patch = version
+    return f"{major}.{minor}.{patch}" if patch else f"{major}.{minor}"
 
 
 def parse_load_commands(otool_l: str) -> MachO:
@@ -105,8 +139,7 @@ def parse_load_commands(otool_l: str) -> MachO:
             (words[0] == "minos" and command == "LC_BUILD_VERSION")
             or (words[0] == "version" and command == "LC_VERSION_MIN_MACOSX")
         ):
-            parts = [int(part) for part in words[1].split(".")]
-            minimum_os = tuple((parts + [0, 0])[:3])
+            minimum_os = parse_os_version(words[1])
     return MachO(install_id, tuple(deps), tuple(rpaths), minimum_os)
 
 
@@ -375,13 +408,16 @@ def resolve_anchored_source(
     raise MissingDylibError(f"{dep} from {image} not found in {lib_dirs}")
 
 
-def bundle_anchored_closure(root: Path, lib_dirs: tuple[Path, ...]) -> tuple[int, int, int]:
+def bundle_anchored_closure(root: Path, lib_dirs: tuple[Path, ...]) -> dict[str, OsVersion]:
     """Bundle the linked plugin closure, editing and signing each image once.
 
     The original source path is retained while traversing copied libraries, so
     loader-relative dependencies resolve against their original directory.
     Plugin anchors supply ordinary load commands; no plugin list or YAML rewrite
-    is needed. The returned OS version is the maximum required by the closure.
+    is needed.
+
+    Returns:
+        The minimum macOS of every image in the wheel, by its path relative to `root`.
     """
     bundle = root / BUNDLE
     bundle.mkdir(parents=True, exist_ok=True)
@@ -389,14 +425,14 @@ def bundle_anchored_closure(root: Path, lib_dirs: tuple[Path, ...]) -> tuple[int
     queue = [(image, image) for image in _images(root)]
     sources = {image: image for image, _ in queue if image.parent == bundle}
     seen: set[Path] = set()
-    minimum_os = (0, 0, 0)
+    minimum_os: dict[str, OsVersion] = {}
     while queue:
         image, original = queue.pop()
         if image in seen:
             continue
         seen.add(image)
         macho = read_macho(original)
-        minimum_os = max(minimum_os, macho.minimum_os)
+        minimum_os[image.relative_to(root).as_posix()] = macho.minimum_os
         edits: list[str] = []
         uses_openmp = False
         for dep in macho.deps:
@@ -443,14 +479,56 @@ def bundle_anchored_closure(root: Path, lib_dirs: tuple[Path, ...]) -> tuple[int
     return minimum_os
 
 
-def retag_macos(root: Path, name: str, minimum_os: tuple[int, int, int]) -> str:
-    """Keep the wheel filename and WHEEL tags consistent with bundled libraries."""
+def check_deployment_target(minimum_os: dict[str, OsVersion], target: OsVersion) -> None:
+    """Refuse a wheel whose images need a newer macOS than `target`.
+
+    The tag is the deployment target, never raised to fit the closure: an image above it was
+    built without the target (a sub-build that did not inherit it), and is fixed at its build.
+
+    Args:
+        minimum_os: From `bundle_anchored_closure`: each image's minimum macOS.
+        target: The declared deployment target.
+
+    Raises:
+        DeploymentTargetExceededError: Some image's minimum macOS is above `target`.
+    """
+    above = sorted((name, version) for name, version in minimum_os.items() if version > target)
+    if above:
+        found = "\n".join(f"{name}: {format_os_version(version)}" for name, version in above)
+        raise DeploymentTargetExceededError(
+            f"{len(above)} bundled image(s) need a newer macOS than the deployment target "
+            f"{format_os_version(target)} (native_stack.OSX_DEPLOYMENT_TARGET):\n{found}\n"
+            "Rebuild them with MACOSX_DEPLOYMENT_TARGET set (native_stack.py sets it for colcon "
+            "and the bindings); a library from outside the stack needs a build for that target."
+        )
+
+
+def retag_macos(root: Path, name: str, target: OsVersion) -> str:
+    """Tag the wheel filename and its WHEEL metadata for the deployment target.
+
+    Args:
+        root: The unpacked wheel.
+        name: The wheel's filename as built.
+        target: The declared deployment target.
+
+    Returns:
+        The filename with the platform tag `macosx_<major>_<minor>_<arch>` of `target`.
+
+    Raises:
+        InvalidWheelTagError: `name` is not a single-platform macOS wheel.
+        UninstallableTagError: `target` has a nonzero minor from macOS 11 on.
+    """
     prefix, platform = name.removesuffix(".whl").rsplit("-", 1)
     match = re.fullmatch(r"macosx_(\d+)_(\d+)_(arm64|x86_64)", platform)
     if match is None:
         raise InvalidWheelTagError(name)
-    floor = max((int(match[1]), int(match[2])), minimum_os[:2])
-    replacement = f"macosx_{floor[0]}_{floor[1]}_{match[3]}"
+    major, minor, _patch = target
+    if major >= MACOS_MAJOR_ONLY_TAGS_FROM and minor:
+        raise UninstallableTagError(
+            f"deployment target {format_os_version(target)}: pip matches only "
+            f"macosx_{major}_0 from macOS {MACOS_MAJOR_ONLY_TAGS_FROM} on"
+        )
+    replacement = f"macosx_{major}_{minor}_{match[3]}"
     metadata = next(root.glob("*.dist-info/WHEEL"))
     lines = metadata.read_text().splitlines(keepends=True)
     metadata.write_text(
@@ -462,8 +540,27 @@ def retag_macos(root: Path, name: str, minimum_os: tuple[int, int, int]) -> str:
     return f"{prefix}-{replacement}.whl"
 
 
-def repair_anchored(wheel: Path, lib_dirs: tuple[Path, ...], out: Path) -> Path:
-    """Repair an anchored vcpkg wheel without changing its packaged YAML."""
+def repair_anchored(
+    wheel: Path,
+    lib_dirs: tuple[Path, ...],
+    out: Path,
+    *,
+    deployment_target: OsVersion = DEPLOYMENT_TARGET,
+) -> Path:
+    """Repair an anchored vcpkg wheel without changing its packaged YAML.
+
+    Args:
+        wheel: The wheel `pip wheel` built.
+        lib_dirs: The library directories the closure may come from.
+        out: Where the repaired wheel goes.
+        deployment_target: The macOS the wheel is tagged for; no bundled image may need newer.
+
+    Returns:
+        The repaired wheel's path.
+
+    Raises:
+        DeploymentTargetExceededError: A bundled image needs a newer macOS.
+    """
     out.mkdir(parents=True, exist_ok=True)
     lib_dirs = tuple(directory.resolve(strict=True) for directory in lib_dirs)
     with tempfile.TemporaryDirectory(dir=out) as scratch:
@@ -471,8 +568,9 @@ def repair_anchored(wheel: Path, lib_dirs: tuple[Path, ...], out: Path) -> Path:
         with zipfile.ZipFile(wheel) as archive:
             archive.extractall(root)
         minimum_os = bundle_anchored_closure(root, lib_dirs)
+        check_deployment_target(minimum_os, deployment_target)
         verify(root)
-        name = retag_macos(root, wheel.name, minimum_os)
+        name = retag_macos(root, wheel.name, deployment_target)
         # RECORD checksums are mandated by the wheel format, not an application identity.
         write_record(root)
         repaired = out / name
