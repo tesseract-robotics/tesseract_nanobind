@@ -2,7 +2,8 @@ name: Python Wheels
 
 # Builds, tests and publishes the PyPI wheels the same way the tesseract_python SWIG wheels are
 # built: the tesseract C++ stack is built from source with colcon against vcpkg dependencies on every
-# platform (no conda packages), then the wheel is repaired with auditwheel/delvewheel/batched Mach-O edits. The
+# platform (no conda packages, except macOS's libomp: conda-forge's llvm-openmp from the locked pixi
+# env, as the local build uses), then the wheel is repaired with auditwheel/delvewheel/batched Mach-O edits. The
 # plugin factories are linked into the extension modules and registered through their anchors
 # (boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv), so the repair tools bundle them like
 # any other dependency and the plugin loaders find the bundled copies by path.
@@ -435,7 +436,6 @@ jobs:
         # arm64 only: Intel macOS wheels were dropped for 0.36.
         - arch: arm64
           runner: macos-15
-          brew_prefix: /opt/homebrew
     steps:
     - uses: actions/checkout@v6
       with:
@@ -447,7 +447,28 @@ jobs:
         python-version: '3.12'
     - name: brew
       run: |
-        brew install libomp cmake automake autoconf autoconf-archive libtool gcc ninja ccache
+        brew install cmake automake autoconf autoconf-archive libtool gcc ninja ccache
+    # libomp is conda-forge's llvm-openmp from the default pixi env, the env whose $CONDA_PREFIX
+    # the local pixi tasks pass as --libomp-prefix: the version pixi.lock pins, built for macOS
+    # 11.0, below OSX_DEPLOYMENT_TARGET (12.0). Homebrew's is built for the runner's macOS (15.0),
+    # and the repair refuses a wheel that bundles it. Only the prefix is used: the env stays
+    # unactivated, so the build tools are still Homebrew's and setup-python's.
+    - uses: prefix-dev/setup-pixi@v0.8.0
+      with:
+        pixi-version: v0.70.1
+        manifest-path: tesseract_nanobind/pyproject.toml
+        environments: default
+        locked: true
+        cache: true
+    - name: libomp from the locked pixi env
+      working-directory: tesseract_nanobind
+      shell: bash
+      run: |
+        prefix=$(pixi run --frozen -e default printenv CONDA_PREFIX)
+        for path in "$prefix/include/omp.h" "$prefix/lib/libomp.dylib"; do
+          test -f "$path" || { echo "::error::$path does not exist (libomp prefix)"; exit 1; }
+        done
+        echo "LIBOMP_PREFIX=$prefix" >> "$GITHUB_ENV"
     - name: pip3
       run: |
         python3 -m pip install colcon-common-extensions vcs2l ${{ env.NB_BUILD_REQS }}
@@ -465,7 +486,7 @@ jobs:
       if: steps.native_cache.outputs.native-run == ''
       shell: bash
       run: |
-        python3 tesseract_nanobind/scripts/native_stack.py sources --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix ${{ matrix.config.brew_prefix }}/opt/libomp
+        python3 tesseract_nanobind/scripts/native_stack.py sources --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix "$LIBOMP_PREFIX"
     - name: restore vcpkg binary packages
       id: vcpkg_cache
       if: steps.native_cache.outputs.native-run == '' && steps.native_cache.outputs.vcpkg-run == ''
@@ -478,7 +499,7 @@ jobs:
       if: steps.native_cache.outputs.native-run == ''
       shell: bash
       run: |
-        python3 tesseract_nanobind/scripts/native_stack.py vcpkg --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix ${{ matrix.config.brew_prefix }}/opt/libomp --binary-cache "$RUNNER_TEMP/vcpkg_cache"
+        python3 tesseract_nanobind/scripts/native_stack.py vcpkg --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix "$LIBOMP_PREFIX" --binary-cache "$RUNNER_TEMP/vcpkg_cache"
     - name: save vcpkg binary packages
       if: steps.vcpkg.outcome == 'success' && steps.vcpkg_cache.outcome == 'success' && steps.vcpkg_cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
@@ -515,7 +536,7 @@ jobs:
       if: steps.native_cache.outputs.native-run == ''
       shell: bash
       run: |
-        python3 tesseract_nanobind/scripts/native_stack.py colcon --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix ${{ matrix.config.brew_prefix }}/opt/libomp
+        python3 tesseract_nanobind/scripts/native_stack.py colcon --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix "$LIBOMP_PREFIX"
     - name: archive installed native stack
       if: steps.native_build.outcome == 'success'
       shell: bash
@@ -561,17 +582,17 @@ jobs:
         VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
         export TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install
         export CMAKE_PREFIX_PATH="$TESSERACT_CPP_PREFIX:$VCPKG_PREFIX"
-        # descartes_light's exported config needs OpenMP; point it at Homebrew's libomp as colcon does
+        # descartes_light's exported config needs OpenMP; point it at the pixi env's libomp as colcon does
         python3 -m pip wheel . -w dist --no-build-isolation --no-deps \
           -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5 \
           -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-          -Ccmake.define.OpenMP_CXX_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
-          -Ccmake.define.OpenMP_C_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
+          -Ccmake.define.OpenMP_CXX_INCLUDE_DIR="$LIBOMP_PREFIX/include" \
+          -Ccmake.define.OpenMP_C_INCLUDE_DIR="$LIBOMP_PREFIX/include" \
           -Ccmake.define.OpenMP_CXX_LIB_NAMES=libomp \
           -Ccmake.define.OpenMP_C_LIB_NAMES=libomp \
           "-Ccmake.define.OpenMP_CXX_FLAGS=-Xpreprocessor -fopenmp" \
           "-Ccmake.define.OpenMP_C_FLAGS=-Xpreprocessor -fopenmp" \
-          -Ccmake.define.OpenMP_libomp_LIBRARY=${{ matrix.config.brew_prefix }}/opt/libomp/lib/libomp.dylib
+          -Ccmake.define.OpenMP_libomp_LIBRARY="$LIBOMP_PREFIX/lib/libomp.dylib"
     - name: binding compiler statistics
       if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
       shell: bash
@@ -589,7 +610,7 @@ jobs:
         python3 scripts/repair_macos_wheel.py dist/*.whl \
           --lib-dir "$GITHUB_WORKSPACE/ws/install/lib" \
           --lib-dir "$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib" \
-          --lib-dir "${{ matrix.config.brew_prefix }}/opt/libomp/lib" \
+          --lib-dir "$LIBOMP_PREFIX/lib" \
           --out wheelhouse
     - name: support data wheel for the tests
       id: test_wheels

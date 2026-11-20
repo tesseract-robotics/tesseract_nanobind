@@ -64,7 +64,8 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     that, not the runner label. `scripts/native_stack.py` declares it
     (`OSX_DEPLOYMENT_TARGET`, 12.0) and exports it to colcon and the bindings' build;
     the repair tags the wheel with it and refuses any bundled library built for a
-    newer macOS, which includes the current Homebrew `libomp` (15.0, see below).
+    newer macOS, which includes the current Homebrew `libomp` (15.0, see below), so
+    the workflow bundles the pixi env's conda-forge `libomp` (11.0).
 
 ## STABLE_ABI: the wheel under test is not the Python under test
 
@@ -108,8 +109,12 @@ the plugin YAML unchanged.
 
 The current Homebrew runtime is built for macOS 15.0, above the 12.0 deployment
 target, so the repair refuses a wheel that bundles it
-(`DeploymentTargetExceededError`). The pixi env's conda-forge `libomp` is built
-for 11.0 and passes.
+(`DeploymentTargetExceededError`). The pixi env's conda-forge `libomp`
+(`llvm-openmp`) is built for 11.0 and passes, so both builds take it from there:
+the local pixi tasks pass `$CONDA_PREFIX` as `--libomp-prefix`, and the
+workflow's macOS leg installs the `default` env with `setup-pixi` (`locked:
+true`) and passes the same env's `$CONDA_PREFIX`. Its version is the one
+`pixi.lock` pins; the native-cache key records it (`scripts/wheel_cache.py`).
 
 !!! note "Why the bundled-only wheel fails under conda (#136)"
     Wheels up to 0.35.0.8 were repaired by `delocate-wheel`, which bundled `libomp` and

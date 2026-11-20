@@ -28,6 +28,10 @@ class MissingBuildEnvironmentError(RuntimeError):
     """Required hosted-runner metadata is unavailable."""
 
 
+class LibompRecordError(RuntimeError):
+    """The libomp prefix does not hold exactly one conda llvm-openmp record."""
+
+
 def native_inputs_changed(paths: list[str]) -> bool:
     """Whether changed repository paths can affect the installed C++ stack."""
     return any(path.startswith(NATIVE_INPUTS) for path in paths)
@@ -60,11 +64,26 @@ def command(*args: str, cwd: Path | None = None) -> str:
     return subprocess.run(args, cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
 
+def libomp_identity(prefix: Path) -> str:
+    """`name version build` of the llvm-openmp conda package installed in `prefix`."""
+    records = sorted((prefix / "conda-meta").glob("llvm-openmp-*.json"))
+    if len(records) != 1:
+        found = "no llvm-openmp record" if not records else f"{len(records)} llvm-openmp records"
+        raise LibompRecordError(f"{found} in {prefix / 'conda-meta'}")
+    record = json.loads(records[0].read_text())
+    return f"{record['name']} {record['version']} {record['build']}"
+
+
 def build_environment(platform: str, workspace: Path) -> dict[str, str]:
-    """Record actual compiler/runtime versions and the non-relocatable install prefix."""
+    """Record actual compiler/runtime versions and the non-relocatable install prefix.
+
+    On macOS the stack links libomp from `$LIBOMP_PREFIX`, the locked pixi env, so its conda
+    record is part of the key.
+    """
     if not os.environ.get("ImageVersion"):
         raise MissingBuildEnvironmentError("Hosted runner ImageVersion is required")
     homebrew = ""
+    libomp = ""
     if sys.platform == "win32":
         vswhere = "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
         installation = Path(command(vswhere, "-latest", "-property", "installationPath"))
@@ -76,19 +95,24 @@ def build_environment(platform: str, workspace: Path) -> dict[str, str]:
     else:
         compiler = command("c++", "--version").splitlines()[0]
         if sys.platform == "darwin":
-            homebrew = command("brew", "list", "--versions", "libomp", "gcc")
+            homebrew = command("brew", "list", "--versions", "gcc")
+            if not os.environ.get("LIBOMP_PREFIX"):
+                raise MissingBuildEnvironmentError("LIBOMP_PREFIX is required on macOS")
+            libomp = libomp_identity(Path(os.environ["LIBOMP_PREFIX"]))
     return {
         "workspace": str(workspace.resolve()),
         "platform": platform,
         "image": os.environ["ImageVersion"],
         "compiler": compiler,
         "homebrew": homebrew,
+        "libomp": libomp,
     }
 
 
 def native_artifact_name(environment: dict[str, str]) -> str:
     """Use readable platform and toolchain versions as the artifact name."""
-    versions = "-".join(environment[k] for k in ("platform", "image", "compiler", "homebrew"))
+    keys = ("platform", "image", "compiler", "homebrew", "libomp")
+    versions = "-".join(environment[k] for k in keys)
     return "native-stack-" + re.sub(r"[^a-zA-Z0-9_.-]+", "-", versions).strip("-")
 
 
