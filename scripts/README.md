@@ -128,8 +128,9 @@ against vcpkg dependencies, `pip wheel .` builds the bindings against it, and
 auditwheel (Linux), delvewheel (Windows) or `repair_macos_wheel.py` (macOS)
 bundles the closure. The macOS repair batches load-command edits and signs each
 changed image once; repeated `--lib-dir` arguments name the native, vcpkg and
-Homebrew OpenMP library directories. It preserves plugin YAML and derives the
-minimum macOS tag from the bundled libraries.
+Homebrew OpenMP library directories. It preserves plugin YAML, tags the wheel for
+`native_stack.OSX_DEPLOYMENT_TARGET` and refuses a bundled library built for a newer
+macOS (`DeploymentTargetExceededError`).
 The plugin factory libraries are linked into the extension modules and registered
 through their anchors, so the repair tools bundle them like any other dependency.
 See [docs/developer/binaries.md](../docs/developer/binaries.md#building-a-wheel).

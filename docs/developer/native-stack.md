@@ -44,6 +44,22 @@ SHA-256 of the rosinstall, `scripts/native_stack.toml`, the overlays and triplet
 the compiler and cmake versions, and for `colcon` the identity of the `vcpkg` stage. A stage whose
 recorded identity equals the current one is skipped; any input change rebuilds it.
 
+## macOS deployment target
+
+`OSX_DEPLOYMENT_TARGET` in `scripts/native_stack.py` is the macOS the stack and the bindings are
+built for (12.0); the vcpkg triplet overlays declare the same value, and a test holds them equal.
+The colcon stage and `exec` (the bindings' pip build) export it as `MACOSX_DEPLOYMENT_TARGET`, not
+only as `-DCMAKE_OSX_DEPLOYMENT_TARGET`: trajopt builds osqp, OsqpEigen, piqp and qpOASES through
+`ExternalProject_Add`, which forwards no deployment target, so without the variable those four
+were built for the build host's macOS (15.3) and the wheel's tag rose with them.
+`repair_macos_wheel.py` tags the wheel with the target and refuses an image built for a newer
+macOS (`DeploymentTargetExceededError`).
+
+A sub-build that has configured once keeps its cached `CMAKE_OSX_DEPLOYMENT_TARGET`, and with
+`--merge-install` trajopt's `find_package` finds the four libraries already in `ws/install` and
+skips the sub-builds. Changing the target therefore needs a fresh `ws/build` and `ws/install`;
+ccache recompiles, since the target is part of every compile command.
+
 ## CI
 
 `wheels.yml` runs `sources`, `vcpkg` and `colcon` as separate steps (the vcpkg binary archives are

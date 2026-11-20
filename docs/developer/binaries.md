@@ -82,9 +82,14 @@ copies by path. No plugin directory is configured and no YAML is patched.
 `wheel.py-api = "cp312"` makes the Python 3.12 build an abi3 wheel
 (`cp312-abi3-<platform>`), which installs on 3.12 and every later CPython. Linux wheels
 are `manylinux_2_39`: Ubuntu 24.04's glibc, and its gcc 13 libstdc++, which auditwheel
-leaves to the host. On macOS the C++ stack is built for 12.0, but Homebrew's `libomp`
-is built for the runner's macOS. Repair reads the native closure's minimum OS
-versions and updates both the wheel filename and its WHEEL tags.
+leaves to the host. On macOS the C++ stack and the bindings are built for
+`OSX_DEPLOYMENT_TARGET` in `scripts/native_stack.py` (12.0), and the repair writes that
+target into the wheel filename and its WHEEL tags. It reads every bundled image's minimum
+macOS and refuses the wheel (`DeploymentTargetExceededError`, naming each image) when one is
+above the target, rather than raising the tag: a raised tag once came out as
+`macosx_15_3_arm64`, which pip matches on no Mac. Homebrew's `libomp` is built for the
+runner's macOS (15.0), so a wheel that bundles it is refused; conda-forge's `llvm-openmp`
+(the pixi env's `libomp`) is built for 11.0 and passes.
 
 ### Tests before publishing
 
@@ -139,5 +144,5 @@ to move the bindings to another environment.
 - **libomp under conda (macOS).** The repair bundles Homebrew's `libomp` and
   configures consumers to prefer the Python environment's runtime, then the bundled
   copy. Fresh-wheel and pixi tests verify one runtime in both import orders (#136).
-- **macOS minimum version.** The macOS tag follows Homebrew's `libomp`, so it rises when
-  the runner image does.
+- **macOS minimum version.** The macOS tag is the declared deployment target; a bundled
+  library built for a newer macOS (Homebrew's `libomp` is one) fails the repair.

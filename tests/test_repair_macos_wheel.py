@@ -4,11 +4,14 @@ import base64
 import hashlib
 import importlib.util
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
 
 _SCRIPT = Path(__file__).parent.parent / "scripts" / "repair_macos_wheel.py"
+# The repair reads the deployment target from scripts/native_stack.py, as it does run as a script.
+sys.path.insert(0, str(_SCRIPT.parent))
 _spec = importlib.util.spec_from_file_location("repair_macos_wheel", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
 repair = importlib.util.module_from_spec(_spec)
@@ -184,3 +187,104 @@ def test_verify_catches_a_reference_to_a_file_not_in_the_wheel(tmp_path):
     problems = repair.problems_in(bundle / "libx.dylib", broken, tmp_path, bundle)
     assert len(problems) == 1
     assert "libgone" in problems[0]
+
+
+def test_the_declared_target_is_the_native_stacks():
+    import native_stack
+
+    assert repair.DEPLOYMENT_TARGET == repair.parse_os_version(native_stack.OSX_DEPLOYMENT_TARGET)
+
+
+def test_parse_reads_the_minimum_os():
+    otool = "x.dylib:\nLoad command 9\n      cmd LC_BUILD_VERSION\n  platform 1\n    minos 15.3\n"
+    assert repair.parse_load_commands(otool).minimum_os == (15, 3, 0)
+
+
+def test_a_binary_above_the_deployment_target_is_refused_naming_it():
+    minimums = {
+        "tesseract_robotics/.dylibs/libosqp.dylib": (15, 3, 0),
+        "tesseract_robotics/.dylibs/libpiqp.dylib": (15, 3, 0),
+        "tesseract_robotics/.dylibs/libtesseract_common.dylib": (12, 0, 0),
+    }
+    with pytest.raises(repair.DeploymentTargetExceededError) as caught:
+        repair.check_deployment_target(minimums, (12, 0, 0))
+    message = str(caught.value)
+    assert "libosqp.dylib: 15.3" in message
+    assert "libpiqp.dylib: 15.3" in message
+    assert "libtesseract_common" not in message
+    assert "12.0" in message
+
+
+def test_binaries_at_or_below_the_deployment_target_pass():
+    repair.check_deployment_target({"a.dylib": (12, 0, 0), "b.so": (11, 0, 0)}, (12, 0, 0))
+
+
+def _wheel_metadata(root: Path, tag: str) -> Path:
+    info = root / "pkg-1.dist-info"
+    info.mkdir(parents=True)
+    wheel = info / "WHEEL"
+    wheel.write_text(f"Wheel-Version: 1.0\nTag: {tag}\n")
+    return wheel
+
+
+def test_the_wheel_is_tagged_with_the_deployment_target(tmp_path):
+    """Not the host's version scikit-build-core may have written, nor the closure's maximum."""
+    metadata = _wheel_metadata(tmp_path, "cp312-abi3-macosx_15_0_arm64")
+    name = repair.retag_macos(tmp_path, "pkg-1-cp312-abi3-macosx_15_0_arm64.whl", (12, 0, 0))
+    assert name == "pkg-1-cp312-abi3-macosx_12_0_arm64.whl"
+    assert "Tag: cp312-abi3-macosx_12_0_arm64\n" in metadata.read_text()
+
+
+def test_a_tag_pip_never_matches_is_refused(tmp_path):
+    """pip matches macosx_<major>_0 only, from macOS 11 on: macosx_15_3 installs nowhere."""
+    _wheel_metadata(tmp_path, "cp312-abi3-macosx_12_0_arm64")
+    with pytest.raises(repair.UninstallableTagError, match="15.3"):
+        repair.retag_macos(tmp_path, "pkg-1-cp312-abi3-macosx_12_0_arm64.whl", (15, 3, 0))
+
+
+_WHEEL_NAME = "tesseract_robotics-1-cp312-abi3-macosx_14_0_arm64.whl"
+
+
+def _zip_wheel(tmp_path: Path) -> Path:
+    """A wheel with only its metadata: the Mach-O stages are replaced in these tests."""
+    wheel = tmp_path / _WHEEL_NAME
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr(
+            "tesseract_robotics-1.dist-info/WHEEL",
+            "Wheel-Version: 1.0\nTag: cp312-abi3-macosx_14_0_arm64\n",
+        )
+        archive.writestr("tesseract_robotics-1.dist-info/RECORD", "")
+    return wheel
+
+
+@pytest.fixture
+def no_otool(monkeypatch):
+    """Skip the Mach-O rewriting and verification; the tag decisions read no binary."""
+    monkeypatch.setattr(repair, "bundle_anchored_closure", lambda root, lib_dirs: {})
+    monkeypatch.setattr(repair, "verify", lambda root: None)
+
+
+def test_anchored_repair_refuses_a_closure_above_the_deployment_target(
+    tmp_path, no_otool, monkeypatch
+):
+    monkeypatch.setattr(
+        repair,
+        "bundle_anchored_closure",
+        lambda root, lib_dirs: {"tesseract_robotics/.dylibs/libqpOASES.3.2.dylib": (15, 3, 0)},
+    )
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    with pytest.raises(repair.DeploymentTargetExceededError, match="libqpOASES"):
+        repair.repair_anchored(_zip_wheel(tmp_path), (lib,), tmp_path / "out")
+    assert not list((tmp_path / "out").glob("*.whl"))
+
+
+def test_anchored_repair_names_the_wheel_for_the_deployment_target(tmp_path, no_otool):
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    repaired = repair.repair_anchored(_zip_wheel(tmp_path), (lib,), tmp_path / "out")
+    major, minor, _patch = repair.DEPLOYMENT_TARGET
+    assert repaired.name == f"tesseract_robotics-1-cp312-abi3-macosx_{major}_{minor}_arm64.whl"
+    with zipfile.ZipFile(repaired) as archive:
+        metadata = archive.read("tesseract_robotics-1.dist-info/WHEEL").decode()
+    assert f"Tag: cp312-abi3-macosx_{major}_{minor}_arm64\n" in metadata
