@@ -7,7 +7,7 @@ tesseract `5dfd5ae2` · tesseract_planning `4e27d94b` · trajopt `98b85d55` · l
 
 | module | covered | gaps | deviations | accepted | quoted types | type fallbacks |
 |---|---|---|---|---|---|---|
-| collision | 278 | 5 | 4 | 16 | 0 | 18 |
+| collision | 278 | 5 | 4 | 17 | 0 | 18 |
 | command_language | 380 | 1 | 1 | 129 | 0 | 48 |
 | common | 262 | 89 | 28 | 56 | 0 | 47 |
 | environment | 236 | 10 | 4 | 55 | 0 | 48 |
@@ -203,6 +203,7 @@ None.
 | symbol | rule | location |
 |---|---|---|
 | `CollisionCheckConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
+| `ContactArrays.__repr__` | presentation-dunder | src/tesseract_robotics/collision.pyi |
 | `ContactManagerConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
 | `ContactManagersPluginFactory.__init__` | yaml-node | tesseract/collision/contact_managers_plugin_factory.h:126 |
 | `ContactRequest.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
