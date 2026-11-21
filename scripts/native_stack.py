@@ -37,6 +37,8 @@ WORKFLOWS = REPO / ".github" / "workflows"
 TRIPLET_OVERLAYS = WORKFLOWS / "vcpkg_triplets"
 PORT_OVERLAYS = WORKFLOWS / "vcpkg_overlays"
 PORT_OVERLAYS_WINDOWS = WORKFLOWS / "vcpkg_overlays_windows"
+# Ports every platform overrides, searched before the platform's own overlays.
+PORT_OVERLAYS_COMMON = WORKFLOWS / "vcpkg_overlays_common"
 IDENTITY_FILE = ".native-stack-identity.json"
 # Deployment target of the vcpkg_triplets osx triplets, the colcon build and the bindings (macOS
 # release); repair_macos_wheel.py tags the wheel with it.
@@ -269,7 +271,10 @@ def sources_identity() -> dict[str, str]:
 
 
 def vcpkg_identity(stack: Stack) -> dict[str, str]:
-    overlays = [PORT_OVERLAYS_WINDOWS if stack.host.name == "windows" else PORT_OVERLAYS]
+    overlays = [
+        PORT_OVERLAYS_COMMON,
+        PORT_OVERLAYS_WINDOWS if stack.host.name == "windows" else PORT_OVERLAYS,
+    ]
     if stack.host.name != "windows":
         overlays.append(TRIPLET_OVERLAYS)
     return {
@@ -346,6 +351,7 @@ def build_vcpkg(stack: Stack) -> None:
     ensure_vcpkg(stack, config["revision"], config["repository"])
     stack.binary_cache.mkdir(parents=True, exist_ok=True)
     args = [str(stack.vcpkg_exe()), "install", "--triplet", stack.triplet, "--clean-after-build"]
+    args.append(f"--overlay-ports={PORT_OVERLAYS_COMMON}")
     if stack.host.name == "windows":
         args.append(f"--overlay-ports={PORT_OVERLAYS_WINDOWS}")
     else:

@@ -72,4 +72,18 @@ place the vcpkg revision and package list are declared.
 
 - A different upstream commit: edit `dependencies.rosinstall`.
 - A vcpkg package or revision: edit `scripts/native_stack.toml`.
+- A vcpkg port every platform overrides: `.github/workflows/vcpkg_overlays_common/<port>`, searched
+  before the platform's own overlays (`vcpkg_overlays`, `vcpkg_overlays_windows`).
+
+### kubazip is fetched by commit
+
+`kubazip` (a dependency of `assimp`) comes from `vcpkg_overlays_common/kubazip`: vcpkg 2026.10.16's
+port, fetched as commit `5f680055` instead of tag `v0.3.15`. kuba--/zip rewrote its history on
+2026-11-20 and re-created every tag on the rewritten commits. The tree of `v0.3.15` did not change
+(`17d3c64a` before and after), but GitHub's archive of the tag embeds the commit id, so its bytes and
+SHA-512 changed, and the port's download fails with "unexpected hash"
+([microsoft/vcpkg#55200](https://github.com/microsoft/vcpkg/issues/55200)). A run that restores
+kubazip from the vcpkg binary cache never downloads it; any change to the vcpkg ABI (overlays,
+script, a new runner image's tools) rebuilds it from source and hit the failure. A commit's archive
+cannot be moved by a tag. Drop the overlay when the declared vcpkg release ships a fixed port.
 - Compiler flags and per-platform colcon arguments: `colcon_command` in `scripts/native_stack.py`.
