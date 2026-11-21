@@ -6,6 +6,9 @@ Upstream defines each batch call as observably equivalent to the single calls in
 and `setCollisionObjectsEnabled` report it by a `False` return; `setCollisionObjectsTransform`
 returns nothing, so there the skip is silent. An id missing from a transform map raises, and so
 does `getCollisionObjectsTransform` of an id the manager does not hold.
+
+`setCollisionObjectsTransform(ids, transforms)` with a `(K, 4, 4)` array checks every transform
+as `Isometry3d(matrix)` does before it moves any object.
 """
 
 import gc
@@ -13,6 +16,7 @@ import gc
 import numpy as np
 import pytest
 
+from tesseract_robotics import collision
 from tesseract_robotics.collision import (
     CollisionObjectSpec,
     ContactRequest,
@@ -20,7 +24,7 @@ from tesseract_robotics.collision import (
     ContactTestType,
     ContinuousContactManager,
 )
-from tesseract_robotics.common import CollisionMarginData, Isometry3d, LinkId
+from tesseract_robotics.common import CollisionMarginData, Isometry3d, LinkId, NotRotationError
 
 from .test_contact_manager_config import _box, _get_discrete_factory
 
@@ -272,3 +276,183 @@ def test_spec_rejects_none_shape(make_manager):
     with pytest.raises((TypeError, ValueError)):
         spec = CollisionObjectSpec("box", 0, [None], poses)  # ty: ignore[invalid-argument-type]
         manager.addCollisionObjects([spec])
+
+
+# The (ids, transforms) overload: K transforms as one (K, 4, 4) float64 array, row-major 4 x 4 per
+# transform, as compose_each and Environment.link_transforms_batch hold them.
+
+
+def _rigid_stack(xs=X_POSITIONS) -> np.ndarray:
+    """A (K, 4, 4) stack of rigid transforms, translated along x and turned about z.
+
+    Each rotation is a different one, so a transposed or misindexed read moves an object
+    to a pose the test can tell apart.
+    """
+    stack = np.zeros((len(xs), 4, 4))
+    for k, x in enumerate(xs):
+        angle = 0.3 * (k + 1)  # rad
+        c, s = np.cos(angle), np.sin(angle)
+        stack[k, :3, :3] = [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]
+        stack[k, :3, 3] = [x, 0.1 * k, -0.2 * k]
+        stack[k, 3, 3] = 1.0
+    return stack
+
+
+def _poses(manager, names=NAMES) -> np.ndarray:
+    return np.stack([manager.getCollisionObjectsTransform(name).matrix for name in names])
+
+
+def _contacts_in_place(manager) -> list[tuple[str, str, float]]:
+    """Contacts at the poses the manager holds (no _place), sorted."""
+    manager.setActiveCollisionObjects(list(manager.getCollisionObjects()))
+    manager.setCollisionMarginData(CollisionMarginData(MARGIN))
+    result = ContactResultMap()
+    manager.contactTest(result, ContactRequest(ContactTestType.ALL))
+    found = []
+    for contact in result.flattenCopyResults():
+        a, b = sorted(link.name() for link in contact.link_ids)
+        found.append((a, b, contact.distance))
+    return sorted(found)
+
+
+def test_stack_transform_equals_list_overload(make_manager):
+    """Same poses and same contacts as the (ids, list[Isometry3d]) overload, both manager kinds."""
+    stack = _rigid_stack()
+    from_stack = make_manager()
+    assert from_stack.addCollisionObjects(_specs())
+    from_list = make_manager()
+    assert from_list.addCollisionObjects(_specs())
+
+    assert from_stack.setCollisionObjectsTransform(list(NAMES), stack) is None
+    from_list.setCollisionObjectsTransform(list(NAMES), [Isometry3d(m) for m in stack])
+
+    np.testing.assert_array_equal(_poses(from_stack), _poses(from_list))
+    np.testing.assert_allclose(_poses(from_stack), stack, atol=1e-12)
+    stack_contacts = _contacts_in_place(from_stack)
+    assert stack_contacts, "the boxes at x = 0 and 0.5 must touch"
+    assert stack_contacts == _contacts_in_place(from_list)
+
+
+def test_stack_transform_takes_link_ids(make_manager):
+    manager = make_manager()
+    assert manager.addCollisionObjects(_specs())
+    stack = _rigid_stack()
+    manager.setCollisionObjectsTransform([LinkId(name) for name in NAMES], stack)
+    np.testing.assert_allclose(_poses(manager), stack, atol=1e-12)
+
+
+def test_ndarray_dispatches_to_stack_overload_and_list_to_list_overload(make_manager):
+    """The count check tells the overloads apart: the stack overload raises its own error, the
+    list overload upstream's RuntimeError."""
+    manager = make_manager()
+    assert manager.addCollisionObjects(_specs())
+    stack = _rigid_stack()
+    with pytest.raises(collision.TransformCountMismatchError):
+        manager.setCollisionObjectsTransform(list(NAMES[:2]), stack)
+    with pytest.raises(RuntimeError, match="received 2 ids but 3 poses"):
+        manager.setCollisionObjectsTransform(list(NAMES[:2]), [Isometry3d(m) for m in stack])
+
+
+def test_stack_count_mismatch_is_a_value_error_naming_both_counts(make_manager):
+    manager = make_manager()
+    assert manager.addCollisionObjects(_specs())
+    before = _poses(manager)
+    assert issubclass(collision.TransformCountMismatchError, ValueError)
+    with pytest.raises(collision.TransformCountMismatchError, match=r"3 ids but 2 transforms"):
+        manager.setCollisionObjectsTransform(list(NAMES), _rigid_stack()[:2])
+    np.testing.assert_array_equal(_poses(manager), before)
+
+
+@pytest.mark.parametrize("shape", [(3, 3, 3), (3, 4, 3), (3, 16), (4, 4)])
+def test_stack_wrong_shape_matches_no_overload(make_manager, shape):
+    manager = make_manager()
+    assert manager.addCollisionObjects(_specs())
+    with pytest.raises(TypeError):
+        manager.setCollisionObjectsTransform(list(NAMES), np.zeros(shape))
+
+
+@pytest.mark.parametrize(
+    "layout",
+    ["fortran_slices", "strided", "float32"],
+)
+def test_stack_other_layouts_are_converted(make_manager, layout):
+    """Like compose_each: a stack that is not C-contiguous float64 is converted, not refused."""
+    manager = make_manager()
+    assert manager.addCollisionObjects(_specs())
+    stack = _rigid_stack()
+    if layout == "fortran_slices":
+        given = np.ascontiguousarray(stack.transpose(0, 2, 1)).transpose(0, 2, 1)
+        assert not given.flags.c_contiguous
+    elif layout == "strided":
+        doubled = np.repeat(stack, 2, axis=0)
+        given = doubled[::2]
+        assert not given.flags.c_contiguous
+    else:
+        # float32 rounding leaves the rotation block orthonormal only to ~1e-7: use the identity
+        stack[:, :3, :3] = np.eye(3)
+        given = stack.astype(np.float32)
+    manager.setCollisionObjectsTransform(list(NAMES), given)
+    np.testing.assert_allclose(_poses(manager), stack, atol=1e-6)
+
+
+def _bad(row: int, defect: str) -> np.ndarray:
+    stack = _rigid_stack()
+    if defect == "bottom_row":
+        stack[row, 3] = [0.0, 0.0, 0.0, 2.0]
+    elif defect == "not_orthonormal":
+        stack[row, :3, :3] *= 1.01
+    else:
+        stack[row, 1, 3] = np.nan
+    return stack
+
+
+@pytest.mark.parametrize(
+    ("defect", "match"),
+    [
+        ("bottom_row", "bottom row"),
+        ("not_orthonormal", "not orthonormal"),
+        ("non_finite", "not finite"),
+    ],
+)
+@pytest.mark.parametrize("row", [0, 2])
+def test_stack_non_rigid_row_raises_naming_it_and_moves_nothing(make_manager, defect, match, row):
+    """Isometry3d(matrix)'s rule and error, per row, checked for every row before any id moves."""
+    manager = make_manager()
+    assert manager.addCollisionObjects(_specs())
+    before = _poses(manager)
+    with pytest.raises(NotRotationError, match=rf"transforms\[{row}\].*{match}"):
+        manager.setCollisionObjectsTransform(list(NAMES), _bad(row, defect))
+    np.testing.assert_array_equal(_poses(manager), before)
+
+
+@pytest.mark.parametrize("defect", ["bottom_row", "not_orthonormal", "non_finite"])
+def test_stack_rule_is_isometry3d_rule(defect):
+    """Every row the stack overload refuses, Isometry3d(matrix) refuses with the same error."""
+    with pytest.raises(NotRotationError):
+        Isometry3d(_bad(1, defect)[1])
+
+
+def test_stack_unknown_id_behaves_like_list_overload(make_manager):
+    """An id the manager does not hold is skipped without error; the held ids still move."""
+    stack = _rigid_stack()
+    ids = [NAMES[0], "missing", NAMES[2]]
+    from_stack = make_manager()
+    assert from_stack.addCollisionObjects(_specs())
+    from_list = make_manager()
+    assert from_list.addCollisionObjects(_specs())
+    from_stack.setCollisionObjectsTransform(ids, stack)
+    from_list.setCollisionObjectsTransform(ids, [Isometry3d(m) for m in stack])
+    assert not from_stack.hasCollisionObject("missing")
+    np.testing.assert_array_equal(_poses(from_stack), _poses(from_list))
+    np.testing.assert_allclose(_poses(from_stack, [NAMES[0], NAMES[2]]), stack[[0, 2]], atol=1e-12)
+
+
+def test_stack_empty(make_manager):
+    manager = make_manager()
+    assert manager.addCollisionObjects(_specs())
+    before = _poses(manager)
+    assert manager.setCollisionObjectsTransform([], np.empty((0, 4, 4))) is None
+    np.testing.assert_array_equal(_poses(manager), before)
+    # An empty stack is still counted against the ids.
+    with pytest.raises(collision.TransformCountMismatchError, match=r"1 ids but 0 transforms"):
+        manager.setCollisionObjectsTransform([NAMES[0]], np.empty((0, 4, 4)))

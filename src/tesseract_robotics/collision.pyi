@@ -198,6 +198,11 @@ class ContactResultVector:
         Remove every element; raises ContactResultHeldError while an element is held.
         """
 
+class TransformCountMismatchError(ValueError):
+    """
+    setCollisionObjectsTransform(ids, transforms) got a different number of ids than (K, 4, 4) transforms.
+    """
+
 class EmptyContactResultsError(ValueError):
     """A ContactResultMap vector overload got an empty ContactResultVector."""
 
@@ -622,6 +627,28 @@ class DiscreteContactManager:
     def setCollisionObjectsTransform(self, id: tesseract_robotics.common.LinkId | str, pose: tesseract_robotics.common.Isometry3d) -> None: ...
 
     @overload
+    def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.common.LinkId | str], transforms: Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C', writable=False)]) -> None:
+        """
+        Set the world transform of each id from a stack of homogeneous matrices.
+
+        Equivalent to the (ids, list[Isometry3d]) overload with Isometry3d(transforms[k]) for each k,
+        without building those objects. An id the manager does not hold is skipped, with no error.
+        Every transform is checked before any object moves; the GIL is released while they are set.
+
+        Args:
+            ids: K object ids (LinkId or str).
+            transforms: (K, 4, 4) float64 array, row k the world pose of ids[k] (translation in m).
+                A C-contiguous float64 array is read in place; any other layout or dtype is converted
+                first. Another shape matches no overload (TypeError).
+
+        Raises:
+            TransformCountMismatchError: len(ids) != K.
+            NotRotationError: transforms[k] is not a rigid transform, as Isometry3d(matrix) refuses
+                it (bottom row other than [0, 0, 0, 1], a non-finite entry, or a rotation block with
+                max|RᵀR − I| above EIGEN_DEFAULT_PREC); the message names k.
+        """
+
+    @overload
     def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.common.LinkId | str], poses: Sequence[tesseract_robotics.common.Isometry3d]) -> None: ...
 
     @overload
@@ -718,6 +745,28 @@ class ContinuousContactManager:
 
     @overload
     def setCollisionObjectsTransform(self, id: tesseract_robotics.common.LinkId | str, pose: tesseract_robotics.common.Isometry3d) -> None: ...
+
+    @overload
+    def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.common.LinkId | str], transforms: Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C', writable=False)]) -> None:
+        """
+        Set the world transform of each id from a stack of homogeneous matrices.
+
+        Equivalent to the (ids, list[Isometry3d]) overload with Isometry3d(transforms[k]) for each k,
+        without building those objects. An id the manager does not hold is skipped, with no error.
+        Every transform is checked before any object moves; the GIL is released while they are set.
+
+        Args:
+            ids: K object ids (LinkId or str).
+            transforms: (K, 4, 4) float64 array, row k the world pose of ids[k] (translation in m).
+                A C-contiguous float64 array is read in place; any other layout or dtype is converted
+                first. Another shape matches no overload (TypeError).
+
+        Raises:
+            TransformCountMismatchError: len(ids) != K.
+            NotRotationError: transforms[k] is not a rigid transform, as Isometry3d(matrix) refuses
+                it (bottom row other than [0, 0, 0, 1], a non-finite entry, or a rotation block with
+                max|RᵀR − I| above EIGEN_DEFAULT_PREC); the message names k.
+        """
 
     @overload
     def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.common.LinkId | str], poses: Sequence[tesseract_robotics.common.Isometry3d]) -> None: ...

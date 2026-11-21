@@ -142,6 +142,12 @@ one sample is 10 ms.
 | `task_composer: TaskComposerPluginFactory.getAvailableTaskComposerNodePlugins` | 410 ms | 2 | tests | GIL-held: a getter |
 | `geometry: PolygonMesh.getVertices` / `getFaces` | 80 µs | 1257 | tests | GIL-held: getters (the cost is copying to NumPy) |
 
+`setCollisionObjectsTransform(ids, transforms)` with a `(K, 4, 4)` array was judged without a
+`gil-hotspots` run (py-spy needs `sudo` on macOS): timed directly with every pose changed per call,
+Bullet takes 0.1-0.15 ms at K = 80 and 21-24 ms at K = 1000 (macOS arm64, loaded machine,
+2026-11-21), above the rule's 50 µs. It validates and copies the array into C++ poses with the
+GIL held, then releases it for upstream's `(ids, poses)` call, as the map overload does.
+
 In the benchmarks, 90% of GIL-held samples fall in unlisted bindings, and over 99% of those are
 `Environment.init`, `Environment.getKinematicGroup` and the task composer factory. In real
 workloads, the remaining GIL-bound time is the `Environment` follow-up and the factory caches.
@@ -179,8 +185,9 @@ re-ranks a recording, for instance after the list changed.
 
 - `tests/audit/test_audit_gil.py`: the audit's contract, on a fixture TU with one binding per
   release form and per non-release that must not count.
-- `tests/test_gil_entry_points.py`: run-time checks of the releases #124 added and of
-  `calcManipulabilityVolume_each`. The oracle sets a
+- `tests/test_gil_entry_points.py`: run-time checks of the releases #124 added, of
+  `calcManipulabilityVolume_each` and of the contact managers' `setCollisionObjectsTransform(ids,
+  transforms)` stack overload. The oracle sets a
   switch interval far above the test's run time, so the main thread can only run while a worker
   is inside the call if the call dropped the GIL. The worker repeats the call until the main
   thread has run, so a fast call is still caught. A call that holds the GIL fails

@@ -4,6 +4,7 @@
  */
 
 #include "common_bindings.h"
+#include "transform_stack.h"
 
 #include <cmath>
 #include <limits>
@@ -16,26 +17,9 @@
 // cos(pitch). The round-trip error max(δ / c, c) is least at c = sqrt(δ): both branches then
 // reproduce the rotation to about sqrt(eps) rad. pitch itself is exact in both branches.
 static const double GIMBAL_LOCK_COS_PITCH = std::sqrt(std::numeric_limits<double>::epsilon());
-// [dimensionless] Eigen's float64 dummy_precision (1e-12): exported as EIGEN_DEFAULT_PREC, and the
-// rigidity bound — a 3x3 is a rotation iff orthonormality_residual <= this.
-constexpr double EIGEN_DEFAULT_PREC = Eigen::NumTraits<double>::dummy_precision();
 
 // (N, 3) points or directions as numpy holds them: row-major, one point per row.
 using PointsRowMajor = Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>;
-
-// (M, 4, 4) homogeneous matrices as numpy holds a stack of them: C order, row-major 4 x 4 per
-// transform. An input that is strided, Fortran-ordered or not float64 is converted by nanobind
-// first; an output owns a new buffer.
-using TransformStackIn = nb::ndarray<nb::numpy, const double, nb::shape<-1, 4, 4>, nb::c_contig>;
-using TransformStackOut = nb::ndarray<nb::numpy, double, nb::shape<-1, 4, 4>, nb::c_contig>;
-using RowMajor4d = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-
-// Transform i of a stack, built as `Isometry3d(matrix)` builds one: assigned through matrix().
-static Eigen::Isometry3d stack_isometry(const TransformStackIn& stack, std::size_t i) {
-    Eigen::Isometry3d iso;
-    iso.matrix() = Eigen::Map<const RowMajor4d>(stack.data() + 16 * i);
-    return iso;
-}
 
 static TransformStackOut new_transform_stack(std::size_t m) {
     double* data = new double[16 * m];
@@ -61,20 +45,9 @@ static Eigen::Matrix3d nearest_rotation(const Eigen::Matrix3d& m) {
     return svd.matrixU() * Eigen::Vector3d(1.0, 1.0, d).asDiagonal() * svd.matrixV().transpose();
 }
 
-// max|RᵀR − I| of a 3x3, dimensionless: how far it is from orthonormal. A consumer bounds it to
-// accept a matrix as a rotation; computed here so that check is Eigen's, as the rotation is.
-// A NaN entry gives NaN: Eigen's default maxCoeff may skip a NaN coefficient, which read a NaN
-// matrix as rigid. The trace carries it: diagonal j is |column j|² − 1, NaN iff column j has a NaN
-// (an inf column makes it inf, never NaN). maxCoeff<PropagateNaN> instead costs ~1.7x at 200k.
-static double orthonormality_residual(const Eigen::Matrix3d& r) {
-    const Eigen::Matrix3d deviation = (r.transpose() * r - Eigen::Matrix3d::Identity()).cwiseAbs();
-    const double trace = deviation.trace();
-    return std::isnan(trace) ? trace : deviation.maxCoeff();
-}
-
-// A matrix offered as a rotation is not one: orthonormality_residual > EIGEN_DEFAULT_PREC, a
-// non-finite entry, or (for an Isometry3d) a bottom row that is not [0, 0, 0, 1]. The rule is
-// the one a consumer builds with, written as !(dev <= ...) so a NaN residual refuses.
+// A matrix offered as a rotation is not one: rotation_defect, or for an Isometry3d
+// rigid_transform_defect (transform_stack.h). The contact managers' setCollisionObjectsTransform
+// (ids, transforms) raises the Python class registered here from its own module.
 struct NotRotationError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
@@ -105,13 +78,8 @@ struct DegenerateRotationError : std::invalid_argument {
 };
 
 static const Eigen::Matrix3d& require_rotation(const Eigen::Matrix3d& r, const char* caller) {
-    const double dev = orthonormality_residual(r);
-    if (!(dev <= EIGEN_DEFAULT_PREC)) {
-        std::ostringstream ss;
-        ss << caller << ": the rotation is not orthonormal (max |Rᵀ·R − I| = " << dev << ", bound "
-           << EIGEN_DEFAULT_PREC << ")";
-        throw NotRotationError(ss.str());
-    }
+    if (const auto defect = rotation_defect(r))
+        throw NotRotationError(std::string(caller) + ": " + *defect);
     return r;
 }
 
@@ -187,13 +155,8 @@ void bind_eigen_geometry(nb::module_& m) {
         // A rigid transform: bottom row exactly [0, 0, 0, 1] and an orthonormal rotation block
         // (the Quaterniond(rotation_matrix) rule); NotRotationError otherwise.
         .def("__init__", [](Eigen::Isometry3d* self, const Eigen::Matrix4d& mat) {
-            if (mat.row(3) != Eigen::RowVector4d(0.0, 0.0, 0.0, 1.0) || !mat.allFinite()) {
-                std::ostringstream ss;
-                ss << "Isometry3d(matrix): the bottom row is [" << mat.row(3) << "], not [0 0 0 1]"
-                   << (mat.allFinite() ? "" : ", or an entry is not finite");
-                throw NotRotationError(ss.str());
-            }
-            require_rotation(mat.topLeftCorner<3, 3>(), "Isometry3d(matrix)");
+            if (const auto defect = rigid_transform_defect(mat))
+                throw NotRotationError("Isometry3d(matrix): " + *defect);
             new (self) Eigen::Isometry3d();
             self->matrix() = mat;
         }, "matrix"_a)
