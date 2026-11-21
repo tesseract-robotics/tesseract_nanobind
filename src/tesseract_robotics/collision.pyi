@@ -77,82 +77,129 @@ class CollisionCheckExitType(enum.Enum):
     ALL = 2
 
 class ContactResult:
+    """
+    One contact between two links. Entry k of every two-slot field (link_ids, type_id, shape_id,
+    subshape_id, nearest_points, nearest_points_local, transform, cc_time, cc_type, cc_transform)
+    describes the same body, link_ids[k]; normal points from link_ids[0] towards link_ids[1].
+
+    Which body is slot 0 is chosen by the contact manager, not sorted: it is neither alphabetical
+    nor the ContactResultMap key's first(), and it can change with insertion order, object names,
+    the backend and the build. Resolve a body by link_ids, never by slot.
+    """
+
     def __init__(self) -> None: ...
 
     @property
-    def distance(self) -> float: ...
+    def distance(self) -> float:
+        """
+        Signed distance between nearest_points[0] and nearest_points[1], in m: negative when the links penetrate.
+        """
 
     @distance.setter
     def distance(self, arg: float, /) -> None: ...
 
     @property
-    def type_id(self) -> list[int]: ...
+    def type_id(self) -> list[int]:
+        """
+        [k]: the type id (the mask id given to addCollisionObject) of link_ids[k].
+        """
 
     @type_id.setter
     def type_id(self, arg: Sequence[int], /) -> None: ...
 
     @property
-    def link_ids(self) -> list[tesseract_robotics.common.LinkId]: ...
+    def link_ids(self) -> list[tesseract_robotics.common.LinkId]:
+        """
+        The two links in contact. Entry k of every two-slot field describes link_ids[k]. Which link is first is the contact manager's choice (see the class docstring); never rely on it.
+        """
 
     @link_ids.setter
     def link_ids(self, arg: Sequence[tesseract_robotics.common.LinkId | str], /) -> None: ...
 
     @property
-    def shape_id(self) -> list[int]: ...
+    def shape_id(self) -> list[int]:
+        """
+        [k]: index of the shape of link_ids[k] in contact (a link can have several).
+        """
 
     @shape_id.setter
     def shape_id(self, arg: Sequence[int], /) -> None: ...
 
     @property
-    def subshape_id(self) -> list[int]: ...
+    def subshape_id(self) -> list[int]:
+        """
+        [k]: sub-shape of link_ids[k] in contact (mesh triangle, octree box); -1 for none.
+        """
 
     @subshape_id.setter
     def subshape_id(self, arg: Sequence[int], /) -> None: ...
 
     @property
-    def nearest_points(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]: ...
+    def nearest_points(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
+        """
+        [k]: the point of link_ids[k] nearest the other link, world frame, in m.
+        """
 
     @nearest_points.setter
     def nearest_points(self, arg: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], /) -> None: ...
 
     @property
-    def nearest_points_local(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]: ...
+    def nearest_points_local(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
+        """
+        [k]: nearest_points[k] in the frame of link_ids[k] (transform[k] is its world pose), in m.
+        """
 
     @nearest_points_local.setter
     def nearest_points_local(self, arg: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], /) -> None: ...
 
     @property
-    def transform(self) -> list[tesseract_robotics.common.Isometry3d]: ...
+    def transform(self) -> list[tesseract_robotics.common.Isometry3d]:
+        """[k]: world pose of link_ids[k] (for a cast, its start pose)."""
 
     @transform.setter
     def transform(self, arg: Sequence[tesseract_robotics.common.Isometry3d], /) -> None: ...
 
     @property
-    def normal(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
+    def normal(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """
+        Unit vector, world frame: points from link_ids[0] towards link_ids[1], the direction to move link_ids[1] to separate the links.
+        """
 
     @normal.setter
     def normal(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> None: ...
 
     @property
-    def cc_time(self) -> list[float]: ...
+    def cc_time(self) -> list[float]:
+        """
+        [k]: where along its cast link_ids[k] is in contact, 0 at its start pose and 1 at its end pose; -1 when link_ids[k] was not cast.
+        """
 
     @cc_time.setter
     def cc_time(self, arg: Sequence[float], /) -> None: ...
 
     @property
-    def cc_type(self) -> list[ContinuousCollisionType]: ...
+    def cc_type(self) -> list[ContinuousCollisionType]:
+        """
+        [k]: the ContinuousCollisionType of link_ids[k]; CCType_None when it was not cast.
+        """
 
     @cc_type.setter
     def cc_type(self, arg: Sequence[ContinuousCollisionType], /) -> None: ...
 
     @property
-    def cc_transform(self) -> list[tesseract_robotics.common.Isometry3d]: ...
+    def cc_transform(self) -> list[tesseract_robotics.common.Isometry3d]:
+        """
+        [k]: world end pose of the cast of link_ids[k] (identity when it was not cast). The pose at contact interpolates transform[k] and cc_transform[k] at cc_time[k].
+        """
 
     @cc_transform.setter
     def cc_transform(self, arg: Sequence[tesseract_robotics.common.Isometry3d], /) -> None: ...
 
     @property
-    def single_contact_point(self) -> bool: ...
+    def single_contact_point(self) -> bool:
+        """
+        True when the checker gave one contact point, so nearest_points[0] == nearest_points[1].
+        """
 
     @single_contact_point.setter
     def single_contact_point(self, arg: bool, /) -> None: ...
@@ -168,6 +215,105 @@ class ContactResult:
     def __copy__(self) -> ContactResult: ...
 
     def __deepcopy__(self, memo: dict) -> ContactResult: ...
+
+class ContactArrays:
+    """
+    Every ContactResult of a ContactResultMap or ContactResultVector as arrays, from `to_arrays()`.
+
+    n rows, row r for result r in the container's order. Each array owns its buffer (each read
+    returns a view of that buffer), independent of the results it was read from. A field
+    of the same name on ContactResult reads `results[r].<field>` as `arrays.<field>[r]`;
+    `link_ids` becomes `links` plus `link_index`.
+
+    Slots: column k (axis 1) of every two-slot field describes `link_ids[k]`, the same body
+    for every field of a row. Which body is slot 0 is chosen by the contact manager, not by
+    the binding (see ContactResult.link_ids); resolve a body by `links[link_index[r, k]]`,
+    never by k. `normal[r]` points from slot 0 towards slot 1.
+    """
+
+    @property
+    def distance(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """
+        (n,) float64, m: signed distance between the two nearest points; negative when the bodies penetrate.
+        """
+
+    @property
+    def normal(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 3), order='C')]:
+        """
+        (n, 3) float64, world frame, unit vector: points from link slot 0 towards slot 1, the direction to move slot 1 to separate the pair.
+        """
+
+    @property
+    def nearest_points(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 2, 3), order='C')]:
+        """
+        (n, 2, 3) float64, world frame, m: [r, k] is the point of link slot k nearest the other.
+        """
+
+    @property
+    def nearest_points_local(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 2, 3), order='C')]:
+        """
+        (n, 2, 3) float64, m: nearest_points[r, k] in the frame of link slot k (transform[r, k] is that frame's world pose).
+        """
+
+    @property
+    def transform(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 2, 4, 4), order='C')]:
+        """
+        (n, 2, 4, 4) float64, homogeneous, translation in m: [r, k] is the world pose of link slot k (for a cast, its start pose).
+        """
+
+    @property
+    def type_id(self) -> Annotated[NDArray[numpy.int32], dict(shape=(None, 2), order='C')]:
+        """
+        (n, 2) int32: [r, k] is the type id (the mask id given to addCollisionObject) of link slot k.
+        """
+
+    @property
+    def shape_id(self) -> Annotated[NDArray[numpy.int32], dict(shape=(None, 2), order='C')]:
+        """
+        (n, 2) int32: [r, k] is the index of the shape of link slot k in contact.
+        """
+
+    @property
+    def subshape_id(self) -> Annotated[NDArray[numpy.int32], dict(shape=(None, 2), order='C')]:
+        """
+        (n, 2) int32: [r, k] is the sub-shape (mesh triangle, octree box) of link slot k; -1 for none.
+        """
+
+    @property
+    def single_contact_point(self) -> Annotated[NDArray[numpy.bool_], dict(shape=(None,), order='C')]:
+        """
+        (n,) bool: True when the checker gave one contact point, so nearest_points[r, 0] == nearest_points[r, 1].
+        """
+
+    @property
+    def cc_time(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='C')]:
+        """
+        (n, 2) float64, dimensionless: [r, k] is where in its cast link slot k is in contact, 0 at its start pose, 1 at its end pose; -1 when slot k was not cast.
+        """
+
+    @property
+    def cc_type(self) -> Annotated[NDArray[numpy.uint8], dict(shape=(None, 2), order='C')]:
+        """
+        (n, 2) uint8: [r, k] is the ContinuousCollisionType value of link slot k (0 CCType_None, 1 CCType_Time0, 2 CCType_Time1, 3 CCType_Between); ContinuousCollisionType(int(v)) gives the enum.
+        """
+
+    @property
+    def cc_transform(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 2, 4, 4), order='C')]:
+        """
+        (n, 2, 4, 4) float64, homogeneous, translation in m: [r, k] is the world end pose of the cast of link slot k (identity when slot k was not cast).
+        """
+
+    @property
+    def link_index(self) -> Annotated[NDArray[numpy.int32], dict(shape=(None, 2), order='C')]:
+        """(n, 2) int32: links[link_index[r, k]] is link_ids[k] of result r."""
+
+    @property
+    def links(self) -> tuple[tesseract_robotics.common.LinkId, ...]:
+        """
+        The distinct links of the results, in order of first appearance (row by row, slot 0 before slot 1). A new tuple per read.
+        """
+
+    def __repr__(self) -> str: ...
 
 class ContactResultHeldError(BufferError):
     """
@@ -198,6 +344,16 @@ class ContactResultVector:
         Remove every element; raises ContactResultHeldError while an element is held.
         """
 
+    def to_arrays(self) -> ContactArrays:
+        """
+        Every result as one ContactArrays: row r of each array is result r.
+
+        Rows follow this container's order: ContactResultMap.flattenCopyResults() order for a map,
+        element order for a vector. Each array is a new C-contiguous copy that owns its buffer: it
+        stays valid after clear(), and writing to it does not change the results. For n results it
+        costs one pass in C++ instead of one Python object per field read.
+        """
+
 class TransformCountMismatchError(ValueError):
     """
     setCollisionObjectsTransform(ids, transforms) got a different number of ids than (K, 4, 4) transforms.
@@ -222,6 +378,16 @@ class ContactResultMap:
     def getSummary(self) -> str: ...
 
     def flattenCopyResults(self) -> ContactResultVector: ...
+
+    def to_arrays(self) -> ContactArrays:
+        """
+        Every result as one ContactArrays: row r of each array is result r.
+
+        Rows follow this container's order: ContactResultMap.flattenCopyResults() order for a map,
+        element order for a vector. Each array is a new C-contiguous copy that owns its buffer: it
+        stays valid after clear(), and writing to it does not change the results. For n results it
+        costs one pass in C++ instead of one Python object per field read.
+        """
 
     def flattenMoveResults(self, results: ContactResultVector) -> None:
         """

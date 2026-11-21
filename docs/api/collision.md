@@ -183,7 +183,7 @@ for contact in result_vector:
 | `nearest_points` | `list[np.ndarray]` (2) | Nearest points, world frame |
 | `nearest_points_local` | `list[np.ndarray]` (2) | Nearest points, each link's frame |
 | `transform` | `list[Isometry3d]` (2) | Link transforms at the contact |
-| `normal` | `np.ndarray` | Contact normal (A to B) |
+| `normal` | `np.ndarray` | Unit contact normal, world frame, from `link_ids[0]` towards `link_ids[1]` |
 | `cc_time` | `list[float]` (2) | Continuous collision times (`-1` if not continuous) |
 | `cc_type` | `list[ContinuousCollisionType]` (2) | Continuous collision type per link |
 | `cc_transform` | `list[Isometry3d]` (2) | Cast object's end transform, per link |
@@ -191,6 +191,12 @@ for contact in result_vector:
 The pair fields hold exactly two items, one per link. Assigning a list of any
 other length raises `TypeError`. Every read returns a new list, so
 `contact.link_ids[0] = "x"` changes only that copy; assign the whole list instead.
+
+Entry `k` of every pair field describes the same body, `link_ids[k]`, and `normal` points from
+`link_ids[0]` towards `link_ids[1]` (moving `link_ids[1]` along it separates the pair). Which body
+is slot 0 is the contact manager's choice, not sorted: it is neither alphabetical nor the
+`ContactResultMap` key's `first()`, and it changes with the order the objects were added, their
+names, the backend and the build. Find a body by `link_ids`, never by slot.
 
 ### ContactResultMap
 
@@ -252,6 +258,46 @@ result_map.flattenMoveResults(all_contacts)   # or flattenCopyResults to keep ma
 for contact in all_contacts:
     print(contact.distance, contact.link_ids)
 ```
+
+### ContactArrays
+
+`ContactResultMap.to_arrays()` and `ContactResultVector.to_arrays()` read every result into
+numpy arrays in one call. Row `r` is result `r` of `flattenCopyResults()` (of the vector's own
+order), so `arrays.<field>[r]` is `results[r].<field>` for every `ContactResult` field except
+`link_ids`, which becomes `links` (the distinct links, in order of first appearance) and
+`link_index`. Every array is a new C-contiguous copy that owns its buffer: it stays valid after
+`clear()`, and writing to it does not change the results.
+
+```python
+from tesseract_robotics.collision import ContactArrays, ContactResultMap
+
+result_map = ContactResultMap()
+manager.contactTest(result_map, request)
+arrays: ContactArrays = result_map.to_arrays()
+
+n = len(arrays.distance)
+assert arrays.nearest_points.shape == (n, 2, 3)
+for r in range(n):
+    a, b = (arrays.links[i] for i in arrays.link_index[r])   # link_ids of result r
+    print(a, b, arrays.distance[r], arrays.normal[r])         # normal points from a towards b
+```
+
+| Attribute | dtype, shape | Description |
+|-----------|--------------|-------------|
+| `distance` | `float64 (n,)` | Signed distance, m (negative = penetration) |
+| `normal` | `float64 (n, 3)` | Unit normal, world frame, from slot 0 towards slot 1 |
+| `nearest_points` | `float64 (n, 2, 3)` | `[r, k]`: nearest point of slot `k`, world frame, m |
+| `nearest_points_local` | `float64 (n, 2, 3)` | `[r, k]`: the same point in slot `k`'s frame |
+| `transform` | `float64 (n, 2, 4, 4)` | `[r, k]`: world pose of slot `k` (a cast's start pose) |
+| `type_id`, `shape_id`, `subshape_id` | `int32 (n, 2)` | As on `ContactResult`, per slot (`int` in C++) |
+| `single_contact_point` | `bool (n,)` | One contact point given: `nearest_points[r, 0] == nearest_points[r, 1]` |
+| `cc_time` | `float64 (n, 2)` | Contact time along slot `k`'s cast, 0 to 1; `-1` if not cast |
+| `cc_type` | `uint8 (n, 2)` | `ContinuousCollisionType` value of slot `k` (the enum's own `uint8`) |
+| `cc_transform` | `float64 (n, 2, 4, 4)` | `[r, k]`: end pose of slot `k`'s cast |
+| `link_index` | `int32 (n, 2)` | `links[link_index[r, k]]` is `link_ids[k]` of result `r` |
+| `links` | `tuple[LinkId, ...]` | Distinct links, first appearance row by row, slot 0 before slot 1 |
+
+Column `k` of every two-slot array describes `links[link_index[r, k]]`, as on `ContactResult`.
 
 ## Configuration
 
