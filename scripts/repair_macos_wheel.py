@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -319,12 +320,23 @@ def strip_search_paths(source: str) -> str:
     return "".join(kept)
 
 
+def _rewrite_text(path: Path, edit: Callable[[str], str]) -> None:
+    """Apply `edit` to a UTF-8 file in place, keeping its line endings on every platform.
+
+    `newline=""` turns off newline translation both ways: Windows text mode would otherwise
+    write each "\\n" as "\\r\\n", and the locale codepage would stand in for UTF-8.
+    """
+    with path.open(encoding="utf-8", newline="") as source:
+        text = source.read()
+    path.write_text(edit(text), encoding="utf-8", newline="")
+
+
 def patch_yaml(root: Path) -> None:
     """Patch the task composer configs and robot YAMLs for the installed layout."""
     for path in (root / PACKAGE / "data" / "task_composer_config").glob("*.yaml"):
-        path.write_text(patch_plugin_path(path.read_text()))
+        _rewrite_text(path, patch_plugin_path)
     for path in (root / PACKAGE / "data" / "tesseract" / "support").rglob("*.yaml"):
-        path.write_text(strip_search_paths(path.read_text()))
+        _rewrite_text(path, strip_search_paths)
 
 
 def write_record(root: Path) -> None:
@@ -336,7 +348,8 @@ def write_record(root: Path) -> None:
         digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
         rows.append(f"{path.relative_to(root).as_posix()},sha256={digest},{len(data)}")
     rows.append(f"{record.relative_to(root).as_posix()},,")
-    record.write_text("\n".join(rows) + "\n")
+    # LF on every platform, as the `wheel` package writes RECORD.
+    record.write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
 
 
 def pack(root: Path, wheel: Path) -> None:
@@ -529,13 +542,12 @@ def retag_macos(root: Path, name: str, target: OsVersion) -> str:
             f"macosx_{major}_0 from macOS {MACOS_MAJOR_ONLY_TAGS_FROM} on"
         )
     replacement = f"macosx_{major}_{minor}_{match[3]}"
-    metadata = next(root.glob("*.dist-info/WHEEL"))
-    lines = metadata.read_text().splitlines(keepends=True)
-    metadata.write_text(
-        "".join(
+    _rewrite_text(
+        next(root.glob("*.dist-info/WHEEL")),
+        lambda text: "".join(
             line.replace(platform, replacement) if line.startswith("Tag: ") else line
-            for line in lines
-        )
+            for line in text.splitlines(keepends=True)
+        ),
     )
     return f"{prefix}-{replacement}.whl"
 

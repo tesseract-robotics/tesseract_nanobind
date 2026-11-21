@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import importlib.util
+import io
 import sys
 import zipfile
 from pathlib import Path
@@ -223,8 +224,90 @@ def _wheel_metadata(root: Path, tag: str) -> Path:
     info = root / "pkg-1.dist-info"
     info.mkdir(parents=True)
     wheel = info / "WHEEL"
-    wheel.write_text(f"Wheel-Version: 1.0\nTag: {tag}\n")
+    wheel.write_bytes(f"Wheel-Version: 1.0\nTag: {tag}\n".encode())
     return wheel
+
+
+# What Windows text mode does to a file opened without newline= or encoding=.
+_WINDOWS_LINESEP = "\r\n"
+_WINDOWS_LOCALE_ENCODING = "cp1252"
+
+
+@pytest.fixture
+def windows_text_io(monkeypatch):
+    """Text-mode `open` as on Windows: "\\n" written as "\\r\\n", the locale codepage by default.
+
+    pathlib opens every file through `io.open`. The repair's output must not depend on the
+    platform it runs on; this makes a test of that fail on macOS and Linux too, not only on
+    the Windows CI leg.
+    """
+    native_open = io.open
+
+    def windows_open(file, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        if "b" not in mode:
+            if encoding in (None, "locale"):
+                encoding = _WINDOWS_LOCALE_ENCODING
+            if newline is None and any(flag in mode for flag in "wax+"):
+                newline = _WINDOWS_LINESEP
+        return native_open(file, mode, buffering, encoding, errors, newline)
+
+    monkeypatch.setattr(io, "open", windows_open)
+
+
+def test_retagged_metadata_is_byte_identical_on_every_platform(tmp_path, windows_text_io):
+    metadata = _wheel_metadata(tmp_path, "cp312-abi3-macosx_15_0_arm64")
+    repair.retag_macos(tmp_path, "pkg-1-cp312-abi3-macosx_15_0_arm64.whl", (12, 0, 0))
+    assert metadata.read_bytes() == b"Wheel-Version: 1.0\nTag: cp312-abi3-macosx_12_0_arm64\n"
+
+
+def test_retag_keeps_the_metadata_line_endings_it_was_given(tmp_path):
+    info = tmp_path / "pkg-1.dist-info"
+    info.mkdir()
+    metadata = info / "WHEEL"
+    metadata.write_bytes(b"Wheel-Version: 1.0\r\nTag: cp312-abi3-macosx_15_0_arm64\r\n")
+    repair.retag_macos(tmp_path, "pkg-1-cp312-abi3-macosx_15_0_arm64.whl", (12, 0, 0))
+    assert metadata.read_bytes() == b"Wheel-Version: 1.0\r\nTag: cp312-abi3-macosx_12_0_arm64\r\n"
+
+
+def test_record_is_byte_identical_on_every_platform(tmp_path, windows_text_io):
+    info = tmp_path / "pkg-1.dist-info"
+    info.mkdir()
+    (info / "RECORD").write_bytes(b"")
+    (tmp_path / "a.txt").write_bytes(b"hello")
+    repair.write_record(tmp_path)
+    digest = base64.urlsafe_b64encode(hashlib.sha256(b"hello").digest()).rstrip(b"=").decode()
+    assert (info / "RECORD").read_bytes() == (
+        f"a.txt,sha256={digest},5\npkg-1.dist-info/RECORD,,\n".encode()
+    )
+
+
+def test_patched_yaml_keeps_its_bytes_on_every_platform(tmp_path, windows_text_io):
+    """Line endings as given, and UTF-8 text that is no valid cp1252 ("Á" is 0xC3 0x81)."""
+    config = tmp_path / repair.PACKAGE / "data" / "task_composer_config"
+    support = tmp_path / repair.PACKAGE / "data" / "tesseract" / "support" / "robot"
+    config.mkdir(parents=True)
+    support.mkdir(parents=True)
+    (config / "c.yaml").write_bytes("# Á\nsearch_libraries:\n  - /usr/local/lib\n".encode())
+    (support / "r.yaml").write_bytes(
+        "# Á\r\nplugins:\r\n  search_paths:\r\n    - /usr/local/lib\r\n  x: 1\r\n".encode()
+    )
+    repair.patch_yaml(tmp_path)
+    assert (config / "c.yaml").read_bytes() == (
+        '# Á\nsearch_libraries:\n  - "@PLUGIN_PATH@"\n'.encode()
+    )
+    assert (support / "r.yaml").read_bytes() == "# Á\r\nplugins:\r\n  x: 1\r\n".encode()
+
+
+def test_repaired_wheel_record_hashes_the_metadata_bytes_it_packs(tmp_path, no_otool):
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    repaired = repair.repair_anchored(_zip_wheel(tmp_path), (lib,), tmp_path / "out")
+    with zipfile.ZipFile(repaired) as archive:
+        wheel = archive.read("tesseract_robotics-1.dist-info/WHEEL")
+        record = archive.read("tesseract_robotics-1.dist-info/RECORD").decode()
+    digest = base64.urlsafe_b64encode(hashlib.sha256(wheel).digest()).rstrip(b"=").decode()
+    assert f"tesseract_robotics-1.dist-info/WHEEL,sha256={digest},{len(wheel)}\n" in record
+    assert b"\r" not in wheel
 
 
 def test_the_wheel_is_tagged_with_the_deployment_target(tmp_path):
