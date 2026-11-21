@@ -144,6 +144,11 @@ NB_MODULE(state_solver, m) {
     // name, validated as above.
     // Dispatch: {name: float} matches only the joint-value map, {name: Isometry3d} only the
     // JointIdTransformMap; an empty {} converts to both and reaches the joint-value map first.
+    // The (ids, values) overload comes first among the overloads that take arguments: nanobind
+    // tries overloads in order, and an id list tried against the vector overload costs failed
+    // `__dlpack__` lookups, against the map overload a raised and cleared AttributeError (the dict
+    // caster calls `.items()`), on every call. No argument converts to both, so the order changes
+    // no call's overload.
     const auto set_state_map = [](tsg::StateSolver& self,
                                   const tsg::SceneState::JointValues& joint_values,
                                   const tc::JointIdTransformMap& floating_joint_values) {
@@ -161,6 +166,8 @@ NB_MODULE(state_solver, m) {
     };
 
     nb::class_<tsg::StateSolver>(m, "StateSolver")
+        .def("setState", set_state_names_values,
+             "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{}, "Set joint values (a vector in getActiveJointIds order, a {joint: value} map, or ids and values) and optional floating-joint transforms. Unknown joints raise ValueError before anything changes.")
         .def("setState", [](tsg::StateSolver& self,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
                             const tc::JointIdTransformMap& floating_joint_values) {
@@ -169,8 +176,6 @@ NB_MODULE(state_solver, m) {
             self.setState(joint_values, floating_joint_values);
         }, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("setState", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{}, "Set joint values (a vector in getActiveJointIds order, a {joint: value} map, or ids and values) and optional floating-joint transforms. Unknown joints raise ValueError before anything changes.")
-        .def("setState", set_state_names_values,
-             "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{}, "Set joint values (a vector in getActiveJointIds order, a {joint: value} map, or ids and values) and optional floating-joint transforms. Unknown joints raise ValueError before anything changes.")
         .def("setState", [](tsg::StateSolver& self, const tc::JointIdTransformMap& floating_joint_values) {
             validate_floating_joints(self, floating_joint_values, "setState");
             self.setState(floating_joint_values);
@@ -178,6 +183,14 @@ NB_MODULE(state_solver, m) {
         .def("getState", [](const tsg::StateSolver& self) {
             return self.getState();
         }, "The state at the given joint values (forms as setState), or the current state with no arguments, without changing the solver.")
+        .def("getState", [](const tsg::StateSolver& self,
+                            const std::vector<tc::JointId>& joint_ids,
+                            const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                            const tc::JointIdTransformMap& floating_joint_values) {
+            validate_names_values(self, joint_ids, joint_values, "getState");
+            validate_floating_joints(self, floating_joint_values, "getState");
+            return self.getState(joint_ids, joint_values, floating_joint_values);
+        }, "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getState", [](const tsg::StateSolver& self,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
                             const tc::JointIdTransformMap& floating_joint_values) {
@@ -192,14 +205,6 @@ NB_MODULE(state_solver, m) {
             validate_floating_joints(self, floating_joint_values, "getState");
             return self.getState(joint_values, floating_joint_values);
         }, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
-        .def("getState", [](const tsg::StateSolver& self,
-                            const std::vector<tc::JointId>& joint_ids,
-                            const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                            const tc::JointIdTransformMap& floating_joint_values) {
-            validate_names_values(self, joint_ids, joint_values, "getState");
-            validate_floating_joints(self, floating_joint_values, "getState");
-            return self.getState(joint_ids, joint_values, floating_joint_values);
-        }, "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getState", [](const tsg::StateSolver& self, const tc::JointIdTransformMap& floating_joint_values) {
             validate_floating_joints(self, floating_joint_values, "getState");
             return self.getState(floating_joint_values);
@@ -223,15 +228,6 @@ NB_MODULE(state_solver, m) {
         .def("getRandomState", &tsg::StateSolver::getRandomState, "A state at uniformly random joint values within the joint limits.")
         // 0.36 dropped the joint-value-map getJacobian (state_solver.h:170-189): vector and ids + vector only
         .def("getJacobian", [](const tsg::StateSolver& self,
-                               const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                               const tc::LinkId& link_id,
-                               const tc::JointIdTransformMap& floating_joint_values) {
-            validate_joint_vector(self, joint_values, "getJacobian");
-            validate_floating_joints(self, floating_joint_values, "getJacobian");
-            require_link(self, link_id, "getJacobian");
-            return self.getJacobian(joint_values, link_id, floating_joint_values);
-        }, "joint_values"_a, "link_id"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
-        .def("getJacobian", [](const tsg::StateSolver& self,
                                const std::vector<tc::JointId>& joint_ids,
                                const Eigen::Ref<const Eigen::VectorXd>& joint_values,
                                const tc::LinkId& link_id,
@@ -241,6 +237,15 @@ NB_MODULE(state_solver, m) {
             require_link(self, link_id, "getJacobian");
             return self.getJacobian(joint_ids, joint_values, link_id, floating_joint_values);
         }, "joint_ids"_a, "joint_values"_a, "link_id"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
+        .def("getJacobian", [](const tsg::StateSolver& self,
+                               const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                               const tc::LinkId& link_id,
+                               const tc::JointIdTransformMap& floating_joint_values) {
+            validate_joint_vector(self, joint_values, "getJacobian");
+            validate_floating_joints(self, floating_joint_values, "getJacobian");
+            require_link(self, link_id, "getJacobian");
+            return self.getJacobian(joint_values, link_id, floating_joint_values);
+        }, "joint_values"_a, "link_id"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         // Id getters
         .def("getJointIds", &tsg::StateSolver::getJointIds, "Every joint id of the scene graph.")
         .def("getFloatingJointIds", &tsg::StateSolver::getFloatingJointIds, "The floating joint ids.")
