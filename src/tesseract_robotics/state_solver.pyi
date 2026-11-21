@@ -56,16 +56,16 @@ class SceneState:
 
 class StateSolver:
     @overload
-    def setState(self, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None: ...
-
-    @overload
-    def setState(self, joint_values: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None:
+    def setState(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None:
         """
         Set joint values (a vector in getActiveJointIds order, a {joint: value} map, or ids and values) and optional floating-joint transforms. Unknown joints raise ValueError before anything changes.
         """
 
     @overload
-    def setState(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None:
+    def setState(self, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None: ...
+
+    @overload
+    def setState(self, joint_values: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None:
         """
         Set joint values (a vector in getActiveJointIds order, a {joint: value} map, or ids and values) and optional floating-joint transforms. Unknown joints raise ValueError before anything changes.
         """
@@ -80,13 +80,13 @@ class StateSolver:
         """
 
     @overload
+    def getState(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> SceneState: ...
+
+    @overload
     def getState(self, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> SceneState: ...
 
     @overload
     def getState(self, joint_values: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> SceneState: ...
-
-    @overload
-    def getState(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> SceneState: ...
 
     @overload
     def getState(self, floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d]) -> SceneState: ...
@@ -104,10 +104,10 @@ class StateSolver:
         """A state at uniformly random joint values within the joint limits."""
 
     @overload
-    def getJacobian(self, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_id: tesseract_robotics.common.LinkId | str, floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+    def getJacobian(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_id: tesseract_robotics.common.LinkId | str, floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
 
     @overload
-    def getJacobian(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_id: tesseract_robotics.common.LinkId | str, floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+    def getJacobian(self, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_id: tesseract_robotics.common.LinkId | str, floating_joint_values: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
 
     def getJointIds(self) -> list[tesseract_robotics.common.JointId]:
         """Every joint id of the scene graph."""

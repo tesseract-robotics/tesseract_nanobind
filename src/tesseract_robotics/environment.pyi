@@ -558,15 +558,15 @@ class Environment:
         """The current state: joint values and every link's world transform."""
 
     @overload
-    def getState(self, joints: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> tesseract_robotics.state_solver.SceneState:
-        """
-        The state at the active-joint values `joints` (the rest current), without changing the environment. Unknown or non-active joints raise ValueError.
-        """
-
-    @overload
     def getState(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> tesseract_robotics.state_solver.SceneState:
         """
         The state at `joint_values` for `joint_ids` (the rest current), without changing the environment.
+        """
+
+    @overload
+    def getState(self, joints: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> tesseract_robotics.state_solver.SceneState:
+        """
+        The state at the active-joint values `joints` (the rest current), without changing the environment. Unknown or non-active joints raise ValueError.
         """
 
     @overload
@@ -581,14 +581,14 @@ class Environment:
         """
 
     @overload
+    def setState(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None:
+        """Set `joint_values` for `joint_ids` (and floating-joint transforms)."""
+
+    @overload
     def setState(self, joints: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None:
         """
         Set the active-joint values `joints` (and floating-joint transforms). Unknown or non-active joints raise ValueError before anything changes.
         """
-
-    @overload
-    def setState(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> None:
-        """Set `joint_values` for `joint_ids` (and floating-joint transforms)."""
 
     @overload
     def setState(self, floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d]) -> None:

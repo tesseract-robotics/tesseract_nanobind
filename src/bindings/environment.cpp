@@ -651,12 +651,16 @@ NB_MODULE(environment, m) {
         // State
         .def("getState", [](const te::Environment& self) { return self.getState(); }, NoGil(),
              "The current state: joint values and every link's world transform.")
-        .def("getState", get_state_map, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
-             "The state at the active-joint values `joints` (the rest current), without changing the "
-             "environment. Unknown or non-active joints raise ValueError.")
+        // (ids, values) before the map overloads in getState and setState: nanobind tries overloads
+        // in order, and an id list tried against a map overload first costs a raised and cleared
+        // AttributeError (the dict caster calls `.items()`) on every call. No argument converts to
+        // both, so the order changes no call's overload.
         .def("getState", get_state_ids_values,
              "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
              "The state at `joint_values` for `joint_ids` (the rest current), without changing the environment.")
+        .def("getState", get_state_map, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
+             "The state at the active-joint values `joints` (the rest current), without changing the "
+             "environment. Unknown or non-active joints raise ValueError.")
         .def("getState", [](const te::Environment& self, const tc::JointIdTransformMap& floating_joints) {
             validate_floating_joints(self, floating_joints, "getState");
             return self.getState(floating_joints);
@@ -704,15 +708,7 @@ NB_MODULE(environment, m) {
         }, "joint_ids"_a, "joint_values"_a, "link_ids"_a,
            "World transforms of `link_ids` at each row of `joint_values` ((M, N) for the N `joint_ids`), "
            "as an (M, L, 4, 4) array; the environment's state is not changed.")
-        .def("setState", [](te::Environment& self,
-                            const tsg::SceneState::JointValues& joints,
-                            const tc::JointIdTransformMap& floating_joints) {
-            validate_set_state_joint_ids(self, keys_of(joints));  // GH #43
-            validate_floating_joints(self, floating_joints, "setState");
-            self.setState(joints, floating_joints);
-        }, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
-           "Set the active-joint values `joints` (and floating-joint transforms). Unknown or non-active "
-           "joints raise ValueError before anything changes.")
+        // (ids, values) first, as in getState.
         .def("setState", [](te::Environment& self,
                             const std::vector<tc::JointId>& joint_ids,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
@@ -722,6 +718,15 @@ NB_MODULE(environment, m) {
             self.setState(joint_ids, joint_values, floating_joints);
         }, "joint_ids"_a, "joint_values"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
            "Set `joint_values` for `joint_ids` (and floating-joint transforms).")
+        .def("setState", [](te::Environment& self,
+                            const tsg::SceneState::JointValues& joints,
+                            const tc::JointIdTransformMap& floating_joints) {
+            validate_set_state_joint_ids(self, keys_of(joints));  // GH #43
+            validate_floating_joints(self, floating_joints, "setState");
+            self.setState(joints, floating_joints);
+        }, "joints"_a, "floating_joints"_a = tc::JointIdTransformMap{}, NoGil(),
+           "Set the active-joint values `joints` (and floating-joint transforms). Unknown or non-active "
+           "joints raise ValueError before anything changes.")
         .def("setState", [](te::Environment& self, const tc::JointIdTransformMap& floating_joints) {
             validate_floating_joints(self, floating_joints, "setState");
             self.setState(floating_joints);
