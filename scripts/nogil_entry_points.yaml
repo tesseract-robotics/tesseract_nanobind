@@ -181,7 +181,10 @@ collision:
   DiscreteContactManager:
     contactTest: Broad and narrow phase over every enabled object; called in loops.
     setCollisionObjectsTransform: >-
-      The transform-map overload updates every listed object's broad-phase AABB (gh-241).
+      The transform-map overload updates every listed object's broad-phase AABB (gh-241). The
+      (ids, (K, 4, 4) array) overload does the same for K objects: with every pose changed,
+      0.1-0.15 ms at K = 80 and 21-24 ms at K = 1000 (Bullet, macOS arm64, 2026-11-21). It checks
+      the array and copies it into C++ poses with the GIL held, then releases it.
   ContinuousContactManager:
     contactTest: See DiscreteContactManager.contactTest; swept volumes are costlier still.
     setCollisionObjectsTransform: See DiscreteContactManager.setCollisionObjectsTransform.

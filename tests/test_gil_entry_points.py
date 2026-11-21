@@ -234,3 +234,35 @@ def test_create_mesh_releases_gil(kind):
     assert_releases_gil(lambda: from_path(path))
     assert_releases_gil(lambda: from_resource(resource))
     assert len(from_resource(resource)) == len(from_path(path)) > 0
+
+
+# Objects per call: each moved object updates its broad-phase AABB, so a call runs for about a
+# millisecond and the main thread has a window to wake into.
+TRANSFORM_STACK_SIZE = 1_000
+
+
+@pytest.mark.parametrize("kind", ["Discrete", "Continuous"])
+def test_set_collision_objects_transform_stack_releases_gil(kind):
+    """setCollisionObjectsTransform(ids, (K, 4, 4) array): validated with the GIL, set without."""
+    from .tesseract_collision.test_contact_manager_config import _box, _get_discrete_factory
+
+    factory, _locator = _get_discrete_factory()
+    create = getattr(factory, f"create{kind}ContactManager")
+    manager = create("BulletDiscreteBVHManager" if kind == "Discrete" else "BulletCastBVHManager")
+    names = [f"box_{k}" for k in range(TRANSFORM_STACK_SIZE)]
+    for name in names:
+        shapes, poses = _box(0.1)
+        assert manager.addCollisionObject(name, 0, shapes, poses)
+    stacks = np.tile(np.eye(4), (2, TRANSFORM_STACK_SIZE, 1, 1))
+    stacks[0, :, 0, 3] = np.arange(TRANSFORM_STACK_SIZE)
+    stacks[1, :, 1, 3] = np.arange(TRANSFORM_STACK_SIZE)
+    # Alternate the stacks: an object whose pose does not change is skipped by Bullet.
+    calls = iter(range(10**9))
+
+    assert_releases_gil(
+        lambda: manager.setCollisionObjectsTransform(names, stacks[next(calls) % 2])
+    )
+    manager.setCollisionObjectsTransform(names, stacks[0])
+    np.testing.assert_array_equal(
+        manager.getCollisionObjectsTransform(names[-1]).matrix, stacks[0, -1]
+    )

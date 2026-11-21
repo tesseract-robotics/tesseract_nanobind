@@ -348,6 +348,24 @@ An id the manager does not hold is reported, never silently dropped: `removeColl
 and `setCollisionObjectsEnabled` return `False` (the ids that are present are still applied),
 and `getCollisionObjectsTransform` or a transform map that lacks an id raises `IndexError`.
 
+Poses already held in one `(K, 4, 4)` float64 array (the layout of `Isometry3d.compose_each` and
+`Environment.link_transforms_batch`) go in as the array, with no `Isometry3d` per object:
+
+```python
+import numpy as np
+
+poses = np.tile(np.eye(4), (3, 1, 1))  # (K, 4, 4): row k is the world pose of ids[k], metres
+poses[:, 0, 3] = [0.0, 0.5, 3.0]
+manager.setCollisionObjectsTransform(["a", "b", "c"], poses)
+```
+
+It sets what the `(ids, list[Isometry3d])` overload sets, at about the cost of the native call.
+Every row is checked as `Isometry3d(matrix)` checks it before any object moves: a row that is not
+a rigid transform raises `NotRotationError` naming its index, and `len(ids) != K` raises
+`TransformCountMismatchError` (a `ValueError`). As with the list overload, an id the manager does
+not hold is skipped without an error. A stack that is not C-contiguous float64 is converted first;
+another shape matches no overload (`TypeError`). The GIL is released while the transforms are set.
+
 ## Implicit signed-distance shapes
 
 `collideImplicitSDF` finds the contacts between two shapes given as signed-distance callbacks:

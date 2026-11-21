@@ -5,6 +5,7 @@
 
 #include "tesseract_nb.h"
 #include "collision_defaults.h"
+#include "transform_stack.h"
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/unordered_map.h>
@@ -116,6 +117,61 @@ void bind_batch_collision_objects(Class& cls) {
              "ids"_a, "state"_a,
              "Set each id's transform from `state`; raises IndexError if `state` lacks an id.");
 }
+
+// setCollisionObjectsTransform(ids, transforms) got a different number of ids than transforms.
+struct TransformCountMismatchError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// Raise tesseract_robotics.common.NotRotationError. The C++ type lives in the common module, and
+// a C++ exception thrown here would not match that module's translator: every module links
+// nanobind statically, and libc++ on macOS compares typeinfo by pointer (see
+// register_python_error_translator). So the Python class is raised directly, with the GIL held.
+[[noreturn]] void raise_not_rotation(const std::string& message) {
+    const nb::object type = nb::module_::import_("tesseract_robotics.common._common").attr("NotRotationError");
+    PyErr_SetString(type.ptr(), message.c_str());
+    throw nb::python_error();
+}
+
+// setCollisionObjectsTransform(ids, transforms) for a (K, 4, 4) stack. With the GIL held: the
+// count, then every transform by Isometry3d(matrix)'s rule, so nothing moves when any is refused.
+// Without it: upstream's (ids, poses) overload, as the (ids, list[Isometry3d]) binding calls it,
+// so a backend's own batch (FCL's broad-phase update) and the skip of an unknown id are the same.
+template <class M>
+void set_transform_stack(M& self, const std::vector<tcommon::LinkId>& ids, const TransformStackIn& transforms) {
+    const std::size_t count = transforms.shape(0);
+    if (ids.size() != count)
+        throw TransformCountMismatchError("setCollisionObjectsTransform(ids, transforms): " +
+                                          std::to_string(ids.size()) + " ids but " + std::to_string(count) +
+                                          " transforms");
+    tcommon::VectorIsometry3d poses;
+    poses.reserve(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        const Eigen::Matrix4d matrix = Eigen::Map<const RowMajor4d>(transforms.data() + 16 * i);
+        if (const auto defect = rigid_transform_defect(matrix))
+            raise_not_rotation("setCollisionObjectsTransform(ids, transforms): transforms[" + std::to_string(i) +
+                               "]: " + *defect);
+        poses.push_back(stack_isometry(transforms, i));
+    }
+    nb::gil_scoped_release release;
+    self.setCollisionObjectsTransform(ids, poses);
+}
+
+constexpr const char* SET_TRANSFORM_STACK_DOC =
+    "Set the world transform of each id from a stack of homogeneous matrices.\n\n"
+    "Equivalent to the (ids, list[Isometry3d]) overload with Isometry3d(transforms[k]) for each k,\n"
+    "without building those objects. An id the manager does not hold is skipped, with no error.\n"
+    "Every transform is checked before any object moves; the GIL is released while they are set.\n\n"
+    "Args:\n"
+    "    ids: K object ids (LinkId or str).\n"
+    "    transforms: (K, 4, 4) float64 array, row k the world pose of ids[k] (translation in m).\n"
+    "        A C-contiguous float64 array is read in place; any other layout or dtype is converted\n"
+    "        first. Another shape matches no overload (TypeError).\n\n"
+    "Raises:\n"
+    "    TransformCountMismatchError: len(ids) != K.\n"
+    "    NotRotationError: transforms[k] is not a rigid transform, as Isometry3d(matrix) refuses\n"
+    "        it (bottom row other than [0, 0, 0, 1], a non-finite entry, or a rotation block with\n"
+    "        max|RᵀR − I| above EIGEN_DEFAULT_PREC); the message names k.";
 
 // Eigen::AlignedBox3d has no Python form: ImplicitSDFShape.aabb is a (min, max) tuple.
 using AabbCorners = std::tuple<Eigen::Vector3d, Eigen::Vector3d>;
@@ -333,6 +389,9 @@ NB_MODULE(collision, m) {
         }, "Remove every element; raises ContactResultHeldError while an element is held.");
 
     // ========== ContactResultMap ==========
+    nb::exception<TransformCountMismatchError>(m, "TransformCountMismatchError", PyExc_ValueError)
+        .attr("__doc__") = "setCollisionObjectsTransform(ids, transforms) got a different number of ids "
+                           "than (K, 4, 4) transforms.";
     nb::exception<EmptyContactResultsError>(m, "EmptyContactResultsError", PyExc_ValueError)
         .attr("__doc__") = "A ContactResultMap vector overload got an empty ContactResultVector.";
 
@@ -568,6 +627,9 @@ NB_MODULE(collision, m) {
              [](tc::DiscreteContactManager& self, const tcommon::LinkId& id, const Eigen::Isometry3d& pose) {
                  self.setCollisionObjectsTransform(id, pose);
              }, "id"_a, "pose"_a)
+        // Before the (ids, list[Isometry3d]) overload: nanobind tries overloads in order.
+        .def("setCollisionObjectsTransform", &set_transform_stack<tc::DiscreteContactManager>, "ids"_a,
+             "transforms"_a, SET_TRANSFORM_STACK_DOC)
         .def("setCollisionObjectsTransform",
              [](tc::DiscreteContactManager& self, const std::vector<tcommon::LinkId>& ids,
                 const tcommon::VectorIsometry3d& poses) {
@@ -658,6 +720,9 @@ NB_MODULE(collision, m) {
              [](tc::ContinuousContactManager& self, const tcommon::LinkId& id, const Eigen::Isometry3d& pose) {
                  self.setCollisionObjectsTransform(id, pose);
              }, "id"_a, "pose"_a)
+        // Before the (ids, list[Isometry3d]) overload: nanobind tries overloads in order.
+        .def("setCollisionObjectsTransform", &set_transform_stack<tc::ContinuousContactManager>, "ids"_a,
+             "transforms"_a, SET_TRANSFORM_STACK_DOC)
         .def("setCollisionObjectsTransform",
              [](tc::ContinuousContactManager& self, const std::vector<tcommon::LinkId>& ids,
                 const tcommon::VectorIsometry3d& poses) {
