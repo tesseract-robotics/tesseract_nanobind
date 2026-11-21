@@ -9,8 +9,14 @@
     "ContactTestData": {
       "wont_fix": "Internal to the collision checkers (types.h:322)."
     },
+    "ContinuousContactManager.setCollisionObjectsTransform": {
+      "wont_fix": "Python-only batch form for numpy callers over (K, 4, 4) arrays; no C++ counterpart."
+    },
     "ContinuousContactManager.setCollisionObjectsTransformCast": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:26 #174)"
+    },
+    "DiscreteContactManager.setCollisionObjectsTransform": {
+      "wont_fix": "Python-only batch form for numpy callers over (K, 4, 4) arrays; no C++ counterpart."
     },
     "tesseract/collision/common.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
