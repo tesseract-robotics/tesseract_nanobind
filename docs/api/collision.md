@@ -36,6 +36,8 @@ my_manager = manager.clone()
 my_manager.setCollisionObjectsTransform(link_transforms)
 # or K poses as one (K, 4, 4) float64 array, row k for link_ids[k] (both manager types);
 # each row is checked as Isometry3d(matrix) checks it (NotRotationError names the row)
+link_ids = list(link_transforms)
+poses = np.stack([link_transforms[link_id].matrix for link_id in link_ids])
 my_manager.setCollisionObjectsTransform(link_ids, poses)
 
 # Run collision check — fills ContactResultMap
