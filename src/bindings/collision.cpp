@@ -6,6 +6,7 @@
 #include "tesseract_nb.h"
 #include "collision_defaults.h"
 #include "transform_stack.h"
+#include "contact_arrays.h"
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/unordered_map.h>
@@ -336,24 +337,54 @@ NB_MODULE(collision, m) {
     // Pair fields are std::array<T, 2>: nanobind's array caster raises TypeError on any other length.
     // operator== (types.cpp): almostEqualRelativeAndAbs on the scalars and points, isApprox on
     // the transforms; the binding inherits those tolerances.
-    auto contact_result = nb::class_<tc::ContactResult>(m, "ContactResult")
+    // Slot semantics (upstream types.h, bullet_utils.cpp addDiscreteSingleResult /
+    // addCastSingleResult, fcl_utils.cpp): every two-slot field's entry k is filled from the same
+    // collision object as link_ids[k]; normal = -m_normalWorldOnB points from slot 0 to slot 1.
+    // Slot 0 is the first object of the backend's broadphase pair, which the binding cannot fix.
+    auto contact_result = nb::class_<tc::ContactResult>(m, "ContactResult",
+        "One contact between two links. Entry k of every two-slot field (link_ids, type_id, shape_id,\n"
+        "subshape_id, nearest_points, nearest_points_local, transform, cc_time, cc_type, cc_transform)\n"
+        "describes the same body, link_ids[k]; normal points from link_ids[0] towards link_ids[1].\n\n"
+        "Which body is slot 0 is chosen by the contact manager, not sorted: it is neither alphabetical\n"
+        "nor the ContactResultMap key's first(), and it can change with insertion order, object names,\n"
+        "the backend and the build. Resolve a body by link_ids, never by slot.")
         .def(nb::init<>())
-        .def_rw("distance", &tc::ContactResult::distance)
-        .def_rw("type_id", &tc::ContactResult::type_id)
-        .def_rw("link_ids", &tc::ContactResult::link_ids)
-        .def_rw("shape_id", &tc::ContactResult::shape_id)
-        .def_rw("subshape_id", &tc::ContactResult::subshape_id)
-        .def_rw("nearest_points", &tc::ContactResult::nearest_points)
-        .def_rw("nearest_points_local", &tc::ContactResult::nearest_points_local)
-        .def_rw("transform", &tc::ContactResult::transform)
-        .def_rw("normal", &tc::ContactResult::normal)
-        .def_rw("cc_time", &tc::ContactResult::cc_time)
-        .def_rw("cc_type", &tc::ContactResult::cc_type)
-        .def_rw("cc_transform", &tc::ContactResult::cc_transform)
-        .def_rw("single_contact_point", &tc::ContactResult::single_contact_point)
+        .def_rw("distance", &tc::ContactResult::distance,
+                "Signed distance between nearest_points[0] and nearest_points[1], in m: negative when the "
+                "links penetrate.")
+        .def_rw("type_id", &tc::ContactResult::type_id,
+                "[k]: the type id (the mask id given to addCollisionObject) of link_ids[k].")
+        .def_rw("link_ids", &tc::ContactResult::link_ids,
+                "The two links in contact. Entry k of every two-slot field describes link_ids[k]. Which link "
+                "is first is the contact manager's choice (see the class docstring); never rely on it.")
+        .def_rw("shape_id", &tc::ContactResult::shape_id,
+                "[k]: index of the shape of link_ids[k] in contact (a link can have several).")
+        .def_rw("subshape_id", &tc::ContactResult::subshape_id,
+                "[k]: sub-shape of link_ids[k] in contact (mesh triangle, octree box); -1 for none.")
+        .def_rw("nearest_points", &tc::ContactResult::nearest_points,
+                "[k]: the point of link_ids[k] nearest the other link, world frame, in m.")
+        .def_rw("nearest_points_local", &tc::ContactResult::nearest_points_local,
+                "[k]: nearest_points[k] in the frame of link_ids[k] (transform[k] is its world pose), in m.")
+        .def_rw("transform", &tc::ContactResult::transform,
+                "[k]: world pose of link_ids[k] (for a cast, its start pose).")
+        .def_rw("normal", &tc::ContactResult::normal,
+                "Unit vector, world frame: points from link_ids[0] towards link_ids[1], the direction to move "
+                "link_ids[1] to separate the links.")
+        .def_rw("cc_time", &tc::ContactResult::cc_time,
+                "[k]: where along its cast link_ids[k] is in contact, 0 at its start pose and 1 at its end "
+                "pose; -1 when link_ids[k] was not cast.")
+        .def_rw("cc_type", &tc::ContactResult::cc_type,
+                "[k]: the ContinuousCollisionType of link_ids[k]; CCType_None when it was not cast.")
+        .def_rw("cc_transform", &tc::ContactResult::cc_transform,
+                "[k]: world end pose of the cast of link_ids[k] (identity when it was not cast). The pose at "
+                "contact interpolates transform[k] and cc_transform[k] at cc_time[k].")
+        .def_rw("single_contact_point", &tc::ContactResult::single_contact_point,
+                "True when the checker gave one contact point, so nearest_points[0] == nearest_points[1].")
         .def("clear", &tc::ContactResult::clear);
     bind_value_equality(contact_result);
     bind_copy(contact_result);  // copy.copy(v[i]): a copy that does not pin v (#395)
+
+    contact_arrays::bind(m);
 
     // ========== ContactResultVector ==========
     // ContactResultVector uses Eigen aligned_allocator, so we need to bind manually.
@@ -386,7 +417,10 @@ NB_MODULE(collision, m) {
         .def("clear", [](tc::ContactResultVector& v) {
             check_no_held_element(v, "clear");
             v.clear();
-        }, "Remove every element; raises ContactResultHeldError while an element is held.");
+        }, "Remove every element; raises ContactResultHeldError while an element is held.")
+        // Reads only: a held element does not block it.
+        .def("to_arrays", [](const tc::ContactResultVector& v) { return contact_arrays::to_arrays(v); },
+             contact_arrays::TO_ARRAYS_DOC);
 
     // ========== ContactResultMap ==========
     nb::exception<TransformCountMismatchError>(m, "TransformCountMismatchError", PyExc_ValueError)
@@ -410,6 +444,8 @@ NB_MODULE(collision, m) {
             self.flattenCopyResults(v);
             return v;
         })
+        .def("to_arrays", [](const CRM& self) { return contact_arrays::to_arrays(self); },
+             contact_arrays::TO_ARRAYS_DOC)
         .def("flattenMoveResults", [](CRM& self, tc::ContactResultVector& v) {
             check_no_held_element(v, "flattenMoveResults");  // clears and refills v
             self.flattenMoveResults(v);

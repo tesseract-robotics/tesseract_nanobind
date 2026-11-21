@@ -109,6 +109,43 @@ results.clear()                   # now allowed; kept is unaffected
 A loop variable counts as a reference: after `for i in range(len(results)): r = results[i]`,
 `del r` before reusing `results`.
 
+### Which body is which: the two slots
+
+A `ContactResult` describes two bodies, and every two-item field (`nearest_points`,
+`nearest_points_local`, `transform`, `shape_id`, `subshape_id`, `type_id`, `cc_time`, `cc_type`,
+`cc_transform`) keeps them in the same slots as `link_ids`: entry `k` belongs to `link_ids[k]`.
+`normal` points from `link_ids[0]` towards `link_ids[1]`, the direction that moves `link_ids[1]`
+out of contact.
+
+Which body lands in slot 0 is the contact manager's choice, and the bindings do not reorder it.
+It is not alphabetical and not the map key's `first()`. In a two-object test, Bullet's default
+`BulletDiscreteBVHManager` put the object added last in slot 0, `BulletDiscreteSimpleManager`
+and `FCLDiscreteBVHManager` the object added first; renaming the objects or cloning the manager
+changed neither. For a cast
+of a moving object against a static one, Bullet's cast managers put the moving object in slot 1.
+Treat all of this as observed, not promised: find each body by its id, as below.
+
+### Reading every result as arrays
+
+`to_arrays()` on a `ContactResultMap` or `ContactResultVector` returns a `ContactArrays`: one
+numpy array per field, row `r` for result `r` of `flattenCopyResults()`, filled in one pass in
+C++. For a few dozen contacts it is tens of times faster than reading the fields in a Python
+loop, and the arrays are copies: they stay valid after `clear()`.
+
+```python
+contacts = ContactResultMap()
+manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
+arrays = contacts.to_arrays()
+
+# Witness point on the obstacle and the normal pointing away from it, for every contact with it:
+# find the obstacle's slot in each row by id, never assume it
+is_box = np.array([link.name() == "box" for link in arrays.links], dtype=bool)
+rows, slots = np.nonzero(is_box[arrays.link_index])
+points_on_box = arrays.nearest_points[rows, slots]          # (m, 3), world frame, metres
+sign = np.where(slots == 0, 1.0, -1.0)[:, None]
+away_from_box = sign * arrays.normal[rows]                  # unit vectors
+```
+
 ## Distance, margin and penetration
 
 `ContactResult.distance` is the signed distance between the two objects' nearest points, in
