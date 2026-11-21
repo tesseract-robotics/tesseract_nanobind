@@ -103,7 +103,10 @@ class Isometry3d:
     def __init__(self, matrix: Annotated[NDArray[numpy.float64], dict(shape=(4, 4), order='F')] | Sequence[Sequence[float]]) -> None: ...
 
     @overload
-    def __init__(self, rotation_quaternion: Quaterniond) -> None: ...
+    def __init__(self, rotation_quaternion: Quaterniond) -> None:
+        """
+        Pure rotation by `rotation_quaternion`. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     @overload
     def __init__(self, rotation_angle_axis: AngleAxisd) -> None: ...
@@ -112,10 +115,16 @@ class Isometry3d:
     def __init__(self, translation: Translation3d) -> None: ...
 
     @overload
-    def __init__(self, translation: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], rotation: Quaterniond) -> None: ...
+    def __init__(self, translation: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], rotation: Quaterniond) -> None:
+        """
+        Rotation `rotation`, then translation `translation` [m]. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     @overload
-    def __init__(self, translation: Translation3d, rotation: Quaterniond) -> None: ...
+    def __init__(self, translation: Translation3d, rotation: Quaterniond) -> None:
+        """
+        Rotation `rotation`, then translation `translation` [m]. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     @staticmethod
     def Identity() -> Isometry3d: ...
@@ -143,7 +152,10 @@ class Isometry3d:
     def __mul__(self, arg: Translation3d, /) -> Isometry3d: ...
 
     @overload
-    def __mul__(self, arg: Quaterniond, /) -> Isometry3d: ...
+    def __mul__(self, arg: Quaterniond, /) -> Isometry3d:
+        """
+        self * Isometry3d(q). The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     @overload
     def __mul__(self, arg: AngleAxisd, /) -> Isometry3d: ...
@@ -164,7 +176,10 @@ class Isometry3d:
     def pretranslate(self, vec: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> Isometry3d: ...
 
     @overload
-    def rotate(self, rotation: Quaterniond) -> Isometry3d: ...
+    def rotate(self, rotation: Quaterniond) -> Isometry3d:
+        """
+        self = self * Isometry3d(rotation), in place; returns self. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     @overload
     def rotate(self, rotation: AngleAxisd) -> Isometry3d: ...
@@ -173,7 +188,10 @@ class Isometry3d:
     def rotate(self, rotation: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')] | Sequence[Sequence[float]]) -> Isometry3d: ...
 
     @overload
-    def prerotate(self, rotation: Quaterniond) -> Isometry3d: ...
+    def prerotate(self, rotation: Quaterniond) -> Isometry3d:
+        """
+        self = Isometry3d(rotation) * self, in place; returns self. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     @overload
     def prerotate(self, rotation: AngleAxisd) -> Isometry3d: ...
@@ -261,7 +279,10 @@ class Quaterniond:
 
     def vec(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
 
-    def toRotationMatrix(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')]: ...
+    def toRotationMatrix(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')]:
+        """
+        The 3x3 rotation matrix; bitwise Isometry3d(q).linear. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     def slerp(self, t: float, other: Quaterniond) -> Quaterniond: ...
 
@@ -269,7 +290,10 @@ class Quaterniond:
     def __mul__(self, arg: Quaterniond, /) -> Quaterniond: ...
 
     @overload
-    def __mul__(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
+    def __mul__(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """
+        `v` rotated by the quaternion. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     def conjugate(self) -> Quaterniond: ...
 
@@ -291,9 +315,15 @@ class Quaterniond:
 
     def isApprox(self, other: Quaterniond, prec: float = 1e-12) -> bool: ...
 
-    def to_rpy(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
+    def to_rpy(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """
+        (roll, pitch, yaw) [rad] of R = Rz(yaw)·Ry(pitch)·Rx(roll), the inverse of from_rpy; read from toRotationMatrix(). The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
-    def eulerAngles(self, order: str) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
+    def eulerAngles(self, order: str) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """
+        Intrinsic Euler angles [rad] in the 3-axis `order` (e.g. 'ZYX'), Eigen's eulerAngles of toRotationMatrix(). The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     def __repr__(self) -> str: ...
 
@@ -303,7 +333,10 @@ class AngleAxisd:
         """Rotation by `angle` [rad] about `axis` (normalized; zero raises)."""
 
     @overload
-    def __init__(self, quaternion: Quaterniond) -> None: ...
+    def __init__(self, quaternion: Quaterniond) -> None:
+        """
+        The rotation of `quaternion` as angle [rad] and unit axis. The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, bit for bit. A zero or non-finite quaternion raises DegenerateRotationError.
+        """
 
     @overload
     def __init__(self, rotation_matrix: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')] | Sequence[Sequence[float]]) -> None: ...

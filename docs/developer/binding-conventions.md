@@ -72,7 +72,15 @@ code carries it explicitly instead: the emitters' `FramedPose` pairs a pose with
 - A rigid-transform type holds a rigid transform: `Isometry3d(matrix)` and
   `Quaterniond(rotation_matrix)` refuse a non-orthonormal rotation block (`NotRotationError`);
   a non-unit quaternion or axis names the rotation of its direction and is normalized; a zero
-  one raises `DegenerateRotationError`.
+  one raises `DegenerateRotationError`. Every member that turns a `Quaterniond` into a rotation
+  (the `Isometry3d` constructors, `*`, `rotate`, `prerotate`, `AngleAxisd(q)`, `toRotationMatrix`,
+  `to_rpy`, `eulerAngles`, `q * v`) converts the same quaternion, through one helper
+  (`unit_quaternion`, `src/bindings/common_eigen.cpp`): `q` as given when
+  `|q.squaredNorm() - 1| <= 6·eps`, `q / |q|` otherwise. 6·eps bounds the squared-norm defect of
+  `q / |q|` in float64, so a quaternion unit to rounding is never re-rounded and every member gives
+  it Eigen's own rotation, bit for bit (gh-463). The quaternion algebra (`*` of two quaternions,
+  `conjugate`, `inverse`, `dot`, `slerp`, `angularDistance`, `normalized`) works on the
+  coefficients as given, as Eigen's does.
 - A getter returns a copy unless its docstring says "by reference". A reference into a C++
   container is kept valid by refusing the calls that would move or free it while Python holds
   it (`ContactResultVector`, `CompositeInstruction`: `nb::find` on the element addresses), not
