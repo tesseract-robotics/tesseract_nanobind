@@ -103,6 +103,14 @@ qx, qy, qz, qw = q.coeffs()
 rotation_matrix = q.toRotationMatrix()
 ```
 
+!!! note "One rotation per quaternion"
+    `toRotationMatrix`, `to_rpy`, `eulerAngles`, `q * v`, `AngleAxisd(q)` and the `Isometry3d`
+    constructors, `*`, `rotate` and `prerotate` all convert the same quaternion, so
+    `Isometry3d(q).linear` equals `q.toRotationMatrix()` bit for bit. A quaternion with
+    `|q.squaredNorm() - 1| <= 6·eps` (unit to float64 rounding) is converted as given; any other is
+    divided by its norm first, so a non-unit quaternion reads out as the rotation of its direction.
+    A zero or non-finite quaternion raises `DegenerateRotationError`.
+
 !!! warning "No scalar-first constructor"
     Eigen's `Quaterniond(w, x, y, z)` is not bound: four scalars raise
     `TypeError`. Use `Quaterniond.from_xyzw(qx, qy, qz, qw)` or

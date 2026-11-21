@@ -1377,3 +1377,210 @@ def test_scalar_rigidity_readouts_refuse_what_is_not_3_by_3(bad):
 def test_norm_each_refuses_what_is_not_n_by_3():
     with pytest.raises(TypeError):
         norm_each(np.zeros((2, 4)))
+
+
+# ---------- one quaternion-to-rotation rule (gh-463) ----------
+#
+# Every member that turns a Quaterniond into a rotation converts the same quaternion: q itself
+# when |q.squaredNorm() - 1| <= UNIT_SQUARED_NORM_DEFECT, q / |q| otherwise. Bitwise, not
+# approximately: a pose built one way and compared with a rotation read another way must match.
+
+EPS = float(np.finfo(np.float64).eps)
+# The binding's UNIT_QUATERNION_SQUARED_NORM_DEFECT (src/bindings/common_eigen.cpp): 6·eps, the
+# worst-case squared-norm defect of q / |q| as float64 computes it.
+UNIT_SQUARED_NORM_DEFECT = 6.0 * EPS
+# [dimensionless] spacing of float64 in [0.5, 1): one ulp below 1.
+ULP_BELOW_ONE = EPS / 2.0
+# A z component far below one ulp of 1 when squared (2^-60 against 2^-53), so that
+# squaredNorm(0, 0, TINY_Z, w) == w * w and the w set below fixes the squared norm exactly.
+TINY_Z = 2.0**-30
+# Any vector to rotate: q * v is a rotation readout too.
+_PROBE_VECTOR = np.array([0.3, -1.2, 2.5])
+
+
+def _rotation_matrices(q: Quaterniond) -> dict[str, np.ndarray]:
+    """The 3x3 rotation of `q` as every matrix-valued entry point gives it.
+
+    The identity on the other side of `*`, `rotate` and `prerotate` is exact (1·r + 0·s = r).
+    """
+    return {
+        "toRotationMatrix": q.toRotationMatrix(),
+        "Isometry3d(q)": Isometry3d(q).linear,
+        "Isometry3d(vector, q)": Isometry3d(np.zeros(3), q).linear,
+        "Isometry3d(Translation3d, q)": Isometry3d(Translation3d(0.0, 0.0, 0.0), q).linear,
+        "Isometry3d * q": (Isometry3d.Identity() * q).linear,
+        "rotate": Isometry3d.Identity().rotate(q).linear,
+        "prerotate": Isometry3d.Identity().prerotate(q).linear,
+    }
+
+
+def _rotation_readouts(q: Quaterniond) -> dict[str, np.ndarray]:
+    """Every rotation readout of `q`: the matrices plus the angle, axis and vector readouts."""
+    readouts = _rotation_matrices(q)
+    readouts["to_rpy"] = q.to_rpy()
+    for order in ("ZYX", "XYZ", "ZYZ"):
+        readouts[f"eulerAngles({order})"] = q.eulerAngles(order)
+    angle_axis = AngleAxisd(q)
+    readouts["AngleAxisd.angle"] = np.array([angle_axis.angle])
+    readouts["AngleAxisd.axis"] = angle_axis.axis
+    readouts["q * v"] = q * _PROBE_VECTOR
+    return readouts
+
+
+def _assert_bitwise_equal(left: dict[str, np.ndarray], right: dict[str, np.ndarray]) -> None:
+    differing = [name for name in left if not np.array_equal(left[name], right[name])]
+    assert not differing, f"differ bitwise: {differing}"
+
+
+def _issue_463_quaternion() -> Quaterniond:
+    """Quaterniond(R) of a 0.3 rad z rotation as float64 computes it.
+
+    Its squared norm is one ulp below 1 (numpy's norm of it is 1 - 2^-53, as the issue reports).
+    """
+    return Quaterniond.from_xyzw(
+        0.0, 0.0, float.fromhex("0x1.320c9e9dfed22p-3"), float.fromhex("0x1.fa4033e5ee937p-1")
+    )
+
+
+def _z_quaternion(w: float) -> Quaterniond:
+    """(0, 0, TINY_Z, w): squaredNorm is exactly fl(w·w), set by the choice of w."""
+    return Quaterniond.from_xyzw(0.0, 0.0, TINY_Z, w)
+
+
+def _shoemake(rng: np.random.Generator) -> Quaterniond:
+    """A uniform random rotation (Shoemake 1992), unit to rounding."""
+    u1, u2, u3 = rng.uniform(0.0, 1.0, size=3)
+    return Quaterniond.from_xyzw(
+        math.sqrt(1 - u1) * math.sin(2 * math.pi * u2),
+        math.sqrt(1 - u1) * math.cos(2 * math.pi * u2),
+        math.sqrt(u1) * math.sin(2 * math.pi * u3),
+        math.sqrt(u1) * math.cos(2 * math.pi * u3),
+    )
+
+
+def _quaternion_sweep() -> list[Quaterniond]:
+    """Exactly unit, one ulp off unit, unit to rounding from every factory, and non-unit."""
+    rng = np.random.default_rng(seed=0x463)
+    exact = [
+        Quaterniond.Identity(),
+        Quaterniond.from_xyzw(1.0, 0.0, 0.0, 0.0),
+        Quaterniond.from_xyzw(0.5, 0.5, 0.5, 0.5),
+        Quaterniond.from_xyzw(0.5, -0.5, 0.5, -0.5),
+    ]
+    near = [_issue_463_quaternion(), _z_quaternion(1.0 - ULP_BELOW_ONE), _z_quaternion(1.0 + EPS)]
+    sweep = exact + near
+    for _ in range(64):
+        unit = _shoemake(rng)
+        sweep.append(unit)
+        sweep.append(Quaterniond(unit.toRotationMatrix()))
+        sweep.append(Quaterniond.from_rpy(rng.uniform(-math.pi, math.pi, size=3)))
+        sweep.append(Quaterniond(rng.uniform(0.1, 10.0) * unit.coeffs()))
+    return sweep
+
+
+def test_issue_463_quaternion_is_one_ulp_below_unit():
+    """The regression input is unit to rounding, not exactly: q / |q| re-rounds it."""
+    q = _issue_463_quaternion()
+    assert q.squaredNorm() == 1.0 - ULP_BELOW_ONE
+    assert q.normalized().coeffs().tolist() != q.coeffs().tolist()
+
+
+def test_every_matrix_entry_point_converts_the_same_quaternion():
+    """Isometry3d(q), Isometry3d(t, q), `*`, rotate, prerotate and toRotationMatrix agree bitwise."""
+    for q in _quaternion_sweep():
+        matrices = _rotation_matrices(q)
+        reference = matrices["toRotationMatrix"]
+        differing = [name for name, m in matrices.items() if not np.array_equal(m, reference)]
+        assert not differing, f"{q!r}: {differing} differ from toRotationMatrix"
+
+
+@pytest.mark.parametrize(
+    "q",
+    [
+        pytest.param(_issue_463_quaternion(), id="issue-463-norm-1-minus-2^-53"),
+        pytest.param(_z_quaternion(1.0 - ULP_BELOW_ONE), id="norm-one-ulp-below"),
+        pytest.param(_z_quaternion(1.0 + EPS), id="norm-one-ulp-above"),
+        pytest.param(_z_quaternion(1.0 + 3.0 * EPS), id="squared-norm-at-bound-above"),
+        pytest.param(_z_quaternion(1.0 - 6.0 * ULP_BELOW_ONE), id="squared-norm-at-bound-below"),
+    ],
+)
+def test_a_quaternion_unit_to_rounding_is_converted_as_given(q):
+    """Within the bound (inclusive) q is not re-rounded by a division by |q|.
+
+    With x = y = 0, entry (0, 1) of Eigen's matrix is -(2z)·w, one rounding, so the expected
+    value is computed here exactly; dividing by |q| first changes it in the last bit.
+    """
+    assert abs(q.squaredNorm() - 1.0) <= UNIT_SQUARED_NORM_DEFECT
+    as_given = -(2.0 * q.z) * q.w
+    renormalized = q.normalized()
+    assert -(2.0 * renormalized.z) * renormalized.w != as_given  # the case discriminates
+    for name, matrix in _rotation_matrices(q).items():
+        assert matrix[0, 1] == as_given, name
+        assert matrix[1, 0] == -as_given, name
+
+
+@pytest.mark.parametrize(
+    "w",
+    [
+        pytest.param(1.0 + 4.0 * EPS, id="squared-norm-one-step-past-bound-above"),
+        pytest.param(1.0 - 7.0 * ULP_BELOW_ONE, id="squared-norm-one-step-past-bound-below"),
+    ],
+)
+def test_a_quaternion_just_past_the_bound_is_normalized(w):
+    """One representable squared norm past the bound, every readout is that of q / |q|."""
+    q = _z_quaternion(w)
+    assert abs(q.squaredNorm() - 1.0) > UNIT_SQUARED_NORM_DEFECT
+    assert q.toRotationMatrix()[0, 1] != -(2.0 * q.z) * q.w
+    _assert_bitwise_equal(_rotation_readouts(q), _rotation_readouts(q.normalized()))
+
+
+@pytest.mark.parametrize("scale", [2.0, 0.5, 1.7, 1.0 + 1e-9, 1e-3, 1e3])
+def test_a_non_unit_quaternion_reads_out_as_its_normalized_copy(scale):
+    """Every rotation readout of a non-unit q, matrices, angles and q * v alike, is bitwise
+    that of q.normalized(): the rotation of q's direction (the deliberate 0.36 rule)."""
+    rng = np.random.default_rng(seed=0x4630)
+    for _ in range(32):
+        q = Quaterniond(scale * _shoemake(rng).coeffs())
+        normalized = q.normalized()
+        _assert_bitwise_equal(_rotation_readouts(q), _rotation_readouts(normalized))
+        assert orthonormality_residual(q.toRotationMatrix()) <= EIGEN_DEFAULT_PREC
+
+
+def test_rotation_readouts_of_a_non_unit_quaternion_are_a_rotation():
+    """toRotationMatrix of 2q is the rotation of q, not Eigen's matrix scaled by |q|^2."""
+    q = Quaterniond.from_rpy(0.1, 0.2, 0.3)
+    doubled = Quaterniond(2.0 * q.coeffs())
+    nptest.assert_array_equal(doubled.toRotationMatrix(), q.normalized().toRotationMatrix())
+    nptest.assert_array_equal(doubled.to_rpy(), q.normalized().to_rpy())
+    nptest.assert_array_equal(doubled * _PROBE_VECTOR, q.normalized() * _PROBE_VECTOR)
+
+
+def test_a_zero_quaternion_has_no_rotation_readout():
+    """The readouts that now go through the rule refuse a zero or non-finite q, as the
+    constructors do."""
+    for bad in ([0.0, 0.0, 0.0, 0.0], [math.nan, 0.0, 0.0, 1.0], [math.inf, 0.0, 0.0, 1.0]):
+        q = Quaterniond(np.array(bad))
+        for readout in (
+            q.toRotationMatrix,
+            q.to_rpy,
+            lambda q=q: q.eulerAngles("ZYX"),
+            lambda q=q: q * _PROBE_VECTOR,
+        ):
+            with pytest.raises(DegenerateRotationError, match="no rotation"):
+                readout()
+
+
+def test_pose_round_trip_through_a_quaternion_is_stable():
+    """Isometry3d(q).linear → Quaterniond → Isometry3d gives the matrix every other entry
+    point gives that quaternion, on the first round trip and on the next.
+
+    Matrix → quaternion → matrix itself is not exact (Quaterniond(R) rounds); what is stable
+    is that the rebuilt pose and the quaternion's own readout never disagree.
+    """
+    rng = np.random.default_rng(seed=0x4631)
+    for _ in range(256):
+        first = Quaterniond(Isometry3d(_shoemake(rng)).linear)
+        rebuilt = Isometry3d(Translation3d(0.0, 0.0, 0.0), first).linear
+        nptest.assert_array_equal(rebuilt, first.toRotationMatrix())
+        second = Quaterniond(rebuilt)
+        nptest.assert_array_equal(Isometry3d(second).linear, second.toRotationMatrix())

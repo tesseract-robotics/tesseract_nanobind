@@ -83,18 +83,40 @@ static const Eigen::Matrix3d& require_rotation(const Eigen::Matrix3d& r, const c
     return r;
 }
 
-// q/|q|: the unit quaternion of q's rotation. Eigen's toRotationMatrix and Transform(q) assume a
-// unit quaternion and scale or shear otherwise.
+// [dimensionless, |squaredNorm - 1|] the squared-norm defect up to which a quaternion is unit to
+// float64 rounding, 6·eps. With u = eps/2 and first-order error bounds, q/|q| as computed below
+// carries: squaredNorm, 4 products and 3 sums, relative error ≤ 4u; its sqrt ≤ 4u/2 + u = 3u; each
+// quotient q_i / |q| ≤ 3u + u = 4u, so the exact squared norm of the result is within 8u of 1;
+// reading that back with squaredNorm adds 4u: 12u = 6·eps. Every quaternion this helper divides
+// therefore passes the test on its next call: the rule is idempotent, and a quaternion as unit as
+// division can make it is never re-rounded. The defect is computed exactly (Sterbenz) and lies
+// on the float64 grid (u below 1, eps above), where the neglected O(u²) terms cannot reach the
+// next point; the bound is inclusive.
+static const double UNIT_QUATERNION_SQUARED_NORM_DEFECT = 6.0 * std::numeric_limits<double>::epsilon();
+
+// The quaternion every member that turns a Quaterniond into a rotation converts (gh-463): q itself
+// when |q.squaredNorm() - 1| ≤ UNIT_QUATERNION_SQUARED_NORM_DEFECT (Eigen's own conversion, exactly
+// as 0.35 gave it), q/|q| otherwise (a non-unit q names the rotation of its direction; Eigen's
+// toRotationMatrix and Transform(q) would scale or shear). One rule, so no two members can give one
+// quaternion two rotations. A zero or non-finite q raises DegenerateRotationError.
 static Eigen::Quaterniond unit_quaternion(const Eigen::Quaterniond& q, const char* caller) {
-    const double norm = q.norm();
-    if (!q.coeffs().allFinite() || !(norm > 0.0)) {
+    const double squared_norm = q.squaredNorm();
+    if (!q.coeffs().allFinite() || !(squared_norm > 0.0)) {
         std::ostringstream ss;
         ss << caller << ": the quaternion [x=" << q.x() << ", y=" << q.y() << ", z=" << q.z() << ", w=" << q.w()
            << "] has no rotation (zero or not finite)";
         throw DegenerateRotationError(ss.str());
     }
-    return Eigen::Quaterniond(q.coeffs() / norm);
+    if (std::abs(squared_norm - 1.0) <= UNIT_QUATERNION_SQUARED_NORM_DEFECT)
+        return q;
+    return Eigen::Quaterniond(q.coeffs() / std::sqrt(squared_norm));
 }
+
+// The docstring sentence every member that converts a quaternion with unit_quaternion carries.
+#define QUATERNION_ROTATION_RULE                                                                      \
+    "The quaternion is converted as given when |q.squaredNorm() - 1| <= 6·eps (unit to float64 "     \
+    "rounding) and as q / |q| otherwise, so every member gives one quaternion the same rotation, "  \
+    "bit for bit. A zero or non-finite quaternion raises DegenerateRotationError."
 
 static Eigen::Vector3d unit_axis(const Eigen::Vector3d& axis, const char* caller) {
     const double norm = axis.norm();
@@ -164,7 +186,7 @@ void bind_eigen_geometry(nb::module_& m) {
         // to assemble a 4x4 matrix by hand.
         .def("__init__", [](Eigen::Isometry3d* self, const Eigen::Quaterniond& q) {
             new (self) Eigen::Isometry3d(unit_quaternion(q, "Isometry3d(rotation_quaternion)"));
-        }, "rotation_quaternion"_a)
+        }, "rotation_quaternion"_a, "Pure rotation by `rotation_quaternion`. " QUATERNION_ROTATION_RULE)
         .def("__init__", [](Eigen::Isometry3d* self, const Eigen::AngleAxisd& aa) {
             new (self) Eigen::Isometry3d(aa);  // AngleAxisd keeps a unit axis (its constructors)
         }, "rotation_angle_axis"_a)
@@ -180,7 +202,8 @@ void bind_eigen_geometry(nb::module_& m) {
             self->setIdentity();
             self->linear() = unit_quaternion(q, "Isometry3d(translation, rotation)").toRotationMatrix();
             self->translation() = t;
-        }, "translation"_a, "rotation"_a)
+        }, "translation"_a, "rotation"_a,
+           "Rotation `rotation`, then translation `translation` [m]. " QUATERNION_ROTATION_RULE)
         .def("__init__", [](Eigen::Isometry3d* self,
                             const Eigen::Translation3d& t,
                             const Eigen::Quaterniond& q) {
@@ -188,7 +211,8 @@ void bind_eigen_geometry(nb::module_& m) {
             self->setIdentity();
             self->linear() = unit_quaternion(q, "Isometry3d(translation, rotation)").toRotationMatrix();
             self->translation() = t.vector();
-        }, "translation"_a, "rotation"_a)
+        }, "translation"_a, "rotation"_a,
+           "Rotation `rotation`, then translation `translation` [m]. " QUATERNION_ROTATION_RULE)
         .def_static("Identity", []() { return Eigen::Isometry3d::Identity(); })
         .def("setIdentity", [](Eigen::Isometry3d& self) { self.setIdentity(); })
         // Stored-data accessors as properties (matches the project
@@ -222,7 +246,7 @@ void bind_eigen_geometry(nb::module_& m) {
         })
         .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::Quaterniond& q) {
             return Eigen::Isometry3d(self * unit_quaternion(q, "Isometry3d * Quaterniond"));
-        })
+        }, "self * Isometry3d(q). " QUATERNION_ROTATION_RULE)
         .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::AngleAxisd& aa) {
             return Eigen::Isometry3d(self * aa);
         })
@@ -303,7 +327,8 @@ void bind_eigen_geometry(nb::module_& m) {
         .def("rotate", [](Eigen::Isometry3d& self, const Eigen::Quaterniond& q) -> Eigen::Isometry3d& {
             self.rotate(unit_quaternion(q, "Isometry3d.rotate"));
             return self;
-        }, "rotation"_a, nb::rv_policy::reference_internal)
+        }, "rotation"_a, nb::rv_policy::reference_internal,
+           "self = self * Isometry3d(rotation), in place; returns self. " QUATERNION_ROTATION_RULE)
         .def("rotate", [](Eigen::Isometry3d& self, const Eigen::AngleAxisd& aa) -> Eigen::Isometry3d& {
             self.rotate(aa);
             return self;
@@ -315,7 +340,8 @@ void bind_eigen_geometry(nb::module_& m) {
         .def("prerotate", [](Eigen::Isometry3d& self, const Eigen::Quaterniond& q) -> Eigen::Isometry3d& {
             self.prerotate(unit_quaternion(q, "Isometry3d.prerotate"));
             return self;
-        }, "rotation"_a, nb::rv_policy::reference_internal)
+        }, "rotation"_a, nb::rv_policy::reference_internal,
+           "self = Isometry3d(rotation) * self, in place; returns self. " QUATERNION_ROTATION_RULE)
         .def("prerotate", [](Eigen::Isometry3d& self, const Eigen::AngleAxisd& aa) -> Eigen::Isometry3d& {
             self.prerotate(aa);
             return self;
@@ -458,8 +484,8 @@ void bind_eigen_geometry(nb::module_& m) {
             return q.vec();
         })
         .def("toRotationMatrix", [](const Eigen::Quaterniond& q) -> Eigen::Matrix3d {
-            return q.toRotationMatrix();
-        })
+            return unit_quaternion(q, "Quaterniond.toRotationMatrix").toRotationMatrix();
+        }, "The 3x3 rotation matrix; bitwise Isometry3d(q).linear. " QUATERNION_ROTATION_RULE)
         // Spherical linear interpolation: q1.slerp(t, q2) -> Quaterniond.
         // Eigen handles the short-arc sign flip and the near-parallel
         // numerically-stable lerp fallback internally.
@@ -470,10 +496,10 @@ void bind_eigen_geometry(nb::module_& m) {
         .def("__mul__", [](const Eigen::Quaterniond& self, const Eigen::Quaterniond& other) {
             return Eigen::Quaterniond(self * other);
         })
-        // q * v rotates a 3-vector by the quaternion (== R(q) @ v).
+        // q * v rotates a 3-vector by the quaternion (== R(q) @ v to rounding: Eigen's own formula).
         .def("__mul__", [](const Eigen::Quaterniond& self, const Eigen::Vector3d& v) -> Eigen::Vector3d {
-            return self * v;
-        })
+            return unit_quaternion(self, "Quaterniond * vector") * v;
+        }, "`v` rotated by the quaternion. " QUATERNION_ROTATION_RULE)
         // Conjugate / inverse for unit quaternions.
         .def("conjugate", [](const Eigen::Quaterniond& self) {
             return Eigen::Quaterniond(self.conjugate());
@@ -528,7 +554,7 @@ void bind_eigen_geometry(nb::module_& m) {
         // tool axes use the quaternion / rotation-matrix surface.
         .def("to_rpy", [](const Eigen::Quaterniond& self) -> Eigen::Vector3d {
 
-            const Eigen::Matrix3d R = self.toRotationMatrix();
+            const Eigen::Matrix3d R = unit_quaternion(self, "Quaterniond.to_rpy").toRotationMatrix();
             // Resolve pitch and cos(pitch) from the matrix entries directly, NOT
             // via `cos(asin(-R(2,0)))`. That composition is `√(1 - sin²)`
             // evaluated the cancellation-prone way: near ±π/2, sin(pitch) rounds
@@ -553,7 +579,8 @@ void bind_eigen_geometry(nb::module_& m) {
                 yaw  = 0.0;
             }
             return Eigen::Vector3d(roll, pitch, yaw);
-        })
+        }, "(roll, pitch, yaw) [rad] of R = Rz(yaw)·Ry(pitch)·Rx(roll), the inverse of from_rpy; read "
+           "from toRotationMatrix(). " QUATERNION_ROTATION_RULE)
         // Decompose into intrinsic Euler angles given a 3-character axis
         // order (case-insensitive), e.g. "ZYX" — first axis rotated about
         // is Z, then Y, then X. The returned triple matches that order:
@@ -591,8 +618,10 @@ void bind_eigen_geometry(nb::module_& m) {
                     "eulerAngles order requires adjacent axes to differ; got \""
                     + order + "\"");
             }
-            return self.toRotationMatrix().eulerAngles(a0, a1, a2);
-        }, "order"_a)
+            return unit_quaternion(self, "Quaterniond.eulerAngles").toRotationMatrix().eulerAngles(a0, a1, a2);
+        }, "order"_a,
+           "Intrinsic Euler angles [rad] in the 3-axis `order` (e.g. 'ZYX'), Eigen's eulerAngles of "
+           "toRotationMatrix(). " QUATERNION_ROTATION_RULE)
         // Project canonical: scalar-last [qx, qy, qz, qw] in repr.
         .def("__repr__", [](const Eigen::Quaterniond& self) {
             std::ostringstream ss;
@@ -609,7 +638,7 @@ void bind_eigen_geometry(nb::module_& m) {
         // Construct from a Quaterniond.
         .def("__init__", [](Eigen::AngleAxisd* self, const Eigen::Quaterniond& q) {
             new (self) Eigen::AngleAxisd(unit_quaternion(q, "AngleAxisd(quaternion)"));
-        }, "quaternion"_a)
+        }, "quaternion"_a, "The rotation of `quaternion` as angle [rad] and unit axis. " QUATERNION_ROTATION_RULE)
         // Construct from a 3x3 rotation matrix.
         .def("__init__", [](Eigen::AngleAxisd* self, const Eigen::Matrix3d& R) {
             new (self) Eigen::AngleAxisd(require_rotation(R, "AngleAxisd(rotation_matrix)"));
