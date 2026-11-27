@@ -86,7 +86,7 @@ objects = [("box", [Box(0.1, 0.1, 0.1)], [Isometry3d.Identity()])]
 
     | repository | upstream master | carried PRs |
     | --- | --- | --- |
-    | tesseract | `e5c79c0c` | #1408 |
+    | tesseract | `e5c79c0c` | #1408, #1421 |
     | tesseract_planning | `a6483823` | #789, #792, #794 |
     | trajopt | `963baf7d` | #628, #629 |
 

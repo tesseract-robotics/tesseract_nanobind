@@ -24,9 +24,9 @@ UPSTREAM_SOURCES: tuple[UpstreamSource, ...] = (
     UpstreamSource(
         repository="tesseract-robotics/tesseract",
         fork="jf---/tesseract",
-        sha="5dfd5ae224883d676e50ebb17807899001385be5",
+        sha="a6c8e781e7d5a139604134935b7e47ea7151b6e0",
         base_master_sha="e5c79c0c",
-        carried_pull_requests=(1408,),
+        carried_pull_requests=(1408, 1421),
     ),
     UpstreamSource(
         repository="tesseract-robotics/tesseract_planning",
