@@ -58,6 +58,13 @@ Upstream's checks raise `RuntimeError`: `joint_names` of the wrong size or with
 other names than the solver's, or a working frame or tip link that is not a
 link in `scene_state`.
 
+`joint_names` may list the solver's joints in another order. The group's order
+is the public one: `calcInvKin` takes the seed and returns every solution in
+`getJointIds()` order, and harmonizes and checks limits in that order
+(tesseract#1421, [#469]).
+
+[#469]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/469
+
 ### JointGroup
 
 Forward kinematics only (no IK solver).

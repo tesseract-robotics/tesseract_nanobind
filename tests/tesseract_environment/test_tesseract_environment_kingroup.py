@@ -3,9 +3,10 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_support_path
-from tesseract_robotics.common import ManipulatorInfo
+from tesseract_robotics.common import Isometry3d, ManipulatorInfo
 from tesseract_robotics.environment import Environment
 from tesseract_robotics.kinematics import (
+    KinematicGroup,
     KinGroupIKInput,
     KinGroupIKInputs,
 )
@@ -198,4 +199,67 @@ def test_kinematic_group_single_ik_input():
     # Cleanup
     del solutions, sol_fk, sol_pose, seed, ik_input, target_pose, fk_result
     del kin_group, joint_names, manip_info, env, locator
+    gc.collect()
+
+
+# IK round trip: OPW is closed-form, so FK(IK(pose)) matches pose to float round-off; 1e-7 (m, and
+# dimensionless rotation entries) is well above that and far below the 0.5 m swap in gh-469.
+IK_ROUND_TRIP_ATOL = 1e-7
+
+
+def test_kinematic_group_permuted_joint_order():
+    """A group whose joint order differs from its solver's returns IK in group order (gh-469).
+
+    The group lists the solver's first three joints cyclically permuted (j2, j3, j1, j4, j5, j6),
+    which exercises both map directions. Every solution the group returns must reproduce the
+    target through the group's own FK and pass its limits, and the solution set must equal the
+    registered (solver-ordered) group's solutions in group order, so none are lost to limit
+    filtering or harmonization applied in the wrong order.
+    """
+    import gc
+
+    env, manip_info, joint_names, locator = get_environment()
+    registered = env.getKinematicGroup(manip_info.manipulator)
+    solver = registered.getInverseKinematics()
+    solver_names = [joint.name() for joint in solver.getJointIds()]
+    assert solver_names == [joint.name() for joint in registered.getJointIds()]
+
+    # group index i holds solver joint perm[i]
+    perm = [1, 2, 0, 3, 4, 5]
+    group_names = [solver_names[i] for i in perm]
+    group = KinematicGroup(
+        "permuted_group", group_names, solver, env.getSceneGraph(), env.getState()
+    )
+    assert [joint.name() for joint in group.getJointIds()] == group_names
+
+    seed_solver_order = np.array([0.1, 0.2, -0.1, 0.15, 0.25, -0.2])
+    seed = seed_solver_order[perm]
+    assert group.checkJoints(seed)
+
+    tip = manip_info.tcp_frame
+    working_frame = manip_info.working_frame
+    poses = group.calcFwdKin(seed)
+    target = np.array(poses[tip].matrix, copy=True)
+    np.testing.assert_allclose(
+        registered.calcFwdKin(seed_solver_order)[tip].matrix, target, atol=IK_ROUND_TRIP_ATOL
+    )
+    working_pose = np.array(poses[working_frame].matrix, copy=True)
+    request = KinGroupIKInput(Isometry3d(np.linalg.solve(working_pose, target)), working_frame, tip)
+
+    solutions = group.calcInvKin(request, seed)
+    assert solutions
+    for solution in solutions:
+        assert np.isfinite(solution).all()
+        assert group.checkJoints(solution)
+        np.testing.assert_allclose(
+            group.calcFwdKin(solution)[tip].matrix, target, atol=IK_ROUND_TRIP_ATOL, rtol=0
+        )
+
+    expected = [np.asarray(s)[perm] for s in registered.calcInvKin(request, seed_solver_order)]
+    assert len(solutions) == len(expected)
+    for want in expected:
+        assert any(np.allclose(want, got, atol=IK_ROUND_TRIP_ATOL, rtol=0) for got in solutions)
+
+    del solutions, expected, request, poses, group, solver, registered
+    del joint_names, manip_info, env, locator
     gc.collect()
